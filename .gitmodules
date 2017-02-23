@@ -1,0 +1,3 @@
+[submodule "local/Plugin/HumanitiesCommonsIdpEnroller"]
+	path = local/Plugin/HumanitiesCommonsIdpEnroller
+	url = git@github.com:mlaa/HumanitiesCommonsIdpEnroller.git
