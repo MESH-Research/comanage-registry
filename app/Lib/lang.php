@@ -474,6 +474,7 @@ original notification at
                                  IdentifierEnum::Network => 'Network',
                                  IdentifierEnum::OpenID => 'OpenID',
                                  IdentifierEnum::ORCID => 'ORCID iD',
+				 'wpid' => 'WordPress ID',
                                  IdentifierEnum::Reference => 'Match Reference',
                                  IdentifierEnum::SORID => 'System of Record ID',
                                  IdentifierEnum::UID => 'UID'),
@@ -1707,6 +1708,8 @@ original notification at
   // Shell
   
   'sh.job.arg.coid' =>    'Numeric CO ID to run tasks for (all COs if not specified)',
+  'sh.job.arg.oisid' =>   'Numeric OIS ID to run tasks for (all OISs if not specified)',
+  'sh.job.arg.skipnew' => 'If set do not search emails for new memberships after sync',
   'sh.job.arg.epilog' =>  "If no task specified, all run.\nAvailable tasks: expirations, syncorgsources",
   'sh.job.done' =>        'Job shell finished',
   'sh.job.sync.ois' =>    'Syncing Organizational Identity Sources for CO %1$s (%2$s)',

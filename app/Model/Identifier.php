@@ -86,6 +86,7 @@ class Identifier extends AppModel {
                                                  IdentifierEnum::ORCID,
                                                  IdentifierEnum::Reference,
                                                  IdentifierEnum::SORID,
+                                                 'wpid',
                                                  IdentifierEnum::UID))),
         'required' => true,
         'allowEmpty' => false

@@ -154,7 +154,7 @@ class FileSourceBackend extends OrgIdentitySourceBackend {
         'identifier' => $result[15],
         'login'      => false,
         'status'     => StatusEnum::Active,
-        'type'       => IdentifierEnum::National
+        'type'       => IdentifierEnum::UID
       );
     }
     
