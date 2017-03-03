@@ -1211,7 +1211,6 @@ class OrgIdentitySource extends AppModel {
       // trigger a pull from OIS 2 if the configurations are set up appropriately.
       
       $args = array();
-      $args['fields'] = ['DISTINCT EmailAddress.mail'];
       $args['conditions']['EmailAddress.verified'] = true;
       $args['conditions'][] = 'EmailAddress.org_identity_id IS NOT NULL';
       // Since org identities are not pooled, constrain to current CO
