@@ -254,6 +254,18 @@ class IdentifierAssignmentExclusionEnum
   const Superstitious = 'S';
 }
 
+// Note CO or COU is determined by co_groups:cou_id
+class GroupEnum
+{
+  const Standard      = "S";
+  const ActiveMembers = "MA";
+  const Admins        = "A";
+  const AllMembers    = "M";
+  // XXX CO-1100, not yet supported
+  const NestedAdmins  = "AN";
+  const NestedMembers = "MN";
+}
+
 class IdentifierEnum
 {
   const Badge      = 'badge';
@@ -275,6 +287,7 @@ class JobStatusEnum
   const Complete   = 'OK';
   const Failed     = 'X';
   const InProgress = 'GO';
+  const Notice     = 'NT';
   const Queued     = 'Q';
 }
 
@@ -359,6 +372,12 @@ class NSFRaceEnum
   const Black            = 'B';
   const NativeHawaiian   = 'N';
   const White            = 'W';
+}
+
+class OrgIdentityMismatchEnum
+{
+  const CreateNew        = 'N';
+  const Ignore           = 'X';
 }
 
 class OrgIdentityStatusEnum
