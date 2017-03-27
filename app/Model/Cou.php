@@ -229,9 +229,13 @@ class Cou extends AppModel {
       $conditions = array();
       $conditions['Cou.co_id'] = $coId;
     }
+
+    $args = array();
+    $args['conditions'] = $conditions;
+    $args['contain'] = false;
     
     // Create options list all other COUS in CO
-    $optionArrays = $this->find('all', array('conditions' => $conditions) );
+    $optionArrays = $this->find('all', $args);
     $optionList = Set::combine($optionArrays, '{n}.Cou.id','{n}.Cou.name');
     
     return $optionList;
