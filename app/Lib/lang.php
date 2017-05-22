@@ -2,24 +2,27 @@
 /**
  * COmanage Registry Language File
  *
- * Copyright (C) 2011-17 University Corporation for Advanced Internet Development, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2011-17 University Corporation for Advanced Internet Development, Inc.
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
  * @since         COmanage Registry v0.1
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
   
 global $cm_lang, $cm_texts, $cm_texts_orig;
@@ -460,7 +463,16 @@ original notification at
   'en.extattr' =>     array(ExtendedAttributeEnum::Integer => 'Integer',
                             ExtendedAttributeEnum::Timestamp => 'Timestamp',
                             ExtendedAttributeEnum::Varchar32 => 'String (32)'),
-
+  
+  'en.group.type' => array(
+    GroupEnum::Standard      => 'Standard',
+    GroupEnum::ActiveMembers => 'Active Members',
+    GroupEnum::Admins        => 'Administrators',
+    GroupEnum::AllMembers    => 'All Members',
+    GroupEnum::NestedAdmins  => 'Nested Administrators',
+    GroupEnum::NestedMembers => 'Nested Members'
+  ),
+  
   'en.ia.algorithm' => array(IdentifierAssignmentEnum::Random => 'Random',
                              IdentifierAssignmentEnum::Sequential => 'Sequential'),
 
@@ -802,6 +814,8 @@ original notification at
   'er.file.none' =>   'No file specified',
   'er.file.read' =>   'Unable to open "%1$s" for reading',
   'er.file.write' =>  'Unable to open "%1$s" for writing',
+  'er.gr.auto.edit' => 'Members of automatic groups may not be edited directly',
+  'er.gr.delete' =>   'This group cannot be deleted',
   'er.gr.exists' =>   'A group named "%1$s" already exists within the CO',
   'er.gr.init' =>     'Group created, but failed to set initial owner/member',
   'er.gr.nf' =>       'Group %1$s Not Found',
@@ -809,9 +823,9 @@ original notification at
   'er.gr.admin.delete' => 'Admin groups for COs and COUs may not be deleted directly',
   'er.gr.members.delete' => 'Members groups for COs and COUs may not be deleted directly',
   'er.gr.members.edit' => 'Members groups for COs and COUs may not be edited directly',
-  'er.gr.members.res' => 'Groups named "members" or prefixed "members:" are reserved',
   'er.gr.reconcile'    => 'Members group reconciliation failed: ',
   'er.gr.reconcile.inv' => 'Specified group is not eligible for reconciliation',
+  'er.gr.reserved' => 'Groups named with the prefix "CO:" are reserved',
   'er.grm.already' => 'CO Person %1$s is already a member of group %2$s',
   'er.grm.history' =>  'Error creating history record when automatically adding CO Person ID %1$s to group %2$s',
   'er.grm.history.members' => 'Error creating history record when automatically adding CO Person ID %1$s to members group',
@@ -946,6 +960,8 @@ original notification at
   'fd.cou' =>         'COU',
   'fd.cou.nopar'  =>  'No COUs are available to be assigned parent',  
   'fd.cou-a' =>       '%1$s COU',
+  'fd.co_group.auto' => 'Automatic',
+  'fd.co_group.group_type' => 'Group Type',
   'fd.co_people.search' => 'CO Person Search',
   'fd.co_people.status' => 'CO Person Status',
   'fd.created' =>     'Created',
@@ -1087,6 +1103,7 @@ original notification at
   'fd.false' =>       'False',
   'fd.group.desc.adm' => '%1$s Administrators',
   'fd.group.desc.mem' => '%1$s Members',
+  'fd.group.desc.mem.act' => '%1$s Active Members',
   'fd.group.grmem' => 'Group Member',
   'fd.group.grmemown' => 'Group Member and Owner',
   'fd.group.mem' =>   'Member',
@@ -1268,7 +1285,7 @@ original notification at
   'fd.ssp.type.desc' => '"Default" applies this permission to all types not otherwise specified',
   'fd.status' =>      'Status',
   'fd.status.ae.desc' => 'Making an Attribute Enumeration inactive will not affect existing records using it',
-  'fd.status.change' => 'Manually changing the status of a CO Person when there is a Petition in progress will not change the status of the Petiton',
+  'fd.status.change' => 'Manually changing the status of a CO Person when there is a Petition in progress will not change the status of the Petition',
   'fd.status.et.desc' => 'An Extended Type that is in use cannot be made inactive',
   'fd.subject' =>     'Subject',
   'fd.svc.euri' =>    'Entitlement URI',
@@ -1757,7 +1774,7 @@ original notification at
   'sh.ug.100.cmpdefault' => 'Verifying default CMP Enrollment Configuration',
   'sh.ug.105.attrdefault' => 'Clearing extraneous CO Enrollment Attribute defaults',
   'sh.ug.110.ef' =>       'Migrating enrollment flow configurations',
-  'sh.ug.110.gr' =>       'Reconciling members groups (please wait, this may take some time)',
+  'sh.ug.110.gr' =>       'Renaming and reconciling automatic groups (please wait, this may take some time)',
   'sh.ug.110.is' =>       'Updating inactive identifier status',
 );
 
