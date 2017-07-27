@@ -78,6 +78,18 @@
     </tr>
     <tr class="line2">
       <td>
+        <strong class="fieldTitle"><?php print _txt('pl.netforumsource.querycmts'); ?></strong><br />
+        <font class="desc"><?php print _txt('pl.netforumsource.querycmts.desc'); ?></font>
+      </td>
+      <td>
+        <?php print ($e
+                     ? $this->Form->input('query_committees')
+                     : ($net_forum_sources[0]['NetForumSource']['query_committees']
+                        ? _txt('fd.yes') : _txt('fd.no'))); ?>
+      </td>
+    </tr>
+    <tr class="line3">
+      <td>
         <strong class="fieldTitle"><?php print _txt('pl.netforumsource.queryevents'); ?></strong><br />
         <font class="desc"><?php print _txt('pl.netforumsource.queryevents.desc'); ?></font>
       </td>
