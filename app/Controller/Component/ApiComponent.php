@@ -2,24 +2,27 @@
 /**
  * COmanage Registry API Component
  *
- * Copyright (C) 2015 University Corporation for Advanced Internet Development, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2015 University Corporation for Advanced Internet Development, Inc.
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
  * @since         COmanage Registry v0.9.3
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
  
 class ApiComponent extends Component {
@@ -73,6 +76,29 @@ class ApiComponent extends Component {
     
     // Use the model to validate the provided fields
     
+    if(!empty($this->reqModel->validate['type']['content']['rule'][0])
+       && $this->reqModel->validate['type']['content']['rule'][0] == 'validateExtendedType') {
+      // If the model supports extended types, we need to determine the CO ID,
+      // which we have to calculate from the requested person date.
+      
+      $coId = null;
+      
+      if(!empty($this->reqConvData['co_person_id'])) {
+        $coId = $this->reqModel->CoPerson->field('co_id',
+                                                 array('CoPerson.id' => $this->reqConvData['co_person_id']));
+      } elseif(!empty($this->reqConvData['co_person_role_id'])) {
+        $coId = $this->reqModel->CoPersonRole->field('co_id',
+                                                     array('CoPersonRole.id' => $this->reqConvData['co_person_role_id']));
+      }
+      
+      if($coId) {
+        $vrule = $this->reqModel->validate['type']['content']['rule'];
+        $vrule[1]['coid'] = $coId;
+        
+        $this->reqModel->validator()->getField('type')->getRule('content')->rule = $vrule;
+      }
+    }
+ 
     $this->reqModel->set($this->reqConvData);
     
     if(!$this->reqModel->validates()) {
@@ -277,6 +303,8 @@ class ApiComponent extends Component {
       }
     } else {
       // In some instances, PHP doesn't set $_POST and so Cake doesn't see the request body.
+      // $_POST isn't set when the client sets the content type to application/json.
+      // PHP can't handle that by default, and Cake seems not to pick up on it.
       // Here's a workaround, based on CakeRequest::_readInput().
       
       switch($this->request->params['ext']) {

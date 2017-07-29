@@ -2,24 +2,27 @@
 /**
  * COmanage Registry CO LDAP Provisioner Target Model
  *
- * Copyright (C) 2012-16 University Corporation for Advanced Internet Development, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2012-16 University Corporation for Advanced Internet Development, Inc.
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry-plugin
  * @since         COmanage Registry v0.8
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
 
 App::uses("CoProvisionerPluginTarget", "Model");
@@ -215,11 +218,19 @@ class CoLdapProvisionerTarget extends CoProvisionerPluginTarget {
         
         $pattrs = $pmodel->assemblePluginAttributes($configuredAttributes[$oc], $provisioningData);
         
-        // Filter out any attributes in $pattrs that are not defined in $configuredAttributes
-        // and merge the results into the marshalled attributes
-        
-        $attributes = array_merge($attributes, array_intersect_key($pattrs, $configuredAttributes[$oc]));
-        
+        // Filter out any attributes in $pattrs that are not defined in $configuredAttributes.
+        $pattrs = array_intersect_key($pattrs, $configuredAttributes[$oc]);
+
+        // If this is not a modify operation than filter out any array() values.        
+        if(!$modify) {
+          $pattrs = array_filter($pattrs, function ($attrValue) {
+            return !(is_array($attrValue) && empty($attrValue));
+          });
+        }
+
+        // Merge into the marshalled attributes.
+        $attributes = array_merge($attributes, $pattrs);
+
         // Insert an objectclass
         $attributes['objectclass'][] = $oc;
         
@@ -248,10 +259,11 @@ class CoLdapProvisionerTarget extends CoProvisionerPluginTarget {
       if($supportedAttributes[$oc]['objectclass']['required']
          || (isset($coProvisioningTargetData['CoLdapProvisionerTarget']['oc_' . strtolower($oc)])
              && $coProvisioningTargetData['CoLdapProvisionerTarget']['oc_' . strtolower($oc)])) {
-        $attributes['objectclass'][] = $oc;
-        
         // Within the objectclass, iterate across the supported attributes looking
-        // for required or enabled attributes
+        // for required or enabled attributes. We need to add at least one $attr
+        // before we add $oc to the list of objectclasses.
+        
+        $attrEmitted = false;
         
         foreach(array_keys($supportedAttributes[$oc]['attributes']) as $attr) {
           if($supportedAttributes[$oc]['attributes'][$attr]['required']
@@ -699,6 +711,19 @@ class CoLdapProvisionerTarget extends CoProvisionerPluginTarget {
               $attributes[$attr] = array();
             }
           }
+          
+          // Check if we emitted anything
+          if(!empty($attributes[$attr])) {
+            $attrEmitted = true;
+          }
+        }
+        
+        // Add $oc to the list of objectclasses if an attribute was emitted, or if
+        // the objectclass is required (in which case the LDAP server will likely
+        // throw an error if a required attribute is missing).
+        
+        if($attrEmitted || $supportedAttributes[$oc]['objectclass']['required']) {
+          $attributes['objectclass'][] = $oc;
         }
       }
     }
@@ -1085,7 +1110,7 @@ class CoLdapProvisionerTarget extends CoProvisionerPluginTarget {
                                               $provisioningData[($person ? 'CoPerson' : 'CoGroup')]['id'],
                                               $dns['newdnerr'])));
       }
-      
+
       if(!@ldap_add($cxn, $dns['newdn'], $attributes)) {
         throw new RuntimeException(ldap_error($cxn), ldap_errno($cxn));
       }

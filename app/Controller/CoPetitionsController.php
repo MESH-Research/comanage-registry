@@ -2,24 +2,27 @@
 /**
  * COmanage Registry CO Petition Controller
  *
- * Copyright (C) 2012-16 University Corporation for Advanced Internet Development, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2012-16 University Corporation for Advanced Internet Development, Inc.
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
  * @since         COmanage Registry v0.5
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
 
 App::uses("StandardController", "Controller");
@@ -507,7 +510,7 @@ class CoPetitionsController extends StandardController {
   /**
    * Check eligibility prior to approval
    *
-   * @since  COmanage Registry v1.1.0
+   * @since  COmanage Registry v2.0.0
    * @param  Integer $id CO Petition ID
    */
   
@@ -715,7 +718,14 @@ class CoPetitionsController extends StandardController {
                                                             array('CoEnrollmentFlow.id' => $efId));
         
         if($authz != EnrollmentAuthzEnum::None) {
-          $petitionerCoPersonId = $this->Session->read('Auth.User.co_person_id');
+          // We only want the CO Person ID if it's in the current CO, otherwise we
+          // want a token to be generated so subsequent authn checks succeed.
+          
+          $curCoPersonId = $this->Session->read('Auth.User.co_person_id');
+          
+          if($this->Role->isCoPerson($curCoPersonId, $coId)) {
+            $petitionerCoPersonId = $curCoPersonId;
+          }
         }
         
         $ptid = $this->CoPetition->initialize($efId,
@@ -874,7 +884,7 @@ class CoPetitionsController extends StandardController {
   /**
    * Execute CO Petition 'checkEligibility' step
    *
-   * @since  COmanage Registry v1.1.0
+   * @since  COmanage Registry v2.0.0
    * @param Integer $id CO Petition ID
    * @throws Exception
    */
@@ -1188,7 +1198,7 @@ class CoPetitionsController extends StandardController {
   /**
    * Execute CO Petition 'selectOrgIdentity' step
    *
-   * @since  COmanage Registry v1.1.0
+   * @since  COmanage Registry v2.0.0
    * @param Integer $id CO Petition ID
    * @throws Exception
    */
@@ -1224,6 +1234,29 @@ class CoPetitionsController extends StandardController {
           $this->CoPetition->linkOrgIdentity($id,
                                              $this->request->params['named']['orgidentityid'],
                                              $this->Session->read('Auth.User.co_person_id'));
+          
+          // If we don't already have a CO Person, and if the OIS was attached
+          // to a pipeline and that pipeline created a CO Person we should attach
+          // that CO Person to the petition.
+          
+          $pCoPersonId = $this->CoPetition->field('enrollee_co_person_id', array('CoPetition.id' => $id));
+          
+          if(!$pCoPersonId) {
+            $pCoPersonId = $this->CoPetition
+                                ->EnrolleeOrgIdentity
+                                ->CoOrgIdentityLink
+                                ->field('co_person_id',
+                                        array('CoOrgIdentityLink.org_identity_id'
+                                              => $this->request->params['named']['orgidentityid']));
+            
+            if($pCoPersonId) {
+              // Link this CO Person ID to the petition
+              
+              $this->CoPetition->linkCoPerson($id,
+                                              $pCoPersonId,
+                                              $this->Session->read('Auth.User.co_person_id'));
+            }
+          }
         } else {
           // Redirect into the OIS Selector
           
@@ -1319,7 +1352,7 @@ class CoPetitionsController extends StandardController {
         $this->set('vv_ois_mode', 'email');
         
         if(!empty($this->request->data['OrgIdentitySource']['mail'])) {
-          $this->set('vv_ois_mail', Sanitize::html($this->request->data['OrgIdentitySource']['mail']));
+          $this->set('vv_ois_mail', filter_var($this->request->data['OrgIdentitySource']['mail'],FILTER_SANITIZE_SPECIAL_CHARS));
           
           if(!empty($this->request->data['OrgIdentitySource']['token'])) {
             // We're back from the form with a token. Verify it, then search for
@@ -1344,6 +1377,7 @@ class CoPetitionsController extends StandardController {
             
             try {
 // XXX update this to query all EnrollmentSources in Claim mode
+// XXX also probably want to set provision=false
               $orgId = $this->OrgIdentitySource->createOrgIdentity($s[0], $s[1], null, (!empty($this->cur_co['Co']['id'])
                                                                                         ? $this->cur_co['Co']['id']
                                                                                         : null));
@@ -2110,7 +2144,7 @@ class CoPetitionsController extends StandardController {
   /**
    * Select the org identity for a new CO Petition
    *
-   * @since  COmanage Registry v1.1.0
+   * @since  COmanage Registry v2.0.0
    * @param  Integer $id CO Petition ID
    */
   
@@ -2121,7 +2155,7 @@ class CoPetitionsController extends StandardController {
   /**
    * Execute an OIS plugin in Authenticate mode
    *
-   * @since  COmanage Registry v1.1.0
+   * @since  COmanage Registry v2.0.0
    * @param  Integer $id CO Petition ID
    */
   
@@ -2137,7 +2171,7 @@ class CoPetitionsController extends StandardController {
     
     if(empty($oiscfg)) {
       $this->Flash->set(_txt('er.notfound',
-                             array('ct.org_identity_sources.1', Sanitize::html($this->request->params['named']['oisid']))),
+                             array('ct.org_identity_sources.1', filter_var($this->request->params['named']['oisid'],FILTER_SANITIZE_SPECIAL_CHARS))),
                         array('key' => 'error'));
       $this->redirect("/");
     }
