@@ -2,24 +2,27 @@
 /**
  * COmanage Registry CO Enrollment Source Fields
  *
- * Copyright (C) 2016 SCG
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2016 SCG
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
- * @since         COmanage Registry v1.1.0
+ * @since         COmanage Registry v2.0.0
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
 
   // Determine if fields are editable
@@ -73,94 +76,94 @@
   
   $l = 1;
 ?>
-<table id="<?php print $this->action; ?>_co_enrollment_source" class="ui-widget">
-  <tbody>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <b><?php print _txt('ct.org_identity_sources.1'); ?></b></strong><font class="required">*</font>
-      </td>
-      <td>
-        <?php
-          global $cm_lang, $cm_texts;
-          
-          $attrs = array();
-          $attrs['value'] = (isset($co_enrollment_sources)
-                             ? $co_enrollment_sources[0]['CoEnrollmentSource']['org_identity_source_id']
-                             : null);
-          $attrs['empty'] = false;
-  
-          if($e) {
-            print $this->Form->select('org_identity_source_id',
-                                      $vv_avail_ois,
-                                      $attrs);
-  
-            if($this->Form->isFieldError('org_identity_source_id')) {
-              print $this->Form->error('org_identity_source_id');
-            }
-          } else {
-            print $vv_avail_ois[ $co_enrollment_sources[0]['CoEnrollmentSource']['org_identity_source_id'] ];
-          }
-        ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <strong class="fieldTitle"><?php print _txt('fd.ef.orgid'); ?></strong><font class="required">*</font><br />
-        <span class="descr"><?php print _txt('fd.ef.orgid.desc'); ?></span>
-      </td>
-      <td>
-        <?php
-          global $cm_lang, $cm_texts;
-          
-          $attrs = array();
-          $attrs['value'] = (!empty($co_enrollment_sources[0]['CoEnrollmentSource']['org_identity_mode'])
-                             ? $co_enrollment_sources[0]['CoEnrollmentSource']['org_identity_mode']
-                             : EnrollmentOrgIdentityModeEnum::None);
-          $attrs['empty'] = false;
+<div class="table-container">
+  <table id="<?php print $this->action; ?>_co_enrollment_source">
+    <tbody>
+      <tr class="line<?php print ($l % 2); $l++; ?>">
+        <td>
+          <b><?php print _txt('ct.org_identity_sources.1'); ?></b></strong><font class="required">*</font>
+        </td>
+        <td>
+          <?php
+            global $cm_lang, $cm_texts;
 
-          if($e) {
-            print $this->Form->select('org_identity_mode',
-                                      $cm_texts[ $cm_lang ]['en.enrollment.orgid'],
-                                      $attrs);
+            $attrs = array();
+            $attrs['value'] = (isset($co_enrollment_sources)
+                               ? $co_enrollment_sources[0]['CoEnrollmentSource']['org_identity_source_id']
+                               : null);
+            $attrs['empty'] = false;
 
-            if($this->Form->isFieldError('org_identity_mode')) {
-              print $this->Form->error('org_identity_mode');
+            if($e) {
+              print $this->Form->select('org_identity_source_id',
+                                        $vv_avail_ois,
+                                        $attrs);
+
+              if($this->Form->isFieldError('org_identity_source_id')) {
+                print $this->Form->error('org_identity_source_id');
+              }
+            } else {
+              print $vv_avail_ois[ $co_enrollment_sources[0]['CoEnrollmentSource']['org_identity_source_id'] ];
             }
-          } else {
-            print _txt('en.enrollment.orgid', null, $co_enrollment_sources[0]['CoEnrollmentSource']['org_identity_mode']);
-          }
-        ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <b><?php print _txt('fd.order'); ?></b><br />
-        <span class="descr"><?php print _txt('fd.order.es.desc'); ?></span>
-      </td>
-      <td>
-        <?php print ($e
-          ? $this->Form->input('ordr')
-          : filter_var($co_enrollment_sources[0]['CoEnrollmentSource']['ordr'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-  </tbody>
-  <tfoot>
-    <tr>
-      <td>
-        <em class="required"><?php print _txt('fd.req'); ?></em>
-      </td>
-      <td>
-        <?php
-          if($e) {
-            print $this->Form->submit($submit_label, array('onClick' => 'on_submit()'));
-            print $this->Form->button(_txt('op.reset'),
-              array('type'=>'reset'));
-          }
-        ?>
-      </td>
-    </tr>
-  </tfoot>
-</table>
-<div>
-  <?php print $this->element("changelog"); ?>
+          ?>
+        </td>
+      </tr>
+      <tr class="line<?php print ($l % 2); $l++; ?>">
+        <td>
+          <strong class="fieldTitle"><?php print _txt('fd.ef.orgid'); ?></strong><font class="required">*</font><br />
+          <span class="descr"><?php print _txt('fd.ef.orgid.desc'); ?></span>
+        </td>
+        <td>
+          <?php
+            global $cm_lang, $cm_texts;
+
+            $attrs = array();
+            $attrs['value'] = (!empty($co_enrollment_sources[0]['CoEnrollmentSource']['org_identity_mode'])
+                               ? $co_enrollment_sources[0]['CoEnrollmentSource']['org_identity_mode']
+                               : EnrollmentOrgIdentityModeEnum::None);
+            $attrs['empty'] = false;
+
+            if($e) {
+              print $this->Form->select('org_identity_mode',
+                                        $cm_texts[ $cm_lang ]['en.enrollment.orgid'],
+                                        $attrs);
+
+              if($this->Form->isFieldError('org_identity_mode')) {
+                print $this->Form->error('org_identity_mode');
+              }
+            } else {
+              print _txt('en.enrollment.orgid', null, $co_enrollment_sources[0]['CoEnrollmentSource']['org_identity_mode']);
+            }
+          ?>
+        </td>
+      </tr>
+      <tr class="line<?php print ($l % 2); $l++; ?>">
+        <td>
+          <b><?php print _txt('fd.order'); ?></b><br />
+          <span class="descr"><?php print _txt('fd.order.es.desc'); ?></span>
+        </td>
+        <td>
+          <?php print ($e
+            ? $this->Form->input('ordr')
+            : filter_var($co_enrollment_sources[0]['CoEnrollmentSource']['ordr'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+        </td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td>
+          <em class="required"><?php print _txt('fd.req'); ?></em>
+        </td>
+        <td>
+          <?php
+            if($e) {
+              print $this->Form->submit($submit_label, array('onClick' => 'on_submit()'));
+            }
+          ?>
+        </td>
+      </tr>
+    </tfoot>
+  </table>
 </div>
+
+<?php
+  print $this->element("changelog");

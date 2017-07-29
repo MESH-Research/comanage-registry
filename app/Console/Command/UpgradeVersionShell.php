@@ -2,24 +2,27 @@
 /**
  * COmanage Upgrade Shell (not called "UpgradeShell" to avoid conflict with Cake's Upgrade shell)
  *
- * Copyright (C) 2015-17 University Corporation for Advanced Internet Development, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2015-17 University Corporation for Advanced Internet Development, Inc.
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
  * @since         COmanage Registry v0.9.4
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
 
 class UpgradeVersionShell extends AppShell {
@@ -30,6 +33,7 @@ class UpgradeVersionShell extends AppShell {
                     'CoEnrollmentAttributeDefault',
                     'CoEnrollmentFlow',
                     'CoGroup',
+                    'GrouperProvisioner.CoGrouperProvisionerTarget',
                     'Identifier');
   
   // A list of known versions, must be semantic versioning compliant. The value
@@ -62,7 +66,10 @@ class UpgradeVersionShell extends AppShell {
     "1.0.4" => array('block' => false),
     "1.0.5" => array('block' => false, 'post' => 'post105'),
     "1.0.6" => array('block' => false),
-    "2.0.0" => array('block' => false, 'post' => 'post110')
+    "1.0.7" => array('block' => false),
+    "2.0.0" => array('block' => false, 'post' => 'post110'),
+    "2.0.1" => array('block' => false),
+    "3.0.0" => array('block' => false)
   );
   
   public function getOptionParser() {
@@ -308,6 +315,11 @@ class UpgradeVersionShell extends AppShell {
     // 2.0.0 replaces CoEnrollmentFlow::verify_email with email_verification_mode.
     $this->out(_txt('sh.ug.110.ef'));
     $this->CoEnrollmentFlow->_ug110();
+
+    // 2.0.0 deprecates using a database view as the source of subjectes for Grouper.
+    // Mark existing GrouperProvisioner targets as using the legacy view.
+    $this->out(_txt('sh.grouperprovisioner.ug.110.gp'));
+    $this->CoGrouperProvisionerTarget->_ug110();
     
     // 2.0.0 changes how automatic groups are populated.
     $this->out(_txt('sh.ug.110.gr'));

@@ -2,24 +2,27 @@
 /**
  * COmanage Registry CO Enrollment Attributes Controller
  *
- * Copyright (C) 2011-16 University Corporation for Advanced Internet Development, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2011-16 University Corporation for Advanced Internet Development, Inc.
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
  * @since         COmanage Registry v0.3
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
 
 App::uses("StandardController", "Controller");
@@ -138,46 +141,49 @@ class CoEnrollmentAttributesController extends StandardController {
         
         $this->set('vv_available_attributes', $this->CoEnrollmentAttribute->availableAttributes($coid));
         
-        // And pull details of extended attributes so views can determine types
-        
-        $args = array();
-        $args['conditions']['co_id'] = $coid;
-        $args['fields'] = array('CoExtendedAttribute.name', 'CoExtendedAttribute.type');
-        $args['contain'] = false;
-        
-        $this->set('vv_ext_attr_types',
-                   $this->CoEnrollmentAttribute->CoEnrollmentFlow->Co->CoExtendedAttribute->find('list', $args));
-        
-        // Assemble the list of available COUs
-        
-        $this->set('vv_cous', $this->CoEnrollmentAttribute->CoEnrollmentFlow->Co->Cou->allCous($coid));
-        
-        // Assemble the list of available affiliations
-        
-        $this->set('vv_affiliations', $this->CoPersonRole->types($coid, 'affiliation'));
-        
-        // Assemble the list of available Sponsors
-        
-        $this->set('vv_sponsors', $this->CoEnrollmentAttribute->CoEnrollmentFlow->Co->CoPerson->sponsorList($coid));
-        
-        // Assemble the list of available groups. Note we currently allow any group to be
-        // specified (ie: whether or not it's open). The idea is that an Enrollment Flow
-        // is defined by an admin, who can correctly select a group. However, it's plausible
-        // that we should offer options to filter to open groups, or to a subset of groups
-        // as selected by the administrator (especially for scenarios where the value is
-        // modifiable).
-        
-        $args = array();
-        $args['conditions']['co_id'] = $coid;
-        $args['fields'] = array('CoGroup.id', 'CoGroup.name');
-        $args['order'] = array('CoGroup.name asc');
-        $args['contain'] = false;
-        
-        $this->set('vv_groups', $this->CoEnrollmentAttribute->CoEnrollmentFlow->Co->CoGroup->find('list', $args));
-        
-        if($this->CmpEnrollmentConfiguration->orgIdentitiesFromCOEF()
-           && $this->CmpEnrollmentConfiguration->enrollmentAttributesFromEnv()) {
-          $this->set('vv_attributes_from_env', true);
+        // By specifying actions here we limit the number of queries for /index
+        if($this->action == 'add' || $this->action == 'edit') {
+          // And pull details of extended attributes so views can determine types
+          
+          $args = array();
+          $args['conditions']['co_id'] = $coid;
+          $args['fields'] = array('CoExtendedAttribute.name', 'CoExtendedAttribute.type');
+          $args['contain'] = false;
+          
+          $this->set('vv_ext_attr_types',
+                     $this->CoEnrollmentAttribute->CoEnrollmentFlow->Co->CoExtendedAttribute->find('list', $args));
+          
+          // Assemble the list of available COUs
+          
+          $this->set('vv_cous', $this->CoEnrollmentAttribute->CoEnrollmentFlow->Co->Cou->allCous($coid));
+          
+          // Assemble the list of available affiliations
+          
+          $this->set('vv_affiliations', $this->CoPersonRole->types($coid, 'affiliation'));
+          
+          // Assemble the list of available Sponsors
+          
+          $this->set('vv_sponsors', $this->CoEnrollmentAttribute->CoEnrollmentFlow->Co->CoPerson->sponsorList($coid));
+          
+          // Assemble the list of available groups. Note we currently allow any group to be
+          // specified (ie: whether or not it's open). The idea is that an Enrollment Flow
+          // is defined by an admin, who can correctly select a group. However, it's plausible
+          // that we should offer options to filter to open groups, or to a subset of groups
+          // as selected by the administrator (especially for scenarios where the value is
+          // modifiable).
+          
+          $args = array();
+          $args['conditions']['co_id'] = $coid;
+          $args['fields'] = array('CoGroup.id', 'CoGroup.name');
+          $args['order'] = array('CoGroup.name asc');
+          $args['contain'] = false;
+          
+          $this->set('vv_groups', $this->CoEnrollmentAttribute->CoEnrollmentFlow->Co->CoGroup->find('list', $args));
+          
+          if($this->CmpEnrollmentConfiguration->orgIdentitiesFromCOEF()
+             && $this->CmpEnrollmentConfiguration->enrollmentAttributesFromEnv()) {
+            $this->set('vv_attributes_from_env', true);
+          }
         }
       }
     }
@@ -311,7 +317,7 @@ class CoEnrollmentAttributesController extends StandardController {
    * Clear unnecessary data from a form submission.
    * - postcondition: $this->request->data updated
    *
-   * @since  COmanage Registry v1.1.0
+   * @since  COmanage Registry v2.0.0
    */
   
   protected function clearUnassociatedRequestData() {
@@ -348,7 +354,7 @@ class CoEnrollmentAttributesController extends StandardController {
    * - postcondition: On POST, session flash message updated (HTML) or HTTP status returned (REST)
    * - postcondition: On POST error, $invalid_fields set (REST)
    *
-   * @since  COmanage Registry v1.1.0
+   * @since  COmanage Registry v2.0.0
    * @param  integer Object identifier (eg: cm_co_groups:id) representing object to be retrieved
    */
   

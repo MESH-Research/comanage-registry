@@ -2,24 +2,27 @@
 /**
  * COmanage Registry Organizational Identity Sources Fields
  *
- * Copyright (C) 2015-17 University Corporation for Advanced Internet Development, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2015-17 University Corporation for Advanced Internet Development, Inc.
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
- * @since         COmanage Registry v1.1.0
+ * @since         COmanage Registry v2.0.0
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
 
   // Determine if fields are editable
@@ -55,6 +58,7 @@
   
   $l = 1;
 ?>
+  
 <script type="text/javascript">
   // JS specific to these fields
 
@@ -85,31 +89,34 @@
     fields_update_gadgets();
   }
 </script>
+  
 <?php if(empty($plugins)): ?>
-<div class="ui-state-highlight ui-corner-all co-info-topbox">
-  <p>
-    <span class="ui-icon ui-icon-info co-info"></span>
-    <strong><?php print _txt('er.plugin.none', array(_txt('ct.org_identity_sources.pl'))); ?></strong>
-  </p>
-</div>
-<br />
+  <div class="co-info-topbox">
+    <em class="material-icons">info</em>
+    <?php print _txt('er.plugin.none', array(_txt('ct.org_identity_sources.pl'))); ?>
+  </div>
 <?php else: /* plugins */ ?>
-<table id="<?php print $this->action; ?>_org_identity_source" class="ui-widget">
-  <tbody>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <?php print _txt('fd.desc'); ?><span class="required">*</span>
-      </td>
-      <td>
+  <ul id="<?php print $this->action; ?>_org_identity_source" class="fields form-list form-list-admin">
+    <li>
+      <div class="field-name">
+        <div class="field-title">
+          <?php print _txt('fd.desc'); ?>
+          <span class="required">*</span>
+        </div>
+      </div>
+      <div class="field-info">
         <?php print ($e ? $this->Form->input('description') : filter_var($org_identity_sources[0]['OrgIdentitySource']['description'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <?php print _txt('fd.plugin'); ?><span class="required">*</span><br />
-        <span class="descr"><?php print _txt('fd.plugin.warn', array(_txt('ct.org_identity_sources.1'))); ?></span>
-      </td>
-      <td>
+      </div>
+    </li>
+    <li>
+      <div class="field-name">
+        <div class="field-title">
+          <?php print _txt('fd.plugin'); ?>
+          <span class="required">*</span>
+        </div>
+        <div class="field-desc"><?php print _txt('fd.plugin.warn', array(_txt('ct.org_identity_sources.1'))); ?></div>
+      </div>
+      <div class="field-info">
         <?php
           switch($this->action) {
             case 'add':
@@ -125,15 +132,14 @@
               print filter_var($org_identity_sources[0]['OrgIdentitySource']['plugin'],FILTER_SANITIZE_SPECIAL_CHARS);
               break;
           }
-          
+
           if($this->action == 'edit') {
             // And render a link to the plugin target
             
             $plmodel = filter_var($org_identity_sources[0]['OrgIdentitySource']['plugin'],FILTER_SANITIZE_SPECIAL_CHARS);
             $pl = Inflector::underscore($plmodel);
             $plm = Inflector::tableize($plmodel);
-            
-            print "<br />";
+
             print $this->Html->link(_txt('op.config'),
                                     array(
                                       'plugin' => $pl,
@@ -142,7 +148,7 @@
                                       $org_identity_sources[0][$plmodel]['id']
                                     ),
                                     array('class' => 'configurebutton'));
-            
+
             if(!empty($vv_plugin_group_attrs[$plmodel])) {
               print $this->Html->link(_txt('op.ois.conf.gr'),
                                       array(
@@ -154,13 +160,16 @@
             }
           }
         ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <?php print _txt('fd.status'); ?><span class="required">*</span>
-      </td>
-      <td>
+      </div>
+    </li>
+    <li>
+      <div class="field-name">
+        <div class="field-title">
+          <?php print _txt('fd.status'); ?>
+          <span class="required">*</span>
+        </div>
+      </div>
+      <div class="field-info">
         <?php
           global $cm_lang, $cm_texts;
           $attrs = array();
@@ -168,12 +177,12 @@
                              ? $org_identity_sources[0]['OrgIdentitySource']['status']
                              : SuspendableStatusEnum::Active);
           $attrs['empty'] = false;
-          
+
           if($e) {
             print $this->Form->select('status',
                                       $cm_texts[ $cm_lang ]['en.status.susp'],
                                       $attrs);
-            
+
             if($this->Form->isFieldError('status')) {
               print $this->Form->error('status');
             }
@@ -181,13 +190,16 @@
             print _txt('en.status', null, $org_identity_sources[0]['OrgIdentitySource']['status']);
           }
         ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <?php print _txt('fd.ois.sync.mode'); ?><span class="required">*</span>
-      </td>
-      <td>
+      </div>
+    </li>
+    <li>
+      <div class="field-name">
+        <div class="field-title">
+          <?php print _txt('fd.ois.sync.mode'); ?>
+          <span class="required">*</span>
+        </div>
+      </div>
+      <div class="field-info">
         <?php
           global $cm_lang, $cm_texts;
           $attrs = array();
@@ -201,7 +213,7 @@
             print $this->Form->select('sync_mode',
                                       $cm_texts[ $cm_lang ]['en.sync.mode'],
                                       $attrs);
-            
+
             if($this->Form->isFieldError('sync_mode')) {
               print $this->Form->error('sync_mode');
             }
@@ -209,36 +221,40 @@
             print _txt('en.sync.mode', null, $org_identity_sources[0]['OrgIdentitySource']['sync_mode']);
           }
         ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <?php print _txt('fd.ois.sync.skipknown'); ?><br />
-        <span class="descr"><?php print _txt('fd.ois.sync.skipknown.desc'); ?></span>
-      </td>
-      <td>
+      </div>
+    </li>
+    <li>
+      <div class="field-name">
+        <div class="field-title">
+          <?php print _txt('fd.ois.sync.skipknown'); ?>
+        </div>
+        <div class="field-desc"><?php print _txt('fd.ois.sync.skipknown.desc'); ?></div>
+      </div>
+      <div class="field-info">
         <?php print $this->Form->input('sync_query_skip_known'); ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <?php print _txt('fd.ois.sync.mismatch'); ?><br />
-        <span class="descr"><?php print _txt('fd.ois.sync.mismatch.desc'); ?></span>
-      </td>
-      <td>
+      </div>
+    </li>
+    <li>
+      <div class="field-name">
+        <div class="field-title">
+          <?php print _txt('fd.ois.sync.mismatch'); ?>
+        </div>
+        <div class="field-desc"><?php print _txt('fd.ois.sync.mismatch.desc'); ?></div>
+      </div>
+      <div class="field-info">
         <?php
           global $cm_lang, $cm_texts;
           $attrs = array();
           $attrs['value'] = (isset($org_identity_sources[0]['OrgIdentitySource']['sync_query_mismatch_mode'])
-                             ? $org_identity_sources[0]['OrgIdentitySource']['sync_query_mismatch_mode']
-                             : OrgIdentityMismatchEnum::CreateNew);
+            ? $org_identity_sources[0]['OrgIdentitySource']['sync_query_mismatch_mode']
+            : OrgIdentityMismatchEnum::CreateNew);
           $attrs['empty'] = false;
-          
+
           if($e) {
             print $this->Form->select('sync_query_mismatch_mode',
-                                      $cm_texts[ $cm_lang ]['en.sync.query.mismatch.mode'],
-                                      $attrs);
-            
+              $cm_texts[ $cm_lang ]['en.sync.query.mismatch.mode'],
+              $attrs);
+
             if($this->Form->isFieldError('sync_query_mismatch_mode')) {
               print $this->Form->error('sync_query_mismatch_mode');
             }
@@ -246,27 +262,29 @@
             print _txt('en.sync.query.mismatch.mode', null, $org_identity_sources[0]['OrgIdentitySource']['sync_query_mismatch_mode']);
           }
         ?>
-      </td>
-    </tr>
+      </div>
+    </li>
     <?php if(!empty($vv_co_pipelines)): ?>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <?php print _txt('fd.pipeline'); ?><br />
-        <span class="descr"><?php print _txt('fd.pipeline.desc.ois'); ?></span>
-      </td>
-      <td>
+    <li>
+      <div class="field-name">
+        <div class="field-title">
+          <?php print _txt('fd.pipeline'); ?>
+        </div>
+        <div class="field-desc"><?php print _txt('fd.pipeline.desc.ois'); ?></div>
+      </div>
+      <div class="field-info">
         <?php
           $attrs = array();
           $attrs['value'] = (isset($org_identity_sources[0]['OrgIdentitySource']['co_pipeline_id'])
                              ? $org_identity_sources[0]['OrgIdentitySource']['co_pipeline_id']
                              : '');
           $attrs['empty'] = true;
-          
+
           if($e) {
             print $this->Form->select('co_pipeline_id',
                                       $vv_co_pipelines,
                                       $attrs);
-            
+
             if($this->Form->isFieldError('co_pipeline_id')) {
               print $this->Form->error('co_pipeline_id');
             }
@@ -276,15 +294,18 @@
             }
           }
         ?>
-      </td>
-    </tr>
+      </div>
+    </li>
     <?php endif; // vv_co_pipelines ?>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <?php print _txt('fd.ois.eppn.type'); ?><br />
-        <span class="descr"><?php print _txt('fd.ois.eppn.type.desc'); ?></span>
-      </td>
-      <td>
+
+    <li>
+      <div class="field-name">
+        <div class="field-title">
+          <?php print _txt('fd.ois.eppn.type'); ?>
+        </div>
+        <div class="field-desc"><?php print _txt('fd.ois.eppn.type.desc'); ?></div>
+      </div>
+      <div class="field-info">
         <?php
           $attrs = array();
           $attrs['value'] = (isset($org_identity_sources[0]['OrgIdentitySource']['eppn_identifier_type'])
@@ -307,32 +328,27 @@
             }
           }
         ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <?php print _txt('fd.ois.eppn.suffix'); ?><br />
-        <span class="descr"><?php print _txt('fd.ois.eppn.suffix.desc'); ?></span>
-      </td>
-      <td>
+      </div>
+    </li>
+    <li>
+      <div class="field-name">
+        <div class="field-title"><?php print _txt('fd.ois.eppn.suffix'); ?></div>
+        <div class="field-desc"><?php print _txt('fd.ois.eppn.suffix.desc'); ?></div>
+      </div>
+      <div class="field-info">
         <?php print ($e ? $this->Form->input('eppn_suffix') : filter_var($org_identity_sources[0]['OrgIdentitySource']['eppn_suffix'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <em><span class="required"><?php print _txt('fd.req'); ?></span></em><br />
-      </td>
-      <td>
-        <?php
-          if($e) {
-            print $this->Form->submit($submit_label);
-            print $this->Form->button(_txt('op.reset'), 
-                                      array('type'=>'reset'));
-          }
-        ?>
-      </td>
-    </tr>
-  </tbody>
-</table>
+      </div>
+    </li>
+    <?php if($e): ?>
+      <li class="fields-submit">
+        <div class="field-name">
+          <span class="required"><?php print _txt('fd.req'); ?></span>
+        </div>
+        <div class="field-info">
+          <?php print $this->Form->submit($submit_label); ?>
+        </div>
+      </li>
+    <?php endif; ?>
+  </ul>
 <?php endif; /* plugins */
   print $this->element("changelog");

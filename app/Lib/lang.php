@@ -2,24 +2,27 @@
 /**
  * COmanage Registry Language File
  *
- * Copyright (C) 2011-17 University Corporation for Advanced Internet Development, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2011-17 University Corporation for Advanced Internet Development, Inc.
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
  * @since         COmanage Registry v0.1
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
   
 global $cm_lang, $cm_texts, $cm_texts_orig;
@@ -36,8 +39,9 @@ $cm_texts['en_US'] = array(
   'lang' => 'en',
 
   // Application name
-  'coordinate' =>     'COmanage Registry',
-  
+  'coordinate'         => 'COmanage Registry',
+  'coordinate.version' => 'Version',
+
   // What a CO is called (abbreviated)
   'co' =>             'CO',
   'cos' =>            'COs',
@@ -933,6 +937,7 @@ original notification at
   'fd.all' =>         'All',
   'fd.an.desc' =>     'Alphanumeric characters only',
   'fd.approver' =>    'Approver',
+  'fd.archived' =>    'Archived',
   'fd.attribute' =>   'Attribute',
   'fd.attr.env' =>    'Environment Variable Name',
   'fd.attr.ldap' =>   'LDAP Name',
@@ -1280,8 +1285,9 @@ original notification at
   'fd.ssp.default' => 'If permission is not explicitly granted here for a supported model, then self service updates are not permitted for that model. The permission will be Read Only. Default Read Write permission is required to add new values.',
   'fd.ssp.type.desc' => '"Default" applies this permission to all types not otherwise specified',
   'fd.status' =>      'Status',
+  'fd.status.filters' => 'Status filters',
   'fd.status.ae.desc' => 'Making an Attribute Enumeration inactive will not affect existing records using it',
-  'fd.status.change' => 'Manually changing the status of a CO Person when there is a Petition in progress will not change the status of the Petiton',
+  'fd.status.change' => 'Manually changing the status of a CO Person when there is a Petition in progress will not change the status of the Petition',
   'fd.status.et.desc' => 'An Extended Type that is in use cannot be made inactive',
   'fd.subject' =>     'Subject',
   'fd.svc.euri' =>    'Entitlement URI',
@@ -1331,6 +1337,7 @@ original notification at
   'fd.type' =>        'Type',
   'fd.type.warn' =>   'After an extended attribute is created, its type may not be changed',
   'fd.timezone' =>    'Timezone',
+  'fd.timezone.desc' => 'By default, browser detection is used to select a timezone. Only set a timezone here to force a particular selection.',
   'fd.timezone.change' => 'A change to your preferred timezone will take effect after your next login',
   'fd.update.last' => 'Last Updated',
   'fd.unresolved' =>  'Unresolved',
@@ -1416,7 +1423,8 @@ original notification at
   // Alphabet menu (for co_people filter by first letter of family name)
   // Can be changed to a static array of internationalized characters, for example:
   //'me.alpha' => array('a','ä','b','c'),
-  'me.alpha' => range('a','z'),
+  'me.alpha'       => range('a','z'),
+  'me.alpha.label' => 'filter people by first letter of family name',
   
   // Job related messages
   'jb.ois.sync.full.finish' => 'Sync of new org identities from source complete',
@@ -1448,19 +1456,23 @@ original notification at
   'op.begin' =>       'Begin',
   'op.cancel' =>      'Cancel',
   'op.clear.all' =>   'Clear',
+  'op.clear.search' =>   'Clear search',
   'op.compare' =>     'Compare',
   'op.config' =>      'Configure',
   'op.confirm' =>     'Confirm',
   'op.cont' =>        'Continue',
   'op.confirm.box' => 'Check the box to confirm',
-  'op.dashboard.select' => 'Welcome to %1$s. Please select an action from the menus, above.',
+  'op.dashboard.configuration' => 'Configuration for %1$s',
+  'op.dashboard.select' => 'Welcome to %1$s. Please select an action from the menus.',
   'op.db.ok' =>       'Database schema update successful',
   'op.db.schema' =>   'Loading schema from file %1$s...',
   'op.decline' =>     'Decline',
   'op.delete' =>      'Delete',
+  'op.delete-a' =>    'Delete %1$s',
   'op.delete.consfdemographics' => 'this NSF demographic entry',
   'op.delete.ok' =>   'Are you sure you wish to remove "%1$s"? This action cannot be undone.',
   'op.deny' =>        'Deny',
+  'op.display.qr.for' => 'Display QR code for %1$s',
   'op.done' =>        'Done',
   'op.dupe' =>        'Duplicate',
   'op.edit' =>        'Edit',
@@ -1495,10 +1507,11 @@ original notification at
   'op.gr.reconcile.wait' => 'Requesting reconcilation, please wait...',
   'op.grm.edit' =>    'Edit Members of %1$s Group %2$s',
   'op.grm.manage' =>  'Manage My Group Memberships',
+  'op.grm.manage.all' =>  'Manage Groups',
   'op.grm.my.groups' => 'My Groups',
   'op.grm.title' =>   '%1$s %2$s Membership For %3$s',
   'op.history' =>     'View History',
-  'op.home.login' =>  'Welcome to %1$s. Please login.',
+  'op.home.login' =>  'Welcome to %1$s.',
   'op.home.select' => 'Welcome to %1$s. Please select a collaboration.',
   'op.home.collabs' => 'Available Collaborations',
   'op.home.collabs.summary' => 'All collaborations in which user may participate',
@@ -1578,7 +1591,8 @@ original notification at
   'op.search' =>      'Search',
   'op.search-a' =>    'Search %1$s',
   'op.search.restore' =>  'Restore default listing',
-  'op.see.notifications' =>  'View full notifications list...',
+  'op.see.notifications' =>  'View all notifications',
+  'op.see.notification.num' =>  'notification #%1$s',
   'op.select' =>      'Select',
   'op.select-a' =>    'Select %1$s',
   'op.select.select' => 'Please select the CO Person you would like to attach to this Petition by clicking the associated select button.',
@@ -1596,6 +1610,7 @@ original notification at
   'op.verify' =>      'Verify',
   'op.view' =>        'View',
   'op.view.all' =>    'View All',
+  'op.view.current' => 'View Current',
   'op.view.pending' => 'View Pending',
   'op.view.source' => 'View Source',
   'op.view-a' =>      'View %1$s',

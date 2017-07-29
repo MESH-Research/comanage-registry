@@ -2,24 +2,27 @@
 /**
  * COmanage Registry CO Grouper Provisioner Target Model
  *
- * Copyright (C) 2012-17 University Corporation for Advanced Internet Development, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2012-16 University Corporation for Advanced Internet Development, Inc.
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry-plugin
  * @since         COmanage Registry v0.8.3
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
 
 App::uses("CoProvisionerPluginTarget", "Model", "ConnectionManager");
@@ -119,6 +122,31 @@ class CoGrouperProvisionerTarget extends CoProvisionerPluginTarget {
       )
     )
   );
+
+  /**
+   * Perform CoGrouperProvisionerTarget model upgrade steps for version 2.0.0.
+   * This function should only be called by UpgradeVersionShell.
+   *
+   * @since  COmanage Registry v2.0.0
+   */
+
+  public function _ug110() {
+    // We set any existing provisioner targets that already do not have a subject
+    // identifier set to using the legacy method for determining the Grouper 
+    // subject for the user.
+    
+    // We use updateAll here which doesn't fire callbacks (including ChangelogBehavior).
+    $fields = array(
+      'CoGrouperProvisionerTarget.legacy_comanage_subject' => true
+    );
+    $conditions = array(
+      'OR' => array(
+        array('CoGrouperProvisionerTarget.subject_identifier' => ''),
+        array('CoGrouperProvisionerTarget.subject_identifier' => null )
+      )
+    );
+    $this->updateAll($fields, $conditions);
+  }
   
   /**
    * Called after each successful save operation. Right now used
@@ -236,7 +264,7 @@ FROM
 
     // We might have been passed the identifier marked as deleted if this is 
     // a CoPersonDeleted operation.
-    if(isset($provisioningData['Identifier']) && $op == ProvisioningActionEnum::CoPersonDeleted) {
+    if(isset($provisioningData['Identifier'])) {
       foreach($provisioningData['Identifier'] as $id) {
         if($id['type'] == $idType && $id['status'] == SuspendableStatusEnum::Active && $id['deleted']) {
           return $id['identifier'];
@@ -252,7 +280,7 @@ FROM
   /**
    * Create and return an instance of the GrouperRestClient.
    *
-   * @since COmanage Registry 1.1.0
+   * @since COmanage Registry 2.0.0
    * @param array $coProvisioningTargetData CO provisioning target data
    * @return instance GrouperRestClient or null if unable to create the instance
    */
@@ -277,7 +305,7 @@ FROM
   /**
    * Process a COU name change.
    *
-   * @since COmanage Registry 1.1.0
+   * @since COmanage Registry 2.0.0
    * @param  array $coProvisioningTargetData CO provisioning target data
    * @param  array $coGroup CoGroup provisioning data
    * @return void
@@ -372,7 +400,7 @@ FROM
   /**
    * Provision a CoGroupAdded event
    *
-   * @since  COmanage Registry v1.1.0
+   * @since  COmanage Registry v2.0.0
    * @param  array $coProvisioningTargetData CO provisioning target data
    * @param  array $provisioningData CoGroup provisioning data
    * @return boolean true on success
@@ -406,7 +434,7 @@ FROM
   /**
    * Provision a CoGroupDeleted event
    *
-   * @since  COmanage Registry v1.1.0
+   * @since  COmanage Registry v2.0.0
    * @param  array $coProvisioningTargetData CO provisioning target data
    * @param  array $coGroup CoGroup provisioning data
    * @return boolean true on success
@@ -450,7 +478,7 @@ FROM
   /**
    * Provision a CoGroupReprovisionRequested event
    *
-   * @since  COmanage Registry v1.1.0
+   * @since  COmanage Registry v2.0.0
    * @param  array $coProvisioningTargetData CO provisioning target data
    * @param  array $coGroup CoGroup provisioning data
    * @return boolean true on success
@@ -505,7 +533,7 @@ FROM
   /**
    * Provision a CoGroupUpdated event
    *
-   * @since  COmanage Registry v1.1.0
+   * @since  COmanage Registry v2.0.0
    * @param  array $coProvisioningTargetData CO provisioning target data
    * @param  array $coGroup CoGroup provisioning data
    * @return boolean true on success
@@ -549,7 +577,7 @@ FROM
   /**
    * Take action on CoPerson provisioning events
    *
-   * @since  COmanage Registry v1.1.0
+   * @since  COmanage Registry v2.0.0
    * @param  array $coProvisioningTargetData CO provisioning target data
    * @param  array $coPerson CoPerson provisioning data
    * @return boolean true on success
@@ -656,7 +684,7 @@ FROM
   /**
    * Provision a Grouper group and any stems if necessary
    *
-   * @since  COmanage Registry v1.1.0
+   * @since  COmanage Registry v2.0.0
    * @param  array $coProvisioningTargetData CO provisioning target data
    * @param  array $groupName Grouper group full name including stems
    * @param  array $groupDescription Grouper group description
@@ -704,7 +732,7 @@ FROM
   /**
    * Reprovision memberships using paging to prevent memory issues
    *
-   * @since  COmanage Registry v1.1.0
+   * @since  COmanage Registry v2.0.0
    * @param  array $coProvisioningTargetData CO provisioning target data
    * @param  array $coGroup CoGroup provisioning data
    * @return boolean true on success
@@ -858,7 +886,7 @@ FROM
   /**
    * Synchronize memberships using paging to prevent memory issues
    *
-   * @since  COmanage Registry v1.1.0
+   * @since  COmanage Registry v2.0.0
    * @param  array $coProvisioningTargetData CO provisioning target data
    * @param  array $coGroup CoGroup provisioning data
    * @return boolean true on success
@@ -985,7 +1013,7 @@ FROM
   /**
    * Update CoGrouperProvisionerGroup mappings for child COU managed groups.
    *
-   * @since COmanage Registry 1.1.0
+   * @since COmanage Registry 2.0.0
    * @param  array $coProvisioningTargetData CO provisioning target data
    * @param  array $coGroup CoGroup provisioning data
    * @return void
@@ -1034,7 +1062,7 @@ FROM
   /**
    * Update a group because CoGroup metadata like name has changed.
    *
-   * @since COmanage Registry v1.1.0
+   * @since COmanage Registry v2.0.0
    * @param  array $coProvisioningTargetData CO provisioning target data
    * @param  array $coGroup CoGroup provisioning data
    * @return boolean true on success
@@ -1080,7 +1108,7 @@ FROM
   /**
    * Update a group membership.
    *
-   * @since COmanage Registry v1.1.0
+   * @since COmanage Registry v2.0.0
    * @param  array $coProvisioningTargetData CO provisioning target data
    * @param  array $coGroup CoGroup provisioning data
    * @return boolean true on success
@@ -1100,7 +1128,7 @@ FROM
       if (empty($subject)) {
         $coPersonId = $coGroup['CoGroup']['CoPerson']['id'];
         $this->log("GrouperProvisioner is unable to compute the Grouper subject for coPersonId = $coPersonId");
-        break;
+        return false;
       }
 
       $provisionerGroup = $this->CoGrouperProvisionerGroup->findProvisionerGroup($coProvisioningTargetData, $coGroup);

@@ -2,24 +2,27 @@
 /**
  * COmanage Registry CO Enrollment Attribute Order View
  *
- * Copyright (C) 2011-15 University Corporation for Advanced Internet Development, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2011-15 University Corporation for Advanced Internet Development, Inc.
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
  * @since         COmanage Registry v0.8.2
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
 
   // Add breadcrumbs
@@ -110,43 +113,45 @@
   });
 </script>
 
-<table id="enrollment_attributes" class="ui-widget">
-  <thead>
-    <tr class="ui-widget-header">
-      <th><?php print _txt('fd.ea.order'); ?></th>
-      <th><?php print _txt('fd.ea.label'); ?></th>
-      <th><?php print _txt('fd.attribute'); ?></th>
-    </tr>
-  </thead>
-  
-  <tbody id="sortable">
-    <?php foreach ($co_enrollment_attributes as $c): ?>
-      <tr id = "CoEnrollmentAttributeId_<?php print $c['CoEnrollmentAttribute']['id']?>" class="line1">
-        <td class = "order">
-          <span class="ui-icon ui-icon-arrow-4"></span>
-        </td>
-        <td>
-          <?php
-            print $this->Html->link($c['CoEnrollmentAttribute']['label'],
-                                    array('controller' => 'co_enrollment_attributes',
-                                          'action' => ($permissions['edit'] ? 'edit' : ($permissions['view'] ? 'view' : '')),
-                                          $c['CoEnrollmentAttribute']['id'],
-                                          'coef' => $vv_coefid));
-          ?>
-        </td>
-        <td><?php print $vv_available_attributes[ $c['CoEnrollmentAttribute']['attribute'] ]; ?></td>
+<div class="table-container">
+  <table id="enrollment_attributes">
+    <thead>
+      <tr>
+        <th><?php print _txt('fd.ea.order'); ?></th>
+        <th><?php print _txt('fd.ea.label'); ?></th>
+        <th><?php print _txt('fd.attribute'); ?></th>
       </tr>
-    <?php endforeach; ?>
-  </tbody>
-  
-  <tfoot>
-    <tr class="ui-widget-header">
-      <th colspan="3">
-        <?php print $this->element("pagination"); ?>
-      </th>
-    </tr>
-  </tfoot>
-</table>
+    </thead>
+
+    <tbody id="sortable">
+      <?php foreach ($co_enrollment_attributes as $c): ?>
+        <tr id = "CoEnrollmentAttributeId_<?php print $c['CoEnrollmentAttribute']['id']?>" class="line1">
+          <td class = "order">
+            <span class="ui-icon ui-icon-arrow-4"></span>
+          </td>
+          <td>
+            <?php
+              print $this->Html->link($c['CoEnrollmentAttribute']['label'],
+                                      array('controller' => 'co_enrollment_attributes',
+                                            'action' => ($permissions['edit'] ? 'edit' : ($permissions['view'] ? 'view' : '')),
+                                            $c['CoEnrollmentAttribute']['id'],
+                                            'coef' => $vv_coefid));
+            ?>
+          </td>
+          <td><?php print $vv_available_attributes[ $c['CoEnrollmentAttribute']['attribute'] ]; ?></td>
+        </tr>
+      <?php endforeach; ?>
+    </tbody>
+
+    <tfoot>
+      <tr>
+        <th colspan="3">
+          <?php print $this->element("pagination"); ?>
+        </th>
+      </tr>
+    </tfoot>
+  </table>
+</div>
 
 <?php
   $args = array();

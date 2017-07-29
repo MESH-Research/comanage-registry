@@ -2,24 +2,27 @@
 /**
  * COmanage Registry Home Layout
  *
- * Copyright (C) 2012-17 University Corporation for Advanced Internet Development, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2012-17 University Corporation for Advanced Internet Development, Inc.
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
  * @since         COmanage Registry v0.4
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
 
   if($this->Session->check('Auth.User')) {
@@ -66,12 +69,10 @@
 ?>
 
 <?php if($err != ""): ?>
-<div class="ui-state-highlight ui-corner-all co-info-topbox">
-  <p>
-    <span class="ui-icon ui-icon-info co-info"></span>
-    <strong><?php print $err; ?></strong>
-  </p>
-</div>
+  <div class="co-info-topbox">
+    <em class="material-icons error">info</em>
+    <?php print $err; ?>
+  </div>
 <?php else: // $err ?>
 <div id="fpDashboard">
   <?php
@@ -79,8 +80,7 @@
     if(!empty($userInfo['cos'])) {
       // Valid user
       print $this->element("lastlogin");
-      
-      print '<h1>' . _txt('op.home.select', array(_txt('coordinate'))) . '</h1>';
+      print '<h1 class="firstPrompt">' . _txt('op.home.select', array(_txt('coordinate'))) . '</h1>';
 
       // Load the list of COs
       if($menuContent['cos']) {
@@ -89,16 +89,12 @@
         $cos = array();
       }
 
-      print '<table id="fpCoList" class="ui-widget">';
-      print '<caption>' . _txt('op.home.collabs') . '</caption>';
-      print '<thead>';
-      print '  <tr class="ui-widget-header">';
-      print '    <th scope="col">' . _txt('fd.name') . '</th>';
-      print '    <th scope="col">' . _txt('fd.desc') . '</th>';
-      print '  </tr>';
-      print '</thead>';
-
-      print '<tbody>';
+      print '<h2>' . _txt('op.home.collabs') . '</h2>';
+      print '<div id="fpCoList" class="co-grid co-grid-with-header mdl-shadow--2dp">';
+      print '<div class="mdl-grid co-grid-header">';
+      print '  <div class="mdl-cell mdl-cell--6-col">' . _txt('fd.name') . '</div>';
+      print '  <div class="mdl-cell mdl-cell--6-col">' . _txt('fd.desc') . '</div>';
+      print '</div>';
 
       //loop over each CO
       if(count($cos) > 0) {
@@ -108,16 +104,15 @@
 
           if((!isset($menuCoData['co_person']['status'])
               || ($menuCoData['co_person']['status'] != StatusEnum::Active
-                  && $menuCoData['co_person']['status'] != StatusEnum::GracePeriod)
+                && $menuCoData['co_person']['status'] != StatusEnum::GracePeriod)
               || empty($menuCoData['co_person']['CoPersonRole']))
             && !$permissions['menu']['admin']) {
             // Don't render this CO, the person is not an active member (or a CMP admin)
             continue;
           }
 
-          print '<tr class="line';
-          print ($i % 2)+1;
-          print '"><td>';
+          print '<div class="mdl-grid co-row spin">';
+          print '<div class="mdl-cell mdl-cell--6-col collab-name">';
           // We use $menuCoData here and not $menuCoName because the former will indicate
           // 'Not a Member' for CMP Admins (where they are not a member of the CO)
           $args = array();
@@ -126,26 +121,50 @@
           $args['action'] = 'dashboard';
           $args['co'] = $collabMenuCoId;
 
-          print $this->Html->link($menuCoData['co_name'], $args);
-          print '</td><td>';
+          print $this->Html->link($menuCoData['co_name'], $args, array('class' => 'co-link'));
+
+          print '</div><div class="mdl-cell mdl-cell--6-col collab-desc">';
+
           if (!empty($menuCoData['co_person']['Co']['description'])) {
             print filter_var($menuCoData['co_person']['Co']['description'],FILTER_SANITIZE_SPECIAL_CHARS);
           } elseif (!empty($menuCoData['co_desc'])) {
             print filter_var($menuCoData['co_desc'],FILTER_SANITIZE_SPECIAL_CHARS);
           }
-          print '</td></tr>';
+          print '</div></div>';
           $i++;
         }
+
+  // Allow the whole div to be clicked:
+  ?>
+  <script type="text/javascript">
+    $(function() {
+      $("#fpCoList .co-row").click(function () {
+        location.href = $(this).find(".collab-name > a.co-link").attr('href');
+      });
+    });
+  </script>
+  <?php
+
       } else {
-        print '<tr class="line1" colspan="2"><td>' . _txt('op.home.no.collabs') .  '</td></tr>';
+        print '<p>' . _txt('op.home.no.collabs') .  '</p>';
       }
-      
-      print '</tbody>';
-      print '</table>';
+
+      print '</div>';
     } elseif(!$userInfo) {
       // Please login
       print '<h1 class="loginMsg">' . _txt('op.home.login', array(_txt('coordinate'))) . '</h1>';
+      // Print the login button
+      $buttonClasses = "mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored";
+      $args = array('controller' => 'auth',
+        'action'     => 'login',
+        'plugin'     => false
+      );
+      print ' <div id="welcome-login">';
+      print $this->Html->link(_txt('op.login') . ' <span class="fa fa-sign-in"></span>',
+        $args, array('escape'=>false, 'id' => 'welcome-login-button', 'class' => $buttonClasses));
+      print '</div>';
     }
+
   ?>
 </div>
 <?php endif; // $err ?>

@@ -2,24 +2,27 @@
 /**
  * COmanage Registry COU Fields
  *
- * Copyright (C) 2011-12 University Corporation for Advanced Internet Development, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2011-12 University Corporation for Advanced Internet Development, Inc.
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
  * @since         COmanage Registry v0.2
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
 
   // Determine if fields are editable
@@ -49,70 +52,64 @@
   if(isset($cur_co))
     print $this->Form->hidden('co_id', array('default' => $cur_co['Co']['id'])) . "\n";
 ?>
-<table id="<?php print $this->action; ?>_cou" class="ui-widget">
-  <tbody>
-    <tr class="line1">
-      <td>
-        <?php print $this->Form->label('name',_txt('fd.name')); ?><span class="required">*</span>
-      </td>
-      <td>
-        <?php print ($e ? $this->Form->input('name', array('class' => 'focusFirst')) : filter_var($cous[0]['Cou']['name'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-    <tr class="line2">
-      <td>
-        <?php print $this->Form->label('description',_txt('fd.desc')); ?>
-      </td>
-      <td>
-        <?php print ($e ? $this->Form->input('description') : filter_var($cous[0]['Cou']['description'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-    <tr class="line1">
-      <td>
-        <?php
+<ul id="<?php print $this->action; ?>_cou" class="fields form-list">
+  <li>
+    <div class="field-name">
+      <?php print $this->Form->label('name',_txt('fd.name')); ?><span class="required">*</span>
+    </div>
+    <div class="field-info">
+      <?php print ($e ? $this->Form->input('name', array('class' => 'focusFirst')) : filter_var($cous[0]['Cou']['name'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <?php print $this->Form->label('description',_txt('fd.desc')); ?>
+    </div>
+    <div class="field-info">
+      <?php print ($e ? $this->Form->input('description') : filter_var($cous[0]['Cou']['description'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <?php
+      if($e) {
+        if (!empty($this->viewVars['parent_options'] )) {
+          print $this->Form->label('parent_id', _txt('fd.parent'));
+        } else {
+          print _txt('fd.parent');
+        }
+      }
+      ?>
+    </div>
+    <div class="field-info">
+      <?php
         if($e) {
           if (!empty($this->viewVars['parent_options'] )) {
-            print $this->Form->label('parent_id', _txt('fd.parent'));
+            // Print dropdown selector with COU options
+            print $this->Form->select('parent_id', $this->viewVars['parent_options']);
           } else {
-            print _txt('fd.parent');
+            // Do not print empty selector
+            print _txt('fd.cou.nopar');
           }
         }
-        ?>
-      </td>
-      <td>
-        <?php
-          if($e) {
-            if (!empty($this->viewVars['parent_options'] )) {
-              // Print dropdown selector with COU options
-              print $this->Form->select('parent_id', $this->viewVars['parent_options']);
-            } else {
-              // Do not print empty selector
-              print _txt('fd.cou.nopar');
-            }
-          }
-          else {
-            print filter_var($cous[0]['Cou']['parent_id'],FILTER_SANITIZE_SPECIAL_CHARS);
-          }
+        else {
+          print filter_var($cous[0]['Cou']['parent_id'],FILTER_SANITIZE_SPECIAL_CHARS);
+        }
 
-          if($this->Form->isFieldError('status')) {
-            print $this->Form->error('status');
-          }
-        ?>
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <em><span class="required"><?php print _txt('fd.req'); ?></span></em><br />
-      </td>
-      <td>
-        <?php
-          if($e) {
-            print $this->Form->submit($submit_label);
-            print $this->Form->button(_txt('op.reset'), 
-                                      array('type'=>'reset'));
-          }
-        ?>
-      </td>
-    </tr>
-  </tbody>
-</table>
+        if($this->Form->isFieldError('status')) {
+          print $this->Form->error('status');
+        }
+      ?>
+    </div>
+  </li>
+  <?php if($e): ?>
+    <li class="fields-submit">
+      <div class="field-name">
+        <span class="required"><?php print _txt('fd.req'); ?></span>
+      </div>
+      <div class="field-info">
+        <?php print $this->Form->submit($submit_label); ?>
+      </div>
+    </li>
+  <?php endif; ?>
+</ul>

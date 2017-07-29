@@ -2,24 +2,27 @@
 /**
  * COmanage Registry Org Identity Search View
  *
- * Copyright (C) 2015 University Corporation for Advanced Internet Development, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2015 University Corporation for Advanced Internet Development, Inc.
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
- * @since         COmanage Registry v1.1.0
+ * @since         COmanage Registry v2.0.0
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
 ?>
 
@@ -115,77 +118,79 @@
 </div>
 
 <?php if(!empty($vv_search_results)): ?>
-<table id="org_identity_source_results" class="ui-widget">
-  <thead>
-    <tr class="ui-widget-header">
-      <th><?php print _txt('fd.name'); ?></th>
-      <th><?php print _txt('fd.email_address.mail'); ?></th>
-      <th><?php print _txt('fd.actions'); ?></th>
-    </tr>
-  </thead>
-  
-  <tbody>
-    <?php $i = 0; ?>
-    <?php foreach($vv_search_results as $k => $o): ?>
-    <tr class="line<?php print ($i % 2)+1; ?>">
-      <td>
-        <?php
-          $retrieveUrl = array(
-            'controller' => 'org_identity_sources',
-            'action' => 'retrieve',
-            $vv_org_identity_source['id'],
-            'key' => $k
-          );
-          
-          if(!empty($this->request->params['named']['copetitionid'])) {
-            $retrieveUrl['copetitionid'] = filter_var($this->request->params['named']['copetitionid'],FILTER_SANITIZE_SPECIAL_CHARS);
-          }
-          
-          // We could walk the set of names to look for primary, but it's easier
-          // to just pick the first (and that will be sufficient in almost all cases).
-          print $this->Html->link(
-            generateCn($o['Name'][0]),
-            $retrieveUrl
-          );
-        ?>
-      </td>
-      <td>
-        <?php
-          if(!empty($o['EmailAddress'][0]['mail'])) {
-            print $o['EmailAddress'][0]['mail'];
-          }
-        ?>
-      </td>
-      <td>
-        <?php
-          if($permissions['retrieve']) {
+<div class="table-container">
+  <table id="org_identity_source_results">
+    <thead>
+      <tr>
+        <th><?php print _txt('fd.name'); ?></th>
+        <th><?php print _txt('fd.email_address.mail'); ?></th>
+        <th><?php print _txt('fd.actions'); ?></th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <?php $i = 0; ?>
+      <?php foreach($vv_search_results as $k => $o): ?>
+      <tr class="line<?php print ($i % 2)+1; ?>">
+        <td>
+          <?php
+            $retrieveUrl = array(
+              'controller' => 'org_identity_sources',
+              'action' => 'retrieve',
+              $vv_org_identity_source['id'],
+              'key' => $k
+            );
+
+            if(!empty($this->request->params['named']['copetitionid'])) {
+              $retrieveUrl['copetitionid'] = filter_var($this->request->params['named']['copetitionid'],FILTER_SANITIZE_SPECIAL_CHARS);
+            }
+
+            // We could walk the set of names to look for primary, but it's easier
+            // to just pick the first (and that will be sufficient in almost all cases).
             print $this->Html->link(
-              _txt('op.view'),
-              $retrieveUrl,
-              array('class' => 'viewbutton')
-            ). "\n";
-          }
-        ?>
-      </td>
-    </tr>
-    <?php $i++; ?>
-    <?php endforeach; // $vv_search_results ?>
-  </tbody>
-  
-  <tfoot>
-    <tr class="ui-widget-header">
-      <th colspan="3">
-        <?php /*print $this->element("pagination");*/ ?>
-      </th>
-    </tr>
-  </tfoot>
-</table>
-<?php elseif(!empty($vv_search_query)): ?>
-  <tbody>
-    <tr>
-      <td>
-        <?php print _txt('rs.search.none'); ?>
-      </td>
-    </tr>
-  </tbody>
-<?php endif; // vv_search_results/query ?>
+              generateCn($o['Name'][0]),
+              $retrieveUrl
+            );
+          ?>
+        </td>
+        <td>
+          <?php
+            if(!empty($o['EmailAddress'][0]['mail'])) {
+              print $o['EmailAddress'][0]['mail'];
+            }
+          ?>
+        </td>
+        <td>
+          <?php
+            if($permissions['retrieve']) {
+              print $this->Html->link(
+                _txt('op.view'),
+                $retrieveUrl,
+                array('class' => 'viewbutton')
+              ). "\n";
+            }
+          ?>
+        </td>
+      </tr>
+      <?php $i++; ?>
+      <?php endforeach; // $vv_search_results ?>
+    </tbody>
+
+    <tfoot>
+      <tr>
+        <th colspan="3">
+          <?php /*print $this->element("pagination");*/ ?>
+        </th>
+      </tr>
+    </tfoot>
+    <?php elseif(!empty($vv_search_query)): ?>
+      <tbody>
+        <tr>
+          <td>
+            <?php print _txt('rs.search.none'); ?>
+          </td>
+        </tr>
+      </tbody>
+    <?php endif; // vv_search_results/query ?>
+  </table>
+</div>

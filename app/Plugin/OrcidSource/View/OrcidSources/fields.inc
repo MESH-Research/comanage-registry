@@ -2,24 +2,27 @@
 /**
  * COmanage Registry ORCID Source Plugin Fields
  *
- * Copyright (C) 2016 SCG
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2016 SCG
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry-plugin
- * @since         COmanage Registry v1.1.0
+ * @since         COmanage Registry v2.0.0
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
 -->
 <?php
@@ -38,47 +41,48 @@
   
   $l = 1;
 ?>
-<table id="<?php print $this->action; ?>_orcid_source" class="ui-widget">
-  <tbody>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <strong class="fieldTitle"><?php print _txt('pl.orcidsource.redirect_url'); ?>
-      </td>
-      <td>
-        <input type="text" readonly="true" size="60" value="<?php print $this->Html->url($vv_orcid_redirect_url, true); ?>" />
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <strong class="fieldTitle"><?php print _txt('pl.orcidsource.clientid'); ?></strong><font class="required">*</font><br />
-        <font class="desc"><?php print _txt('pl.orcidsource.clientid.desc'); ?></font>
-      </td>
-      <td>
-        <?php print ($e ? $this->Form->input('clientid', array('size' => 50)) : filter_var($orcid_sources[0]['OrcidSource']['clientid'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <strong class="fieldTitle"><?php print _txt('pl.orcidsource.secret'); ?></strong><font class="required">*</font><br />
-        <font class="desc"><?php print _txt('pl.orcidsource.secret.desc'); ?></font>
-      </td>
-      <td>
-        <?php print ($e ? $this->Form->input('client_secret', array('size' => 50)) : filter_var($orcid_sources[0]['OrcidSource']['client_secret'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <i><font class="required"><?php print _txt('fd.req'); ?></font></i><br />
-      </td>
-      <td>
-        <?php
-          if($e) {
-            print $this->Form->submit($submit_label);
-            print $this->Form->button(_txt('op.reset'), 
-                                      array('type'=>'reset'));
-          }
-        ?>
-      </td>
-    </tr>
-  </tbody>
-</table>
+<ul id="<?php print $this->action; ?>_orcid_source" class="fields form-list">
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print _txt('pl.orcidsource.redirect_url'); ?></div>
+    </div>
+    <div class="field-info">
+      <input type="text" readonly="true" size="60" value="<?php print $this->Html->url($vv_orcid_redirect_url, true); ?>" />
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title">
+        <?php print _txt('pl.orcidsource.clientid'); ?>
+        <span class="required">*</span>
+      </div>
+      <div class="field-desc"><?php print _txt('pl.orcidsource.clientid.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e ? $this->Form->input('clientid', array('size' => 50)) : filter_var($orcid_sources[0]['OrcidSource']['clientid'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title">
+        <?php print _txt('pl.orcidsource.secret'); ?>
+        <span class="required">*</span>
+      </div>
+      <div class="field-desc"><?php print _txt('pl.orcidsource.secret.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e ? $this->Form->input('client_secret', array('size' => 50)) : filter_var($orcid_sources[0]['OrcidSource']['client_secret'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  
+  <?php if($e): ?>
+    <li class="fields-submit">
+      <div class="field-name">
+        <span class="required"><?php print _txt('fd.req'); ?></span>
+      </div>
+      <div class="field-info">
+        <?php print $this->Form->submit($submit_label); ?>
+      </div>
+    </li>
+  <?php endif; ?>
+</ul>

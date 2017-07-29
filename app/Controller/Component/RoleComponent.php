@@ -2,24 +2,27 @@
 /**
  * COmanage Registry Role Component
  *
- * Copyright (C) 2012-17 University Corporation for Advanced Internet Development, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2012-17 University Corporation for Advanced Internet Development, Inc.
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
  * @since         COmanage Registry v0.8
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
  
 class RoleComponent extends Component {
@@ -249,8 +252,20 @@ class RoleComponent extends Component {
       $condValue = $groupType;
     }
     
-    if(isset($this->cache['coperson'][$coPersonId][$condKey][$condValue][$groupRole])) {
-      return $this->cache['coperson'][$coPersonId][$condKey][$condValue][$groupRole];
+    // We need to use the couId as an element in the caching, in particular for
+    // repeated calls from isCoOrCouAdmin()
+    $condCou = 0;
+    
+    if($couId) {
+      if($couId === true) {
+        $condCou = -1;
+      } else {
+        $condCou = $couId;
+      }
+    }
+    
+    if(isset($this->cache['coperson'][$coPersonId][$condKey][$condValue][$condCou][$groupRole])) {
+      return $this->cache['coperson'][$coPersonId][$condKey][$condValue][$condCou][$groupRole];
     }
     
     $CoGroup = ClassRegistry::init('CoGroup');
@@ -279,7 +294,7 @@ class RoleComponent extends Component {
     
     // Add this result to the cache
     
-    $this->cache['coperson'][$coPersonId][$condKey][$condValue][$groupRole] = $groups;
+    $this->cache['coperson'][$coPersonId][$condKey][$condValue][$condCou][$groupRole] = $groups;
     
     return $groups;
   }
@@ -1198,7 +1213,7 @@ class RoleComponent extends Component {
       // We don't need to walk the tree since we only care if a person is a COU Admin
       // for *any* group, not which groups (which would require getting the child COUs).
       
-      return $this->cachedGroupCheck($coPersonId, "", "", null, false, GroupEnum::Admin, true);
+      return $this->cachedGroupCheck($coPersonId, "", "", null, false, GroupEnum::Admins, true);
     }
   }
   

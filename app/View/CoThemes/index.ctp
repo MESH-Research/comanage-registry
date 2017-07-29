@@ -2,24 +2,27 @@
 /**
  * COmanage Registry CO Themes Index View
  *
- * Copyright (C) 2016 MLA
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2016 MLA
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
- * @since         COmanage Registry v1.1.0
+ * @since         COmanage Registry v2.0.0
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
 
   // Add breadcrumbs
@@ -49,67 +52,64 @@
 
 ?>
 
-<table id="co_themes" class="ui-widget">
-  <thead>
-    <tr class="ui-widget-header">
-      <th><?php print $this->Paginator->sort('name', _txt('fd.key')); ?></th>
-      <th><?php print _txt('fd.actions'); ?></th>
-    </tr>
-  </thead>
+<div class="table-container">
+  <table id="co_themes">
+    <thead>
+      <tr>
+        <th><?php print $this->Paginator->sort('name', _txt('fd.key')); ?></th>
+        <th><?php print _txt('fd.actions'); ?></th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <?php $i = 0; ?>
+      <?php foreach ($co_themes as $c): ?>
+      <tr class="line<?php print ($i % 2)+1; ?>">
+        <td>
+          <?php
+            print $this->Html->link($c['CoTheme']['name'],
+                                    array('controller' => 'co_themes',
+                                          'action' => ($permissions['edit'] ? 'edit' : ($permissions['view'] ? 'view' : '')),
+                                          $c['CoTheme']['id']));
+          ?>
+        </td>
+        <td>
+          <?php
+            if($permissions['edit']) {
+              print $this->Html->link(_txt('op.edit'),
+                  array('controller' => 'co_themes',
+                    'action' => 'edit',
+                    $c['CoTheme']['id']),
+                  array('class' => 'editbutton')) . "\n";
+            }
+            if($permissions['delete']) {
+              print '<button type="button" class="deletebutton" title="' . _txt('op.delete')
+                . '" onclick="javascript:js_confirm_generic(\''
+                . _txt('js.remove') . '\',\''    // dialog body text
+                . $this->Html->url(              // dialog confirm URL
+                  array(
+                    'controller' => 'co_themes',
+                    'action' => 'delete',
+                    $c['CoTheme']['id']
+                  )
+                ) . '\',\''
+                . _txt('op.remove') . '\',\''    // dialog confirm button
+                . _txt('op.cancel') . '\',\''    // dialog cancel button
+                . _txt('op.remove') . '\',[\''   // dialog title
+                . filter_var(_jtxt($c['CoTheme']['name']),FILTER_SANITIZE_STRING)  // dialog body text replacement strings
+                . '\']);">'
+                . _txt('op.delete')
+                . '</button>';
+            }
+          ?>
+          <?php ; ?>
+        </td>
+      </tr>
+      <?php $i++; ?>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
+</div>
   
-  <tbody>
-    <?php $i = 0; ?>
-    <?php foreach ($co_themes as $c): ?>
-    <tr class="line<?php print ($i % 2)+1; ?>">
-      <td>
-        <?php
-          print $this->Html->link($c['CoTheme']['name'],
-                                  array('controller' => 'co_themes',
-                                        'action' => ($permissions['edit'] ? 'edit' : ($permissions['view'] ? 'view' : '')),
-                                        $c['CoTheme']['id']));
-        ?>
-      </td>
-      <td>
-        <?php
-          if($permissions['edit']) {
-            print $this->Html->link(_txt('op.edit'),
-                array('controller' => 'co_themes',
-                  'action' => 'edit',
-                  $c['CoTheme']['id']),
-                array('class' => 'editbutton')) . "\n";
-          }
-          if($permissions['delete']) {
-            print '<button type="button" class="deletebutton" title="' . _txt('op.delete')
-              . '" onclick="javascript:js_confirm_generic(\''
-              . _txt('js.remove') . '\',\''    // dialog body text
-              . $this->Html->url(              // dialog confirm URL
-                array(
-                  'controller' => 'co_themes',
-                  'action' => 'delete',
-                  $c['CoTheme']['id']
-                )
-              ) . '\',\''
-              . _txt('op.remove') . '\',\''    // dialog confirm button
-              . _txt('op.cancel') . '\',\''    // dialog cancel button
-              . _txt('op.remove') . '\',[\''   // dialog title
-              . filter_var(_jtxt($c['CoTheme']['name']),FILTER_SANITIZE_STRING)  // dialog body text replacement strings
-              . '\']);">'
-              . _txt('op.delete')
-              . '</button>';
-          }
-        ?>
-        <?php ; ?>
-      </td>
-    </tr>
-    <?php $i++; ?>
-    <?php endforeach; ?>
-  </tbody>
-  
-  <tfoot>
-    <tr class="ui-widget-header">
-      <th colspan="2">
-        <?php print $this->element("pagination"); ?>
-      </th>
-    </tr>
-  </tfoot>
-</table>
+<?php
+  print $this->element("pagination");

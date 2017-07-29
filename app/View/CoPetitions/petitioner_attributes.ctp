@@ -2,24 +2,27 @@
 /**
  * COmanage Registry CO Petition PetitionerAttributes View
  *
- * Copyright (C) 2015-16 University Corporation for Advanced Internet Development, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2015-16 University Corporation for Advanced Internet Development, Inc.
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
  * @since         COmanage Registry v0.9.4
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
 ?>
 <script type="text/javascript">
@@ -31,14 +34,26 @@ $(document).ready(function() {
     if(event.which != 13) {
       // 13 is enter/return... don't search on form submit
       // XXX Don't hardcode fields here, or /registry prefix
+      var thisFieldId = $(this).attr("id");
       $.ajax({
         url: '/registry/co_people/match/coef:' + <?php print filter_var($co_enrollment_flow_id,FILTER_SANITIZE_URL); ?>
              + '/given:' + document.getElementById(givenNameAttr).value
              + '/family:' + document.getElementById(familyNameAttr).value
       }).done(function(data) {
-        $('#petitionerMatchResults').html(data);
+        //$('#petitionerMatchResults').html(data);
+        $("#matchable-for-" + thisFieldId).html(data);
+
+        // provide a close button to manually hide matchable info
+        $("#matchable-for-" + thisFieldId + " .close-button").click(function() {
+          $(this).closest('.matchable-output').hide();
+        });
       });
     }
+  });
+
+  // clear out existing matchable output boxes when focusing a matchable field
+  $("input.matchable").focus(function() {
+    $('.matchable-output').html('').show();
   });
 });
 </script>
@@ -71,7 +86,7 @@ $(document).ready(function() {
 
   $this->set('enrollmentFlowSteps', $enrollmentFlowSteps);
 
-
+  // XXX is $submit_label used?
   $submit_label = _txt('op.add');
   
   print $this->Form->create(
@@ -93,14 +108,11 @@ $(document).ready(function() {
     print $this->Form->hidden('CoPetition.token', array('default' => $vv_petition_token)) . "\n";
   }
 ?>
-<div>
-  <div id="tabs-attributes">
-    <?php
-      $e = true;  
-      
-      include('petition-attributes.inc');
-    ?>
-  </div>
+<div id="tabs-attributes">
+  <?php
+    $e = true;
+    include('petition-attributes.inc');
+  ?>
 </div>
 <?php
   print $this->Form->end();

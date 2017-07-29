@@ -2,24 +2,27 @@
 /**
  * COmanage Registry Lightbox Layout
  *
- * Copyright (C) 2015 University Corporation for Advanced Internet Development, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2015 University Corporation for Advanced Internet Development, Inc.
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
  * @since         COmanage Registry v1.0
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
 
   // As a general rule, all Registry pages are post-login and so shouldn't be cached
@@ -41,19 +44,20 @@
     <?php print $this->Html->meta('favicon.ico','/favicon.ico',array('type' => 'icon')); ?>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
 
-    <!-- Include the comanage and jquery style sheets -->
+    <!-- Load CSS -->
     <?php
-    print $this->Html->css('jquery/ui/css/comanage-theme/jquery-ui-1.10.0.comanage');
-    print $this->Html->css('jquery/superfish/css/superfish');
-    print $this->Html->css('comanage');
-    print $this->Html->css('comanage-lightbox');
+    print $this->Html->css('jquery/jquery-ui-1.12.1.custom/jquery-ui.min') . "\n    ";
+    print $this->Html->css('mdl/mdl-1.3.0/material.min.css') . "\n    ";
+    print $this->Html->css('fonts/Font-Awesome-4.6.3/css/font-awesome.min') . "\n    ";
+    print $this->Html->css('co-base');
+    print $this->Html->css('co-responsive');
+    print $this->Html->css('co-lightbox');
     ?>
 
-    <!-- Get jquery code -->
+    <!-- Load JavaScript -->
     <?php
-    print $this->Html->script('jquery/ui/js/jquery-1.9.0.js');
-    print $this->Html->script('jquery/ui/js/jquery-ui-1.10.0.custom.min.js');
-    print $this->Html->script('jquery/superfish/js/superfish.js');
+    print $this->Html->script('jquery/jquery-3.2.1.min.js') . "\n    ";
+    print $this->Html->script('jquery/jquery-ui-1.12.1.custom/jquery-ui.min.js') . "\n    ";
     print $this->Html->script('jquery/spin.min.js');
     ?>
 

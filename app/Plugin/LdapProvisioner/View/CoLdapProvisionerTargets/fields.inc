@@ -2,24 +2,27 @@
 /**
  * COmanage Registry CO LDAP Provisioning Target Fields
  *
- * Copyright (C) 2012-16 University Corporation for Advanced Internet Development, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2012-16 University Corporation for Advanced Internet Development, Inc.
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry-plugin
  * @since         COmanage Registry v0.8
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
 -->
 <script type="text/javascript">
@@ -129,159 +132,155 @@
       $currentGroupings[$grouping]['_index'] = $i;
     }
   }
-  
-  $l = 1;
 ?>
-<div class="ui-state-highlight ui-corner-all" style="margin-top: 20px; padding: 0 .7em;"> 
-  <p>
-    <span class="ui-icon ui-icon-info" style="float: left; margin-right: .3em;"></span>
-    <strong><?php print _txt('pl.ldapprovisioner.info'); ?></strong>
-  </p>
+<div class="co-info-topbox">
+  <i class="material-icons">info</i>
+  <?php print _txt('pl.ldapprovisioner.info'); ?>
 </div>
-<br />
-<table id="<?php print $this->action; ?>_co_ldap_provisioner_target" class="ui-widget">
-  <tbody>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td style="width:50%">
-        <strong class="fieldTitle"><?php print _txt('pl.ldapprovisioner.serverurl'); ?></strong><span class="required">*</span><br />
-        <span class="desc"><?php print _txt('pl.ldapprovisioner.serverurl.desc'); ?></span>
-      </td>
-      <td>
-        <?php print ($e ? $this->Form->input('serverurl', array('size' => 50)) : filter_var($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['serverurl'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <strong class="fieldTitle"><?php print _txt('pl.ldapprovisioner.binddn'); ?></strong><span class="required">*</span><br />
-        <span class="desc"><?php print _txt('pl.ldapprovisioner.binddn.desc'); ?></span>
-      </td>
-      <td>
-        <?php print ($e ? $this->Form->input('binddn', array('size' => 50)) : filter_var($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['binddn'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <strong class="fieldTitle"><?php print _txt('pl.ldapprovisioner.password'); ?></strong><span class="required">*</span><br />
-        <span class="desc"><?php print _txt('pl.ldapprovisioner.password.desc'); ?></span>
-      </td>
-      <td>
-        <?php print ($e ? $this->Form->input('password') : filter_var($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['password'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <strong class="fieldTitle"><?php print _txt('pl.ldapprovisioner.dntype'); ?></strong><span class="required">*</span><br />
-        <span class="desc"><?php print _txt('pl.ldapprovisioner.dntype.desc'); ?></span>
-      </td>
-      <td>
-        <?php
-          $xval = "";
-          
-          if(isset($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['dn_identifier_type'])) {
-            $xval = $co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['dn_identifier_type'];
-          }
-          
-          print ($e ? $this->Form->select('dn_identifier_type',
-                                          $identifier_types,
-                                          array('id' => 'dnIdentifierType',
-                                                'value' => $xval,
-                                                'empty' => false,
-                                                'onchange' => 'set_dn_attribute_name()'))
-                    : filter_var($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['dn_identifier_type'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <strong class="fieldTitle"><?php print _txt('pl.ldapprovisioner.dnattr'); ?></strong><span class="required">*</span><br />
-        <span class="desc"><?php print _txt('pl.ldapprovisioner.dnattr.desc'); ?></span>
-      </td>
-      <td>
-        <?php print ($e ? $this->Form->input('dn_attribute_name',
-                                             array('id' => 'dnIdentifierName'))
-                        : filter_var($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['dn_attribute_name'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <strong class="fieldTitle"><?php print _txt('pl.ldapprovisioner.basedn'); ?></strong><span class="required">*</span><br />
-        <span class="desc"><?php print _txt('pl.ldapprovisioner.basedn.desc'); ?></span>
-      </td>
-      <td>
-        <?php print ($e ? $this->Form->input('basedn', array('size' => 50)) : filter_var($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['basedn'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <strong class="fieldTitle"><?php print _txt('pl.ldapprovisioner.basedn.gr'); ?></strong><br />
-        <span class="desc"><?php print _txt('pl.ldapprovisioner.basedn.gr.desc'); ?></span>
-      </td>
-      <td>
-        <?php print ($e ? $this->Form->input('group_basedn', array('size' => 50)) : filter_var($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['group_basedn'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <strong class="fieldTitle"><?php print _txt('pl.ldapprovisioner.scope'); ?></strong><br />
-        <span class="desc"><?php print _txt('pl.ldapprovisioner.scope.desc'); ?></span>
-      </td>
-      <td>
-        <?php print ($e ? $this->Form->input('scope_suffix', array('size' => 50)) : filter_var($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['scope_suffix'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <strong class="fieldTitle"><?php print _txt('pl.ldapprovisioner.uam'); ?></strong><span class="required">*</span><br />
-        <span class="desc"><?php print _txt('pl.ldapprovisioner.uam.desc'); ?></span>
-      </td>
-      <td>
-        <?php
-          global $cm_lang, $cm_texts;
-          
-          $attrs = array();
-          $attrs['value'] = (isset($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['unconf_attr_mode'])
-                             ? $co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['unconf_attr_mode']
-                             : LdapProvUnconfAttrEnum::Remove);
-          $attrs['empty'] = false;
-          
-          if($e) {
-            print $this->Form->select('unconf_attr_mode',
-                                      $cm_texts[ $cm_lang ]['en.ldapprovisioner.unconfattr'],
-                                      $attrs);
 
-            if($this->Form->isFieldError('unconf_attr_mode')) {
-              print $this->Form->error('unconf_attr_mode');
-            }
-          } else {
-            print _txt('en.ldapprovisioner.unconfattr', null, $co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['unconf_attr_mode']);
+<ul id="<?php print $this->action; ?>_co_ldap_provisioner_target" class="fields form-list form-list-admin">
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print _txt('pl.ldapprovisioner.serverurl'); ?> <span class="required">*</span></div>
+      <div class="field-desc"><?php print _txt('pl.ldapprovisioner.serverurl.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e ? $this->Form->input('serverurl', array('size' => 50)) : filter_var($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['serverurl'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print _txt('pl.ldapprovisioner.binddn'); ?> <span class="required">*</span></div>
+      <div class="field-desc"><?php print _txt('pl.ldapprovisioner.binddn.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e ? $this->Form->input('binddn', array('size' => 50)) : filter_var($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['binddn'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print _txt('pl.ldapprovisioner.password'); ?> <span class="required">*</span></div>
+      <div class="field-desc"><?php print _txt('pl.ldapprovisioner.password.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e ? $this->Form->input('password') : filter_var($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['password'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print _txt('pl.ldapprovisioner.dntype'); ?> <span class="required">*</span></div>
+      <div class="field-desc"><?php print _txt('pl.ldapprovisioner.dntype.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php
+        $xval = "";
+        
+        if(isset($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['dn_identifier_type'])) {
+          $xval = $co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['dn_identifier_type'];
+        }
+        
+        print ($e ? $this->Form->select('dn_identifier_type',
+                                        $identifier_types,
+                                        array('id' => 'dnIdentifierType',
+                                              'value' => $xval,
+                                              'empty' => false,
+                                              'onchange' => 'set_dn_attribute_name()'))
+          : filter_var($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['dn_identifier_type'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print _txt('pl.ldapprovisioner.dnattr'); ?> <span class="required">*</span></div>
+      <div class="field-desc"><?php print _txt('pl.ldapprovisioner.dnattr.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e ? $this->Form->input('dn_attribute_name',
+                                           array('id' => 'dnIdentifierName'))
+        : filter_var($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['dn_attribute_name'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print _txt('pl.ldapprovisioner.basedn'); ?> <span class="required">*</span></div>
+      <div class="field-desc"><?php print _txt('pl.ldapprovisioner.basedn.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e ? $this->Form->input('basedn', array('size' => 50)) : filter_var($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['basedn'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print _txt('pl.ldapprovisioner.basedn.gr'); ?></div>
+      <div class="field-desc"><?php print _txt('pl.ldapprovisioner.basedn.gr.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e ? $this->Form->input('group_basedn', array('size' => 50)) : filter_var($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['group_basedn'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print _txt('pl.ldapprovisioner.scope'); ?></div>
+      <div class="field-desc"><?php print _txt('pl.ldapprovisioner.scope.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e ? $this->Form->input('scope_suffix', array('size' => 50)) : filter_var($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['scope_suffix'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print _txt('pl.ldapprovisioner.uam'); ?><span class="required">*</span></div>
+      <div class="field-desc"><?php print _txt('pl.ldapprovisioner.uam.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php
+        global $cm_lang, $cm_texts;
+
+        $attrs = array();
+        $attrs['value'] = (isset($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['unconf_attr_mode'])
+          ? $co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['unconf_attr_mode']
+          : LdapProvUnconfAttrEnum::Remove);
+        $attrs['empty'] = false;
+
+        if($e) {
+          print $this->Form->select('unconf_attr_mode',
+            $cm_texts[ $cm_lang ]['en.ldapprovisioner.unconfattr'],
+            $attrs);
+
+          if($this->Form->isFieldError('unconf_attr_mode')) {
+            print $this->Form->error('unconf_attr_mode');
           }
-        ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <strong class="fieldTitle"><?php print _txt('pl.ldapprovisioner.opts'); ?></strong><br />
-        <span class="desc"><?php /* print _txt('pl.ldapprovisioner.opts.desc'); */ ?></span>
-      </td>
-      <td>
-        <?php
-          if($e) {
-            // Disabled because not yet implemented -- need CO-115
-            print $this->Form->input('opt_lang', array('label' => _txt('pl.ldapprovisioner.opt.lang'),
-                                                       'disabled' => true)) . "<br />";
-            
-            // Disabled because not yet implemented
-            print $this->Form->input('opt_role', array('label' => _txt('pl.ldapprovisioner.opt.role'),
-                                                       'disabled' => true)) . "<br />";
-          }
-        ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <strong class="fieldTitle"><?php print _txt('pl.ldapprovisioner.attrs'); ?></strong><span class="required">*</span><br />
-        <span class="desc"><?php print _txt('pl.ldapprovisioner.attrs.desc'); ?></span>
-      </td>
-      <td>
+        } else {
+          print _txt('en.ldapprovisioner.unconfattr', null, $co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['unconf_attr_mode']);
+        }
+      ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print _txt('pl.ldapprovisioner.opts'); ?></div>
+      <div class="field-desc"><?php /* print _txt('pl.ldapprovisioner.opts.desc'); */ ?></div>
+    </div>
+    <div class="field-info checkbox">
+      <?php
+        if($e) {
+          // Disabled because not yet implemented -- need CO-115
+          print $this->Form->input('opt_lang', array('label' => _txt('pl.ldapprovisioner.opt.lang'),
+                                                   'disabled' => true));
+          
+          // Disabled because not yet implemented
+          print $this->Form->input('opt_role', array('label' => _txt('pl.ldapprovisioner.opt.role'),
+                                                   'disabled' => true));
+        }
+      ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name vtop">
+      <div class="field-title"><?php print _txt('pl.ldapprovisioner.attrs'); ?> <span class="required">*</span></div>
+      <div class="field-desc"><?php print _txt('pl.ldapprovisioner.attrs.desc'); ?></div>
+    </div>
+    <div class="field-info"><!-- do not apply class "checkbox" here -->
+      <div class="fixed-width">
         <?php
           if($e) {
             global $cm_lang, $cm_texts;
@@ -403,7 +402,7 @@
                 
                 $xname = 'CoLdapProvisionerAttribute.' . $xindex . '.export';
                 $xlabel = '<code>' . $attr . '</code>';
-                // Prior to v1.1.0, default was to check for new entries, but that
+                // Prior to v2.0.0, default was to check for new entries, but that
                 // probably isn't desirable for stable deployments (and is also
                 // unintuitive from the UI), so new default is unchecked.
                 $xchecked = (isset($currentAttributes[$attr]['export'])
@@ -482,53 +481,49 @@
                         . "<br />\n";
                 }
               }
-              
-              print "</div>";
             }
           }
         ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <strong class="fieldTitle"><?php print _txt('pl.ldapprovisioner.person_ocs'); ?></strong><br />
-        <span class="desc"><?php print _txt('pl.ldapprovisioner.person_ocs.desc'); ?></span>
-      </td>
-      <td>
-        <?php print ($e
-                     ? $this->Form->input('person_ocs')
-                     : filter_var($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['person_ocs'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <strong class="fieldTitle"><?php print _txt('pl.ldapprovisioner.group_ocs'); ?></strong><br />
-        <span class="desc"><?php print _txt('pl.ldapprovisioner.group_ocs.desc'); ?></span>
-      </td>
-      <td>
-        <?php print ($e
-                     ? $this->Form->input('group_ocs')
-                     : filter_var($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['group_ocs'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <i><span class="required"><?php print _txt('fd.req'); ?></span></i><br />
-      </td>
-      <td>
+      </div>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print _txt('pl.ldapprovisioner.person_ocs'); ?></div>
+      <div class="field-desc"><?php print _txt('pl.ldapprovisioner.person_ocs.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e
+                   ? $this->Form->input('person_ocs')
+        : filter_var($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['person_ocs'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print _txt('pl.ldapprovisioner.group_ocs'); ?></div>
+      <div class="field-desc"><?php print _txt('pl.ldapprovisioner.group_ocs.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e
+                   ? $this->Form->input('group_ocs')
+        : filter_var($co_ldap_provisioner_targets[0]['CoLdapProvisionerTarget']['group_ocs'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <?php if($e): ?>
+    <li class="fields-submit">
+      <div class="field-name">
+        <span class="required"><?php print _txt('fd.req'); ?></span>
+      </div>
+      <div class="field-info">
         <?php
-          if($e) {
-            print $this->Form->submit($submit_label,
-                                     // We could also do this by adding onsubmit to the form open tag
-                                     array('onclick' => 'return js_check_group_config()'));
-            print $this->Form->button(_txt('op.reset'), 
-                                      array('type'=>'reset'));
-          }
+          print $this->Form->submit($submit_label,
+            // We could also do this by adding onsubmit to the form open tag
+            array('onclick' => 'return js_check_group_config()'));
         ?>
-      </td>
-    </tr>
-  </tbody>
-</table>
+      </div>
+    </li>
+  <?php endif; ?>
+</ul>
 
 <div id="error-dialog" title="<?php print _txt('pl.ldapprovisioner.basedn.gr'); ?>">
   <p><?php print _txt('er.ldapprovisioner.basedn.gr.none'); ?></p>

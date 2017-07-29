@@ -2,24 +2,27 @@
 /**
  * COmanage Registry Telephone Number Fields
  *
- * Copyright (C) 2010-16 University Corporation for Advanced Internet Development, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2010-16 University Corporation for Advanced Internet Development, Inc.
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
  * @since         COmanage Registry v0.1
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
 
   // Determine if fields are editable
@@ -104,70 +107,69 @@
 
   $l = 1;
 ?>
-<table id="<?php print $this->action; ?>_telephone_number" class="ui-widget">
-  <tbody>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <?php print _txt('fd.telephone_number.country_code'); ?>
-      </td>
-      <td>
-        <?php print ($e ? $this->Form->input('country_code') : filter_var($telephone_numbers[0]['TelephoneNumber']['country_code'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <?php print _txt('fd.telephone_number.area_code'); ?>
-      </td>
-      <td>
-        <?php print ($e ? $this->Form->input('area_code') : filter_var($telephone_numbers[0]['TelephoneNumber']['area_code'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <?php print _txt('fd.telephone_number.number'); ?><span class="required">*</span>
-      </td>
-      <td>
-        <?php print ($e ? $this->Form->input('number', array('class' => 'focusFirst')) : filter_var($telephone_numbers[0]['TelephoneNumber']['number'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <?php print _txt('fd.telephone_number.extension'); ?>
-      </td>
-      <td>
-        <?php print ($e ? $this->Form->input('extension') : filter_var($telephone_numbers[0]['TelephoneNumber']['extension'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-      </td>
-    </tr>
-    <tr class="line<?php print ($l % 2); $l++; ?>">
-      <td>
-        <?php print _txt('fd.type'); ?>
-      </td>
-      <td>
-        <?php
-          $attrs = array();
-          $attrs['value'] = (isset($telephone_numbers) ? $telephone_numbers[0]['TelephoneNumber']['type'] : "");
-          $attrs['empty'] = false;
+<ul id="<?php print $this->action; ?>_telephone_number" class="fields form-list">
+  <li>
+    <div class="field-name">
+      <?php print _txt('fd.telephone_number.country_code'); ?>
+    </div>
+    <div class="field-info">
+      <?php print ($e ? $this->Form->input('country_code') : filter_var($telephone_numbers[0]['TelephoneNumber']['country_code'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <?php print _txt('fd.telephone_number.area_code'); ?>
+    </div>
+    <div class="field-info">
+      <?php print ($e ? $this->Form->input('area_code') : filter_var($telephone_numbers[0]['TelephoneNumber']['area_code'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <?php print _txt('fd.telephone_number.number'); ?><span class="required">*</span>
+    </div>
+    <div class="field-info">
+      <?php print ($e ? $this->Form->input('number', array('class' => 'focusFirst')) : filter_var($telephone_numbers[0]['TelephoneNumber']['number'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <?php print _txt('fd.telephone_number.extension'); ?>
+    </div>
+    <div class="field-info">
+      <?php print ($e ? $this->Form->input('extension') : filter_var($telephone_numbers[0]['TelephoneNumber']['extension'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <?php print _txt('fd.type'); ?>
+    </div>
+    <div class="field-info">
+      <?php
+        $attrs = array();
+        $attrs['value'] = (isset($telephone_numbers) ? $telephone_numbers[0]['TelephoneNumber']['type'] : "");
+        $attrs['empty'] = false;
+        
+        if($e) {
+          print $this->Form->select('type',
+                                    $vv_available_types,
+                                    $attrs);
           
-          if($e) {
-            print $this->Form->select('type',
-                                      $vv_available_types,
-                                      $attrs);
-            
-            if($this->Form->isFieldError('type')) {
-              print $this->Form->error('type');
-            }
-          } else {
-            print _txt('en.contact', null, $telephone_numbers[0]['TelephoneNumber']['type']);
+          if($this->Form->isFieldError('type')) {
+            print $this->Form->error('type');
           }
-        ?>
-      </td>
-    </tr>
-    <?php if(!empty($telephone_numbers[0]['SourceTelephoneNumber']['id'])): ?>
-    <tr class="line<?php print $l % 2;$l++; ?>">
-      <td>
+        } else {
+          print _txt('en.contact', null, $telephone_numbers[0]['TelephoneNumber']['type']);
+        }
+      ?>
+    </div>
+  </li>
+  <?php if(!empty($telephone_numbers[0]['SourceTelephoneNumber']['id'])): ?>
+    <li>
+      <div class="field-name">
         <?php print _txt('fd.source'); ?><br />
-      </td>
-      <td>
+      </div>
+      <div class="field-info">
         <?php print $this->Html->link(_txt('ct.telephone_numbers.1'),
                                       array('controller' => 'telephone_numbers',
                                             'action'     => 'view',
@@ -178,23 +180,19 @@
                                             'action'     => 'view',
                                             $telephone_numbers[0]['SourceTelephoneNumber']['org_identity_id']));
         ?>
-      </td>
-    </tr>
-    <?php endif; // source id ?>    <tr>
-      <td>
-        <em><span class="required"><?php print _txt('fd.req'); ?></span></em><br />
-      </td>
-      <td>
-        <?php
-          if($e) {
-            print $this->Form->submit($submit_label);
-            print $this->Form->button(_txt('op.reset'), 
-                                      array('type'=>'reset'));
-          }
-        ?>
-      </td>
-    </tr>
-  </tbody>
-</table>
+      </div>
+    </li>
+  <?php endif; // source id ?>
+  <?php if($e): ?>
+    <li class="fields-submit">
+      <div class="field-name">
+        <span class="required"><?php print _txt('fd.req'); ?></span>
+      </div>
+      <div class="field-info">
+        <?php print $this->Form->submit($submit_label); ?>
+      </div>
+    </li>
+  <?php endif; ?>
+</ul>
 <?php
   print $this->element("changelog");

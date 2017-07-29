@@ -2,24 +2,27 @@
 /**
  * COmanage Registry CO Person Role Model
  *
- * Copyright (C) 2010-17 University Corporation for Advanced Internet Development, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2010-17 University Corporation for Advanced Internet Development, Inc.
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
  * @since         COmanage Registry v0.2
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
 
 class CoPersonRole extends AppModel {
@@ -275,6 +278,8 @@ class CoPersonRole extends AppModel {
                                       ($this->cachedData[$this->alias]['valid_through']
                                        != $curdata[$this->alias]['valid_through']));
     }
+    
+    return true;
   }
   
   /**
@@ -359,7 +364,7 @@ class CoPersonRole extends AppModel {
    * Expire any roles for the specified CO Person ID. Specifically, set the status
    * to Expired and set the valid through date to yesterday, if one was set.
    *
-   * @since  COmanage Registry v1.1.0
+   * @since  COmanage Registry v2.0.0
    * @param  Integer $coPersonId      CO Person ID
    * @param  Integer $couId           COU ID to expire roles for, or null for any role
    * @param  Integer $actorCoPersonId CO Person ID of actor, if interactive
@@ -432,14 +437,14 @@ class CoPersonRole extends AppModel {
     // Map the CO Person Role ID to a CO Person ID. Because CoPersonRole is
     // changelog enabled, this will work even on a delete or expunge.
     
-    $coPersonId = $this->field('co_person_id', array('CoPersonRole.id' => $id));
+    $coPersonId = $this->field('co_person_id', array($modelName.'.id' => $id));
     
     if(!$coPersonId) {
       // We're probably deleting the CO
       return;
     }
     
-    $couId = $this->field('cou_id', array('CoPersonRole.id' => $id));
+    $couId = $this->field('cou_id', array($modelName.'.id' => $id));
     
     if(!$couId) {
       // There is no COU associated with this role, so nothing to do

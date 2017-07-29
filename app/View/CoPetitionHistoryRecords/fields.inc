@@ -2,24 +2,27 @@
 /**
  * COmanage Registry CO Petition History Record Fields
  *
- * Copyright (C) 2014 University Corporation for Advanced Internet Development, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- * 
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Portions licensed to the University Corporation for Advanced Internet
+ * Development, Inc. ("UCAID") under one or more contributor license agreements.
+ * See the NOTICE file distributed with this work for additional information
+ * regarding copyright ownership.
  *
- * @copyright     Copyright (C) 2014 University Corporation for Advanced Internet Development, Inc.
+ * UCAID licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
  * @since         COmanage Registry v0.9.1
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
- * @version       $Id$
  */
 
   // Determine if fields are editable
@@ -65,33 +68,34 @@
   $this->Html->addCrumb(_txt('op.petition.comment'));
 
 ?>
-<table id="<?php print $this->action; ?>_co_petition_history_record" class="ui-widget">
-  <tbody>
-    <tr class="line1">
-      <td>
-        <?php print _txt('fd.comment'); ?><span class="required">*</span>
-      </td>
-      <td>
-        <?php print ($e
-                     ? $this->Form->input('comment',
-                                          array('class' => 'focusFirst',
-                                                'size'  => '80'))
-                     : ""); ?>
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <em><span class="required"><?php print _txt('fd.req'); ?></span></em><br />
-      </td>
-      <td>
-        <?php
-          if($e) {
-            print $this->Form->submit($submit_label);
-            print $this->Form->button(_txt('op.reset'), 
-                                      array('type'=>'reset'));
-          }
-        ?>
-      </td>
-    </tr>
-  </tbody>
-</table>
+
+<div class="table-container">
+  <table id="<?php print $this->action; ?>_co_petition_history_record">
+    <tbody>
+      <tr class="line1">
+        <td>
+          <?php print _txt('fd.comment'); ?><span class="required">*</span>
+        </td>
+        <td>
+          <?php print ($e
+                       ? $this->Form->input('comment',
+                                            array('class' => 'focusFirst',
+                                                  'size'  => '80'))
+                       : ""); ?>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <em><span class="required"><?php print _txt('fd.req'); ?></span></em><br />
+        </td>
+        <td>
+          <?php
+            if($e) {
+              print $this->Form->submit($submit_label);
+            }
+          ?>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>  
