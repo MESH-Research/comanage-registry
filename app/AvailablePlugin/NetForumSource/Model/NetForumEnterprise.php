@@ -371,8 +371,13 @@ class NetForumEnterprise extends NetForumServer {
     // The format here is a Unix timestamp, which we created when we parsed the membership records
     if(!empty($result->Membership->ValidFrom))
       $orgdata['OrgIdentity']['valid_from'] = strftime("%F %T", (integer)$result->Membership->ValidFrom);
-//    if(!empty($result->Membership->ValidThrough))
-//      $orgdata['OrgIdentity']['valid_through'] = strftime("%F %T", (integer)$result->Membership->ValidThrough);
+    // Add fake grace period for initial CAA signups
+    if(!empty($result->Membership->ValidThrough)) {
+      //$orgdata['OrgIdentity']['valid_through'] = strftime("%F %T", (integer)$result->Membership->ValidThrough);
+      $validThrough = new DateTime(strftime("%F %T", (integer)$result->Membership->ValidThrough) . ' +15 days');
+      $orgdata['OrgIdentity']['valid_through'] = $validThrough->format('Y-m-d H:i:s');
+      unset($validThrough);
+    }
     
     $orgdata['Name'] = array();
     if(!empty($result->ind_first_name))
