@@ -92,6 +92,7 @@ class Identifier extends AppModel {
                                                  IdentifierEnum::ProvisioningTarget,
                                                  IdentifierEnum::Reference,
                                                  IdentifierEnum::SORID,
+                                                 'wpid',
                                                  IdentifierEnum::UID))),
         'required' => true,
         'allowEmpty' => false

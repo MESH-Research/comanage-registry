@@ -502,6 +502,7 @@ original notification at
                                  IdentifierEnum::Network => 'Network',
                                  IdentifierEnum::OpenID => 'OpenID',
                                  IdentifierEnum::ORCID => 'ORCID iD',
+                                 'wpid' => 'WordPress ID',
                                  IdentifierEnum::ProvisioningTarget => 'Provisioning Target',
                                  IdentifierEnum::Reference => 'Match Reference',
                                  IdentifierEnum::SORID => 'System of Record ID',
