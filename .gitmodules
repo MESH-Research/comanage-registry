@@ -1,0 +1,3 @@
+[submodule "local/Plugin/MlaSource"]
+	path = local/Plugin/MlaSource
+	url = git@github.com:mlaa/MlaSource.git
