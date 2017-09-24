@@ -117,6 +117,8 @@ class CoPetitionsController extends StandardController {
   
   // Here are the required tasks when adding a new step:
   // - Figure out the correct ordering of the step and insert it into $nextSteps
+  // -- dispatch() has special logic for the last step (ie: provision) that will need updating
+  //    if insterting a step after "provision"
   // - Update CoEnrollmentFlow::configuredSteps()
   // - Add an appropriate STEP function (eg: approve()), and update isAuthorized()
   // - Add an appropriate execute_STEP function (eg: execute_approve())
@@ -728,9 +730,21 @@ class CoPetitionsController extends StandardController {
           }
         }
         
+        // If a return URL was provided, store it for later use
+        $returnUrl = null;
+        
+        if(!empty($this->request->params['named']['return'])) {
+          // Because the URL is in a parameter, we expect it to be encoded.
+          // We use base64 to avoid weird parsing errors with partially
+          // visible URLs in a URL.
+          
+          $returnUrl = base64_decode($this->request->params['named']['return']);
+        }
+        
         $ptid = $this->CoPetition->initialize($efId,
                                               $coId,
-                                              $petitionerCoPersonId);
+                                              $petitionerCoPersonId,
+                                              $returnUrl);
       }
       catch(Exception $e) {
         $this->Flash->set($e->getMessage(), array('key' => 'error'));
@@ -743,10 +757,12 @@ class CoPetitionsController extends StandardController {
     if($step == 'provision'
        && $steps['redirectOnConfirm']['enabled'] == RequiredEnum::NotPermitted) {
       // If we've completed the provision step, we're done, unless redirectOnConfirm
-      // is set. This is true when there is no approval step.
+      // is set. It is set when there is no approval step AND email confirmation
+      // is required.
       
       $this->Flash->set(_txt('rs.pt.final'), array('key' => 'success'));
-      $this->performRedirect();
+      
+      $this->execute_redirectOnFinalize($id);
     } else {
       // Firefox has a hardcoded redirect limit (default: 20) that we can actually
       // run into, especially if there are plugins defined and certain steps are
@@ -1101,6 +1117,61 @@ class CoPetitionsController extends StandardController {
       
       $this->Flash->set(_txt('rs.pt.relogin'), array('key' => 'success'));
       $targetUrl = "/auth/logout";
+    }
+    // else we suppress the flash message, since it may not make sense in context
+    // or may appear "randomly" (eg: if the targetUrl is outside the Cake framework)
+    
+    $this->redirect($targetUrl);
+  }
+  
+  /**
+   * Execute CO Petition 'redirectOnFinalize' step
+   *
+   * @since  COmanage Registry v3.1.0
+   * @param Integer $id CO Petition ID
+   * @throws Exception
+   */
+  
+  protected function execute_redirectOnFinalize($id) {
+    // Figure out where to redirect the enrollee to
+    
+    $targetUrl = $this->CoPetition->field('return_url', array('CoPetition.id' => $id));
+
+    if($targetUrl) {
+      // Check that this URL is whitelisted
+      
+      $whiteList = $this->CoPetition->CoEnrollmentFlow->field('return_url_whitelist',
+                                                              array('CoEnrollmentFlow.id' => $this->cachedEnrollmentFlowID));
+      
+      if(!empty($whiteList)) {
+        $found = false;
+        
+        foreach(preg_split('/\R/', $whiteList) as $u) {
+          if(preg_match($u, $targetUrl)) {
+            $found = true;
+            break;
+          }
+        }
+        
+        if(!$found) {
+          // No match, so ignore
+          
+          $targetUrl = null;
+        }
+      } else {
+        // No whitelisted URLs, so ignore return_url
+        $targetUrl = null;
+      }
+    }
+    
+    if(!$targetUrl || $targetUrl == "") {
+      $targetUrl = $this->CoPetition->CoEnrollmentFlow->field('redirect_on_finalize',
+                                                              array('CoEnrollmentFlow.id' => $this->cachedEnrollmentFlowID));
+    }
+    
+    if(!$targetUrl || $targetUrl == "") {
+      // We're done with the enrollment, use the default redirect behavior
+      $this->performRedirect();
     }
     // else we suppress the flash message, since it may not make sense in context
     // or may appear "randomly" (eg: if the targetUrl is outside the Cake framework)

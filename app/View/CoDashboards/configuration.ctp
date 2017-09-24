@@ -69,6 +69,18 @@
         print "</li>";
       }
 
+      if (isset($permissions['menu']['authenticator']) && $permissions['menu']['authenticator']) {
+        print '<li>';
+        $args = array();
+        $args['plugin'] = null;
+        $args['controller'] = 'authenticators';
+        $args['action'] = 'index';
+        $args['co'] = $menuCoId;
+
+        print $this->Html->link(_txt('ct.authenticators.pl'), $args);
+        print "</li>";
+      }
+
       if (isset($permissions['menu']['cous']) && $permissions['menu']['cous']) {
         print '<li>';
         $args = array();
@@ -81,6 +93,18 @@
         print "</li>";
       }
 
+      if (isset($permissions['menu']['colists']) && $permissions['menu']['colists']) {
+        print '<li>';
+        $args = array();
+        $args['plugin'] = null;
+        $args['controller'] = 'co_email_lists';
+        $args['action'] = 'index';
+        $args['co'] = $menuCoId;
+        
+        print $this->Html->link(_txt('ct.co_email_lists.pl'), $args);
+        print "</li>";
+      }
+      
       if (isset($permissions['menu']['coef']) && $permissions['menu']['coef']) {
         print '<li>';
         $args = array();

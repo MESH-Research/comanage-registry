@@ -52,7 +52,7 @@ $efcos = Hash::extract($vv_enrollment_flow_cos, '{n}.CoEnrollmentFlow.co_id');
       print '<span class="fa arrow fa-fw"></span>';
       print '<span class="mdl-ripple"></span>';
       print '</a>';
-      print '<ul aria-expanded="false">';
+      print '<ul aria-expanded="false" class="collapse">';
 
       if (isset($permissions['menu']['cos']) && $permissions['menu']['cos']) {
         print '<li class="mdl-js-ripple-effect">';
@@ -165,7 +165,7 @@ $efcos = Hash::extract($vv_enrollment_flow_cos, '{n}.CoEnrollmentFlow.co_id');
         print '<span class="fa arrow fa-fw"></span>';
         print '<span class="mdl-ripple"></span>';
         print '</a>';
-        print '<ul aria-expanded="false">';
+        print '<ul aria-expanded="false" class="collapse">';
 
         print '<li class="mdl-js-ripple-effect">';
         $args = array();
@@ -196,22 +196,98 @@ $efcos = Hash::extract($vv_enrollment_flow_cos, '{n}.CoEnrollmentFlow.co_id');
         print "</li>";
       }
       
-      // Services Menu
-      if(!empty($menuContent['services'])) {
-        print '<li class="serviceMenu">';
+      // Departments Menu
+      if($permissions['menu']['codepartments']) {
+        print '<li class="configMenu">';
 
-        $linkContent = '<em class="material-icons" aria-hidden="true">apps</em><span class="menuTitle">' . _txt('ct.co_services.pl') .
+        $linkContent = '<em class="material-icons" aria-hidden="true">business</em><span class="menuTitle">' . _txt('ct.co_departments.pl') .
           '</span><span class="mdl-ripple"></span>';
 
         $args = array();
         $args['plugin'] = null;
-        $args['controller'] = 'co_services';
-        $args['action'] = 'portal';
+        $args['controller'] = 'co_departments';
+        $args['action'] = 'index';
         $args['co'] = $menuCoId;
-        print $this->Html->link($linkContent, $args, array('class' => 'mdl-js-ripple-effect', 'escape' => false));
+
+        print $this->Html->link($linkContent, $args, array('class' => 'mdl-js-ripple-effect', 'escape' => false,));
 
         print "</li>";
-
+      }
+      
+      // Services Menu
+      if(!empty($menuContent['services'])) {
+        // We either create a single click menu or a nested drop down menu, according to the contents
+        // of $menuContent['services']. Start by rekeying on COU ID (using -1 for CO-wide.)
+        
+        $services = array();
+        
+        foreach($menuContent['services'] as $s) {
+          $sCouId = !empty($s['CoService']['cou_id']) ? $s['CoService']['cou_id'] : -1;
+          
+          $services[$sCouId][] = $s;
+        }
+        
+        if(count(array_keys($services)) > 1) {
+          // Multiple entries, so render a link to each COU.
+          
+          print '<li class="serviceMenu">';
+          print '<a class="menuTop mdl-js-ripple-effect" aria-expanded="false" href="#">';
+          print '<em class="material-icons" aria-hidden="true">apps</em>';
+          print '<span class="menuTitle">' . _txt('ct.co_services.pl') . '</span>';
+          print '<span class="fa arrow fa-fw"></span>';
+          print '<span class="mdl-ripple"></span>';
+          print '</a>';
+          print '<ul aria-expanded="false" class="collapse">';
+          
+          // COU IDs with a service portal visible to this user
+          $couIds = array_keys($services);
+          sort($couIds);
+          
+          foreach($couIds as $sCouId) {
+            print '<li class="mdl-js-ripple-effect">';
+            $args = array();
+            $args['plugin'] = null;
+            $args['controller'] = 'co_services';
+            $args['action'] = 'portal';
+            if($sCouId == -1) {
+              // CO Portal
+              $args['co'] = $menuCoId;
+              print $this->Html->link($cur_co['Co']['name'], $args);
+            } else {
+              $args['cou'] = $sCouId;
+              print $this->Html->link($menuContent['cous'][$sCouId], $args);
+            }
+    
+            print '<span class="mdl-ripple"></span>';
+            print "</li>";
+          }
+          
+          print '</ul>';
+        } else {
+          // Single entry, so render a link straight to the appropriate dashboard.
+          
+          // Everything has the same COU ID, so we can just look at the first entry.
+          $sCouId = key($services);
+          
+          print '<li class="serviceMenu">';
+  
+          $linkContent = '<em class="material-icons" aria-hidden="true">apps</em><span class="menuTitle">' . _txt('ct.co_services.pl') .
+            '</span><span class="mdl-ripple"></span>';
+  
+          $args = array();
+          $args['plugin'] = null;
+          $args['controller'] = 'co_services';
+          $args['action'] = 'portal';
+          if($sCouId > -1) {
+            $args['couid'] = $sCouId;
+          } else {
+            $args['co'] = $menuCoId;
+          }
+          print $this->Html->link($linkContent, $args, array('class' => 'mdl-js-ripple-effect', 'escape' => false));
+  
+          print "</li>";
+        }
+        
         // Plugins
         /* XXX These need a home
         if(!empty($menuContent['plugins'])) {
@@ -219,6 +295,24 @@ $efcos = Hash::extract($vv_enrollment_flow_cos, '{n}.CoEnrollmentFlow.co_id');
         } */
       }
 
+      // Jobs Menu
+      if ($permissions['menu']['cojobs']) {
+        print '<li class="configMenu">';
+
+        $linkContent = '<em class="material-icons" aria-hidden="true">assignment</em><span class="menuTitle">' . _txt('ct.co_jobs.pl') .
+          '</span><span class="mdl-ripple"></span>';
+
+        $args = array();
+        $args['plugin'] = null;
+        $args['controller'] = 'co_jobs';
+        $args['action'] = 'index';
+        $args['co'] = $menuCoId;
+
+        print $this->Html->link($linkContent, $args, array('class' => 'mdl-js-ripple-effect', 'escape' => false,));
+
+        print "</li>";
+      }
+      
       // Configuration Menu
       if ($permissions['menu']['coconfig']) {
         print '<li class="configMenu">';
@@ -247,7 +341,7 @@ $efcos = Hash::extract($vv_enrollment_flow_cos, '{n}.CoEnrollmentFlow.co_id');
       print '<span class="fa arrow fa-fw"></span>';
       print '<span class="mdl-ripple"></span>';
       print '</a>';
-      print '<ul aria-expanded="false">';
+      print '<ul aria-expanded="false" class="collapse">';
 
       print '<li class="mdl-js-ripple-effect">';
       $args = array();
@@ -325,7 +419,7 @@ $efcos = Hash::extract($vv_enrollment_flow_cos, '{n}.CoEnrollmentFlow.co_id');
     // Collaborations Menu
     print '<li class="collabMenu">';
 
-    $linkContent = '<em class="material-icons" aria-hidden="true">assignment_turned_in</em><span class="menuTitle">' . _txt('me.collaborations') .
+    $linkContent = '<em class="material-icons" aria-hidden="true">transfer_within_a_station</em><span class="menuTitle">' . _txt('me.collaborations') .
       '</span><span class="mdl-ripple"></span>';
 
     print $this->Html->link($linkContent, '/', array('class' => 'mdl-js-ripple-effect', 'escape' => false,));

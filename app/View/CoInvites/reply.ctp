@@ -42,45 +42,12 @@
 <?php
   if($verifyEmail) {
     print "<p>" . _txt('fd.ev.verify.desc', array($invite['EmailAddress']['mail'])) . "</p>";
-    
-    print $this->Html->link(
-      _txt('op.confirm'),
-      array('controller' => 'co_invites',
-            'action' => 'authverify',
-            $invite['CoInvite']['invitation']),
-      array('class' => 'checkbutton')
-    );
-    
-    print $this->Html->link(
-      _txt('op.cancel'),
-      array('controller' => 'co_invites',
-            'action' => 'decline',
-            $invite['CoInvite']['invitation']),
-      array('class' => 'cancelbutton')
-    );
-  } else {
-    if(empty($co_petitions)) {
-      // Default enrollment, put up some basic text
-      print "<p>" . _txt('em.invite.body', array($invitee['Co']['name'])) . "</p>";
-    }
-    
-    print $this->Html->link(
-      _txt('op.accept'),
-      array('controller' => 'co_invites',
-            'action' => (isset($co_enrollment_flow['CoEnrollmentFlow']['require_authn'])
-                         && $co_enrollment_flow['CoEnrollmentFlow']['require_authn']) ? 'authconfirm' : 'confirm',
-            $invite['CoInvite']['invitation']),
-      array('class' => 'checkbutton')
-    );
-    
-    print $this->Html->link(
-      _txt('op.decline'),
-      array('controller' => 'co_invites',
-            'action' => 'decline',
-            $invite['CoInvite']['invitation']),
-      array('class' => 'cancelbutton')
-    );
+  } elseif(empty($co_petitions)) {
+    // Default enrollment, put up some basic text
+    print "<p>" . _txt('em.invite.body', array($invitee['Co']['name'])) . "</p>";
   }
+  
+  include "buttons.inc";
 ?>
 </div>
 

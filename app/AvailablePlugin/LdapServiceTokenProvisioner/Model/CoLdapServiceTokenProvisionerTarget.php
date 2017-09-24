@@ -93,7 +93,8 @@ class CoLdapServiceTokenProvisionerTarget extends CoProvisionerPluginTarget {
       case ProvisioningActionEnum::CoGroupReprovisionRequested:
         break;
       default:
-        throw new RuntimeException("Not Implemented");
+        // Ignore anything else
+        return true;
         break;
     }
     
@@ -106,7 +107,7 @@ class CoLdapServiceTokenProvisionerTarget extends CoProvisionerPluginTarget {
     $CoLdapProvisionerDn = ClassRegistry::init('LdapProvisioner.CoLdapProvisionerDn');
     
     $args = array();
-    $args['conditions']['CoLdapProvisionerDn.co_ldap_provisioner_target_id'] = $coProvisioningTargetData['CoLdapServiceTokenProvisionerTarget']['co_ldap_provisioner_target'];
+    $args['conditions']['CoLdapProvisionerDn.co_ldap_provisioner_target_id'] = $coProvisioningTargetData['CoLdapServiceTokenProvisionerTarget']['co_ldap_provisioner_target_id'];
     $args['conditions']['CoLdapProvisionerDn.co_person_id'] = $provisioningData['CoPerson']['id'];
     $args['fields'] = array('id', 'dn');
     $args['contain'] = false;
@@ -123,7 +124,7 @@ class CoLdapServiceTokenProvisionerTarget extends CoProvisionerPluginTarget {
     $CoLdapProvisionerTarget = ClassRegistry::init('LdapProvisioner.CoLdapProvisionerTarget');
     
     $args = array();
-    $args['conditions']['CoLdapProvisionerTarget.id'] = $coProvisioningTargetData['CoLdapServiceTokenProvisionerTarget']['co_ldap_provisioner_target'];
+    $args['conditions']['CoLdapProvisionerTarget.id'] = $coProvisioningTargetData['CoLdapServiceTokenProvisionerTarget']['co_ldap_provisioner_target_id'];
     $args['contain'] = false;
     
     $ldapTarget = $CoLdapProvisionerTarget->find('first', $args);

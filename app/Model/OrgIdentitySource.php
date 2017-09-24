@@ -123,6 +123,11 @@ class OrgIdentitySource extends AppModel {
         'required' => false,
         'allowEmpty' => true
       )
+    ),
+    'hash_source_record' => array(
+      'rule' => array('boolean'),
+      'required' => false,
+      'allowEmpty' => true
     )
   );
   
@@ -291,7 +296,11 @@ class OrgIdentitySource extends AppModel {
     $orgid['OrgIdentitySourceRecord'] = array(
       'org_identity_source_id' => $id,
       'sorid'                  => $sourceKey,
-      'source_record'          => isset($brec['raw']) ? $brec['raw'] : null,
+      'source_record'          => (!empty($brec['hash'])
+                                   ? $brec['hash']
+                                   : (isset($brec['raw'])
+                                      ? $brec['raw']
+                                      : null)),
       'last_update'            => date('Y-m-d H:i:s')
     );
     
@@ -399,6 +408,42 @@ class OrgIdentitySource extends AppModel {
   }
   
   /**
+   * Instantiate the backend model for the specified Source.
+   *
+   * @since  COmanage Registry v3.1.0
+   * @param  Integer $id Organizational Identity Source ID
+   * @return Model Plugin backend
+   * @throws InvalidArgumentException
+   */
+  
+  public function instantiateBackendModel($id) {
+    // We could just make bindPluginBackendModel public, but this
+    // allows a layer of indirection in case we need to change the
+    // internal (protected) call.
+    
+    return $this->bindPluginBackendModel($id);
+  }
+  
+  /**
+   * Obtain the changelist from a backend.
+   *
+   * @since  COmanage Registry v3.1.0
+   * @param  Integer $id        OrgIdentitySource to query
+   * @param  Integer $lastStart Time of start of last request, or 0 if no previous request
+   * @param  Integer $curStart  Time of start of current request
+   * @return Array Array of source keys that have changed, or false if not supported by backend
+   * @throws InvalidArgumentException
+   */
+  
+  public function obtainChangeList($id, $lastStart, $curStart) {
+    // Pull changelist from source
+    
+    $Backend = $this->bindPluginBackendModel($id);
+    
+    return $Backend->getChangeList($lastStart, $curStart);
+  }
+  
+  /**
    * Obtain all source keys from a backend.
    *
    * @since  COmanage Registry v2.0.0
@@ -483,6 +528,15 @@ class OrgIdentitySource extends AppModel {
             'login'      => true
           );
         }
+      }
+    }
+    
+    if($this->cdata['OrgIdentitySource']['hash_source_record']) {
+      // Create a hash of the raw record. We could also support backend
+      // specific change detection (eg: etags) here instead.
+      
+      if(!empty($ret['raw'])) {
+        $ret['hash'] = md5($ret['raw']);
       }
     }
     
@@ -577,14 +631,17 @@ class OrgIdentitySource extends AppModel {
   }
   
   /**
-   * Sync all Org Identity Sources. Intended primarily for use by CronShell
+   * Sync all Org Identity Sources. Intended primarily for use by JobShell
    *
    * @since  COmanage Registry v2.0.0
    * @param  integer $coId CO ID
    * @return boolean True on success
+   * @throws RuntimeException
    */
   
   public function syncAll($coId) {
+    $errors = array();
+    
     // Select all org identity sources where status=active
     
     $args = array();
@@ -598,9 +655,22 @@ class OrgIdentitySource extends AppModel {
       // Don't automatically sync sources that are in Manual mode
       
       if($src['OrgIdentitySource']['sync_mode'] != SyncModeEnum::Manual) {
-        $this->syncOrgIdentitySource($src);
+        try {
+          $this->syncOrgIdentitySource($src);
+        }
+        catch(Exception $e) {
+          // What do we do with the exception? We don't want to abort the run,
+          // so we'll assemble them and then re-throw them later.
+          $errors[] = $e->getMessage();
+        }
       }
     }
+    
+    if(!empty($errors)) {
+      throw new RuntimeException(implode(';', $errors));
+    }
+    
+    return true;
   }
   
   /**
@@ -661,7 +731,8 @@ class OrgIdentitySource extends AppModel {
         'EmailAddress',
         'Identifier',
         'Name',
-        'TelephoneNumber'
+        'TelephoneNumber',
+        'Url'
       );
       
       // XXX We should use findForUpdate here, but that doesn't support contains yet
@@ -695,11 +766,17 @@ class OrgIdentitySource extends AppModel {
       
       $status = 'unknown';
       
-      if((isset($brec['raw']) && isset($cursrcrec['OrgIdentitySourceRecord']['source_record'])
-          && $brec['raw'] == $cursrcrec['OrgIdentitySourceRecord']['source_record'])
+      $crec = (!empty($brec['hash'])
+               ? $brec['hash']
+               : (isset($brec['raw'])
+                  ? $brec['raw']
+                  : null));
+      
+      if((isset($cursrcrec['OrgIdentitySourceRecord']['source_record'])
+          && $crec == $cursrcrec['OrgIdentitySourceRecord']['source_record'])
          || // was record previously deleted?
-         (!$brec['raw'] && (!isset($cursrcrec['OrgIdentitySourceRecord']['source_record'])
-                            || !$cursrcrec['OrgIdentitySourceRecord']['source_record']))) {
+         (!$crec && (!isset($cursrcrec['OrgIdentitySourceRecord']['source_record'])
+                     || !$cursrcrec['OrgIdentitySourceRecord']['source_record']))) {
         // Source record has not changed, so don't bother doing anything
         
         if($jobId) {
@@ -841,7 +918,8 @@ class OrgIdentitySource extends AppModel {
           'EmailAddress',
           'Identifier',
           'Name',
-          'TelephoneNumber'
+          'TelephoneNumber',
+          'Url'
         );
         
         foreach($models as $m) {
@@ -984,7 +1062,7 @@ class OrgIdentitySource extends AppModel {
         $oisrec['OrgIdentitySourceRecord'] = array(
           'org_identity_source_id' => $id,
           'sorid'                  => $sourceKey,
-          'source_record'          => isset($brec['raw']) ? $brec['raw'] : null,
+          'source_record'          => $crec,
           'last_update'            => date('Y-m-d H:i:s')
         );
         
@@ -1094,14 +1172,25 @@ class OrgIdentitySource extends AppModel {
       throw new RuntimeException(_txt('er.pooling'));
     }
     
-    // We'll need the set of records associated with this source
+    // Figure out the last time we started a job for this source, primarily for changelist.
+    // We use start_time rather than complete_time because it's safer (we might perform an
+    // extra sync rather than miss something that updated after the job started processing).
+    $lastStart = $this->Co->CoJob->lastStart($orgIdentitySource['OrgIdentitySource']['co_id'],
+                                             JobTypeEnum::OrgIdentitySync,
+                                             $orgIdentitySource['OrgIdentitySource']['id']);
+    
+    // We'll need the set of records associated with this source.
+    // This is probably not the most efficient approach...
+    // XXX We only need this in FULL mode if the backend supports changedRecords,
+    // so perhaps only pull if required? Though we also use the count in the
+    // job summary for changelist mode.
     $args = array();
     $args['conditions']['OrgIdentitySourceRecord.org_identity_source_id'] = $orgIdentitySource['OrgIdentitySource']['id'];
     $args['contain'] = false;
     
     $orgRecords = $this->OrgIdentitySourceRecord->find('all', $args);
     
-    // Register a new CoJob
+    // Register a new CoJob. This will throw an exception if a job is already in progress.
     
     $jobId = $this->Co->CoJob->register($orgIdentitySource['OrgIdentitySource']['co_id'],
                                         JobTypeEnum::OrgIdentitySync,
@@ -1110,6 +1199,9 @@ class OrgIdentitySource extends AppModel {
                                         _txt('fd.ois.record.count',
                                              array($orgIdentitySource['OrgIdentitySource']['description'],
                                                    count($orgRecords))));
+    
+    // Flag the Job as started
+    $this->Co->CoJob->start($jobId);
     
     // Count results of various types
     $resCnt = array(
@@ -1133,18 +1225,88 @@ class OrgIdentitySource extends AppModel {
                                                    null,
                                                    JobStatusEnum::Notice);
       
-      foreach($orgRecords as $rec) {
-        try {
-          $r = $this->syncOrgIdentity($rec['OrgIdentitySourceRecord']['org_identity_source_id'],
-                                      $rec['OrgIdentitySourceRecord']['sorid'],
-                                      null,
-                                      $jobId);
+      // First see if the backend supports changedRecords, which relies on the backend
+      // to tell us what changed. Note we may get identifiers for records that are not
+      // currently synced, so we need to check first if they're known and if not ignore them.
+      
+      // Get the timestamp of the current job
+      $curStart = $this->Co->CoJob->startTime($jobId);
+      
+      try {
+        $changelist = $this->obtainChangeList($orgIdentitySource['OrgIdentitySource']['id'],
+                                              $lastStart,
+                                              $curStart);
+      }
+      catch(Exception $e) {
+        // On error, fail the job rather than risk inconsistent sync state
+        
+        $this->Co->CoJob->finish($jobId, $e->getMessage(), JobStatusEnum::Failed);
+        return false;
+      }
+      
+      if($changelist !== false) {
+        $known = 0;   // The number of records reported changed that we already know about
+        
+        foreach($changelist as $srckey) {
+          if($this->Co->CoJob->canceled($jobId)) { return false; }
           
-          $resCnt[ $r['status'] ]++;
+          try {
+            // syncOrgIdentity does NOT create a new org identity if none exists, it
+            // just records an error in the job history. But that's too noisy, so we
+            // do a check here in order to silently ignore unknown SORIDs.
+            
+            $args = array();
+            $args['conditions']['OrgIdentitySourceRecord.org_identity_source_id'] = $orgIdentitySource['OrgIdentitySource']['id'];
+            $args['conditions']['OrgIdentitySourceRecord.sorid'] = $srckey;
+            $args['contain'] = false;
+            
+            // XXX We should probably do this in a transaction with findForUpdate
+            $oisrec = $this->OrgIdentitySourceRecord->find('all', $args);
+            
+            if(count($oisrec) > 0) {  // $cnt should only be 0 or 1, what if for some reason it's > 1?
+              $r = $this->syncOrgIdentity($orgIdentitySource['OrgIdentitySource']['id'],
+                                          $srckey,
+                                          null,
+                                          $jobId);
+              
+              $resCnt[ $r['status'] ]++;
+              $known++;
+            }
+          }
+          catch(Exception $e) {
+            // XXX we should really record this error somewhere (or does syncorgidentity do that for us?)
+            $resCnt['error']++;
+          }
+          
+          // Update the unchanged count
+          $resCnt['unchanged'] = count($orgRecords) - $known;
         }
-        catch(Exception $e) {
-          // XXX we should really record this error somewhere (or does syncorgidentity do that for us?)
-          $resCnt['error']++;
+        
+        $this->Co->CoJob->CoJobHistoryRecord->record($jobId,
+                                                     null,
+                                                     _txt('jb.ois.sync.update.changed',
+                                                          array($known, count($changelist))),
+                                                     null,
+                                                     null,
+                                                     JobStatusEnum::Notice);
+      } else {
+        // Changelist not supported, perform per-record sync
+        
+        foreach($orgRecords as $rec) {
+          if($this->Co->CoJob->canceled($jobId)) { return false; }
+          
+          try {
+            $r = $this->syncOrgIdentity($rec['OrgIdentitySourceRecord']['org_identity_source_id'],
+                                        $rec['OrgIdentitySourceRecord']['sorid'],
+                                        null,
+                                        $jobId);
+            
+            $resCnt[ $r['status'] ]++;
+          }
+          catch(Exception $e) {
+            // XXX we should really record this error somewhere (or does syncorgidentity do that for us?)
+            $resCnt['error']++;
+          }
         }
       }
       
@@ -1204,6 +1366,8 @@ class OrgIdentitySource extends AppModel {
                                                    JobStatusEnum::Notice);
 
       foreach($newKeys as $newKey) {
+        if($this->Co->CoJob->canceled($jobId)) { return false; }
+        
         // This is basically the same logic as used in SyncModeEnum::Query, below
         try {
           $newOrgIdentityId = $this->createOrgIdentity($orgIdentitySource['OrgIdentitySource']['id'],
@@ -1327,6 +1491,8 @@ class OrgIdentitySource extends AppModel {
                                                    JobStatusEnum::Notice);
       
       foreach($emailList as $ea) {
+        if($this->Co->CoJob->canceled($jobId)) { return false; }
+        
         // Since this is search and not retrieve, it's technically possible to get
         // more than one result back from a source, if (eg) there are multiple records
         // with the same email address. It's not exactly clear what to do in that situation,

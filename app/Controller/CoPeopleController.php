@@ -61,10 +61,12 @@ class CoPeopleController extends StandardController {
     'CoPersonRole' => array('CoPetition', 'Cou'),
     // This deep nesting will allow us to display the source of the attribute
     'EmailAddress' => array('SourceEmailAddress' => array('OrgIdentity' => array('OrgIdentitySourceRecord' => array('OrgIdentitySource')))),
-    'Identifier' => array('SourceIdentifier' => array('OrgIdentity' => array('OrgIdentitySourceRecord' => array('OrgIdentitySource')))),
+    'Identifier' => array('CoProvisioningTarget',
+                          'SourceIdentifier' => array('OrgIdentity' => array('OrgIdentitySourceRecord' => array('OrgIdentitySource')))),
     'Name' => array('SourceName' => array('OrgIdentity' => array('OrgIdentitySourceRecord' => array('OrgIdentitySource')))),
     'PrimaryName',
-    'SshKey'
+    'SshKey',
+    'Url' => array('SourceUrl' => array('OrgIdentity' => array('OrgIdentitySourceRecord' => array('OrgIdentitySource')))),
   );
   
   // We need various related models for index and search
@@ -74,7 +76,8 @@ class CoPeopleController extends StandardController {
     'EmailAddress',
     'Identifier',
     'Name',
-    'PrimaryName'
+    'PrimaryName',
+    'Url'
   );
   
   /**
@@ -136,13 +139,22 @@ class CoPeopleController extends StandardController {
       $this->set('vv_enable_nsf_demo', $this->Co->CoSetting->nsfDemgraphicsEnabled($this->cur_co['Co']['id']));
       
       // Mappings for extended types
-      $this->set('vv_cop_emailaddress_types', $this->CoPerson->EmailAddress->types($this->cur_co['Co']['id'], 'type'));
-      $this->set('vv_cop_identifier_types', $this->CoPerson->Identifier->types($this->cur_co['Co']['id'], 'type'));
+      $this->set('vv_email_addresses_types', $this->CoPerson->EmailAddress->types($this->cur_co['Co']['id'], 'type'));
+      $this->set('vv_identifiers_types', $this->CoPerson->Identifier->types($this->cur_co['Co']['id'], 'type'));
+      $this->set('vv_urls_types', $this->CoPerson->Url->types($this->cur_co['Co']['id'], 'type'));
       $this->set('vv_cop_name_types', $this->CoPerson->Name->types($this->cur_co['Co']['id'], 'type'));
       $this->set('vv_copr_affiliation_types', $this->CoPerson->CoPersonRole->types($this->cur_co['Co']['id'], 'affiliation'));
       
       // List of current COUs
       $this->set('vv_cous', $this->CoPerson->Co->Cou->allCous($this->cur_co['Co']['id']));
+      
+      // Are any authenticators defined for this CO?
+      
+      $args = array();
+      $args['conditions']['Authenticator.co_id'] = $this->cur_co['Co']['id'];
+      $args['contain'] = false;
+      
+      $this->set('vv_authenticator_count', $this->Co->Authenticator->find('count', $args));
     }
     
     parent::beforeRender();
@@ -684,6 +696,9 @@ class CoPeopleController extends StandardController {
       $p['view'] = true;
     }
     
+    // View job history? This correlates with CoJobHistoryRecordsController
+    $p['jobhistory'] = ($roles['cmadmin'] || $roles['admin']);
+    
     // Link an Org Identity to a CO Person?
     $p['link'] = $roles['cmadmin'] || $roles['coadmin'];
     
@@ -1011,9 +1026,16 @@ class CoPeopleController extends StandardController {
       
       $args = array();
       $args['conditions']['CoPerson.id'] = $id;
-      $args['contain'] = array('PrimaryName', 'CoGroupMember');
+      $args['contain'] = array(
+        'PrimaryName',
+        'CoGroupMember',
+        'Identifier'
+      );
       
       $this->set('co_person', $this->CoPerson->find('first', $args));
+      $this->set('title_for_layout',
+                 _txt('fd.prov.status.for',
+                      array(filter_var(generateCn($this->viewVars['co_person']['PrimaryName']),FILTER_SANITIZE_SPECIAL_CHARS))));
     }
   }
   

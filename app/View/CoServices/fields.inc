@@ -143,6 +143,35 @@
   <li>
     <div class="field-name">
       <div class="field-title">
+        <?php print ($e ? $this->Form->label('cou_id', _txt('fd.cou')) : _txt('fd.cou')); ?>
+      </div>
+      <div class="field-desc"><?php print _txt('fd.svc.cou.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php
+        $attrs = array();
+        $attrs['value'] = (isset($co_services[0]['CoService']['cou_id'])
+                           ? $co_services[0]['CoService']['cou_id']
+                           : '');
+        $attrs['empty'] = true;
+
+        if($e) {
+          print $this->Form->select('cou_id',
+                                    $vv_cous,
+                                    $attrs);
+
+          if($this->Form->isFieldError('cou_id')) {
+            print $this->Form->error('cou_id');
+          }
+        } else {
+          print $vv_cous[ $co_services[0]['CoService']['cou_id'] ];
+        }
+      ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title">
         <?php print ($e ? $this->Form->label('co_group_id', _txt('fd.svc.group')) : _txt('fd.svc.group')); ?>
       </div>
       <div class="field-desc"><?php print _txt('fd.svc.group.desc'); ?></div>
@@ -182,6 +211,19 @@
       <?php print ($e
                    ? $this->Form->input('service_url')
                    : filter_var($co_services[0]['CoService']['service_url'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title">
+        <?php print ($e ? $this->Form->label('service_label', _txt('fd.svc.label')) : _txt('fd.svc.label')); ?>
+      </div>
+      <div class="field-desc"><?php print _txt('fd.svc.label.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e
+                   ? $this->Form->input('service_label')
+                   : filter_var($co_services[0]['CoService']['service_label'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
     </div>
   </li>
   <li>

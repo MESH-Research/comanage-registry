@@ -50,11 +50,11 @@
 /* Very small devices (tablets, 600px and up) */
 @media only screen and (min-width: 600px) {
   h1 {
-    font-size: 36px;
+    font-size: 2.6em;
   }
   h2 {
-    font-size: 32px;
-    line-height: 32px;
+    font-size: 2em;
+    line-height: 2em;
   }
   #logout {
     /*display: block; -- keep hidden for now */
@@ -213,7 +213,7 @@
     top: 64px; /* never cover header */
     box-shadow: none; /* use no shadow on desktop menu */
   }
-  body.logged-in.with-user-defined-links .mdl-layout__drawer {
+  body.logged-in .mdl-layout__drawer {
     top: 94px;
   }
   .mdl-layout__drawer-button {
@@ -320,7 +320,7 @@
   }
   #collaborationTitle {
     min-height: 46px;
-    font-size: 2em;
+    font-size: 2.4em;
     line-height: 1.6em;
     padding-right: 240px;
   }
