@@ -307,6 +307,7 @@ class IdentifierEnum
 
 class JobStatusEnum
 {
+  const Canceled   = 'CX';
   const Complete   = 'OK';
   const Failed     = 'X';
   const InProgress = 'GO';
@@ -649,6 +650,11 @@ class TAndCLoginModeEnum
   const NotEnforced        = 'X';
   const RegistryLogin      = 'R';
   const DisableAllServices = 'D';
+}
+
+class UrlEnum {
+  const Official      = 'official';
+  const Personal      = 'personal';
 }
 
 class VerificationModeEnum

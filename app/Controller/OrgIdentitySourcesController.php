@@ -292,6 +292,16 @@ class OrgIdentitySourcesController extends StandardController {
       }
       catch(Exception $e) {
         $this->Flash->set($e->getMessage(), array('key' => 'error'));
+        
+        // Redirect back to retrieve key
+        $args = array(
+          'controller' => 'org_identity_sources',
+          'action'     => 'retrieve',
+          $id,
+          'key'        => $key
+        );
+        
+        $this->redirect($args);
       }
     } else {
       $this->Flash->set(_txt('er.notprov.id', array(_txt('fd.sorid'))),
@@ -526,6 +536,10 @@ class OrgIdentitySourcesController extends StandardController {
             
             $this->set('vv_mapped_groups', $this->OrgIdentitySource->Co->CoGroup->find('all', $args));
           }
+        }
+        
+        if(!empty($r['hash'])) {
+          $this->set('vv_source_record_hash', $r['hash']);
         }
         
         // See if there is an associated Org Identity

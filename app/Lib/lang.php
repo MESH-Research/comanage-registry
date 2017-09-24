@@ -77,6 +77,8 @@ $cm_texts['en_US'] = array(
   'ct.authenticators.pl' =>     'Authenticators',
   'ct.cmp_enrollment_configurations.1'  => 'CMP Enrollment Configuration',
   'ct.cmp_enrollment_configurations.pl' => 'CMP Enrollment Configurations',
+  'ct.co_departments.1' =>      'Department',
+  'ct.co_departments.pl' =>     'Departments',
   'ct.co_email_lists.1' =>      'Email List',
   'ct.co_email_lists.pl' =>     'Email Lists',
   'ct.co_enrollment_attributes.1'  => 'Enrollment Attribute',
@@ -105,6 +107,10 @@ $cm_texts['en_US'] = array(
   'ct.co_all_groups' =>         'All Groups',
   'ct.co_invites.1' =>          'Invite',
   'ct.co_invites.pl' =>         'Invites',
+  'ct.co_job_history_records.1' => 'Job History Record',
+  'ct.co_job_history_records.pl' => 'Job History Records',
+  'ct.co_jobs.1' =>             'Job',
+  'ct.co_jobs.pl' =>            'Jobs',
   'ct.co_localizations.1' =>    'Localization',
   'ct.co_localizations.pl' =>   'Localizations',
   'ct.co_message_templates.1' => 'Message Template',
@@ -172,6 +178,8 @@ $cm_texts['en_US'] = array(
   'ct.ssh_keys.pl' =>           'SSH Keys',
   'ct.telephone_numbers.1' =>   'Telephone Number',
   'ct.telephone_numbers.pl' =>  'Telephone Numbers',
+  'ct.urls.1' =>                'URL',
+  'ct.urls.pl' =>               'URLs',
   
   // Embedded Discovery Service
   
@@ -508,6 +516,11 @@ original notification at
                                  IdentifierEnum::SORID => 'System of Record ID',
                                  IdentifierEnum::UID => 'UID'),
   
+  'en.job.type' => array(
+    JobTypeEnum::Expiration      => 'Expiration',
+    JobTypeEnum::OrgIdentitySync => 'Org Identity Sync'
+  ),
+  
   // As a moderately arbitrary decision, the languages listed here those with at least
   // 100m speakers per Ethnologue (by way of wikipedia)
   //  http://en.wikipedia.org/wiki/List_of_languages_by_total_number_of_speakers
@@ -676,6 +689,15 @@ original notification at
     EnrollmentFlowStatusEnum::Template            => 'Template'
   ),
   
+  'en.status.job' => array(
+    JobStatusEnum::Canceled   => 'Canceled',
+    JobStatusEnum::Complete   => 'Complete',
+    JobStatusEnum::Failed     => 'Failed',
+    JobStatusEnum::InProgress => 'In Progress',
+    JobStatusEnum::Notice     => 'Notice',
+    JobStatusEnum::Queued     => 'Queued'
+  ),
+  
   'en.status.not' => array(
     NotificationStatusEnum::Acknowledged          => 'Acknowledged',
     NotificationStatusEnum::Canceled              => 'Canceled',
@@ -760,6 +782,12 @@ original notification at
                                       ContactEnum::Home => 'Home',
                                       ContactEnum::Mobile => 'Mobile',
                                       ContactEnum::Office => 'Office'),
+  
+  // Extended type, key must be en.model.attribute
+  'en.url.type' => array(
+    UrlEnum::Official => 'Official',
+    UrlEnum::Personal => 'Personal',
+  ),
   
   'en.visibility' => array(
     VisibilityEnum::CoAdmin         => 'CO Admin',
@@ -873,6 +901,8 @@ original notification at
   'er.inv.exp' =>     'Invitation Expired',
   'er.inv.exp.use' => 'Processing of invitation failed due to invitation expiration',
   'er.inv.nf' =>      'Invitation Not Found',
+  'er.jb.concurrent' => 'A Job of this type is already registered (id=%1$s)',
+  'er.jb.cxl.status' => 'Job is not in a cancelable status (%1$s)',
   'er.loc.exists' =>  'A localization already exists for the key "%1$s" and language "%2$s"',
   'er.multiple' =>    'Unexpectedly found multiple results',
   'er.nd.already'  => 'NSF Demographic data already exists for this person',
@@ -903,7 +933,7 @@ original notification at
   'er.perm.status' => 'Permission Denied: Status is %1$s',
   'er.permission' =>  'Permission Denied',
   'er.person.noex' => 'Person does not exist',
-  'er.person.none' => 'No CO Person, CO Person Role, or Org Identity specified',
+  'er.person.none' => 'No CO Person, CO Person Role, Org Identity, or CO Department specified',
   'er.pi.match.multi' => 'Canonical %1$s match type found more than one matching record',
   'er.plugin.fail' => 'Failed to load plugin "%1$s"',
   'er.plugin.none' => 'There are no suitable plugins available. No %1$s can be added.',
@@ -950,6 +980,7 @@ original notification at
   'fd.address' =>     'Address',
   // The next set must be named fd.model.validation-field
   'fd.address.country' => 'Country',
+  'fd.address.description' => 'Description',
   'fd.address.language' => 'Language',
   'fd.address.locality' => 'City',
   'fd.address.street' => 'Street',
@@ -1006,6 +1037,14 @@ original notification at
   'fd.de.disab'   =>  'Disability',
   'fd.de.enable'  =>  'Enable NSF Demographics',
   'fd.default'    =>  'Default',
+  'fd.dp.group.admin' => 'Administrative Group',
+  'fd.dp.group.admin.desc' => 'Group containing the Department administrators',
+  'fd.dp.group.leader' => 'Leadership Group',
+  'fd.dp.group.leader.desc' => 'Group containing the Department leadership (Chair/s, PI/s, VP/s, etc)',
+  'fd.dp.group.support' => 'Support Group',
+  'fd.dp.group.support.desc' => 'Group containing the Department support personnel',
+  'fd.dp.intro' =>    'Introduction',
+  'fd.dp.intro.desc' => 'A short introductory text describing the purpose or other information about the department',
   'fd.desc' =>        'Description',
   // fd.description is for default field mapping in AppModel::ChangesForModel
   'fd.description' => 'Description',
@@ -1115,6 +1154,8 @@ original notification at
   'fd.ef.vmt.desc' => 'Message template used for email sent as part of verification step',
   'fd.ef.vsub' =>     'Subject For Verification Email',
   'fd.ef.vsub.desc' => 'Subject line for email message sent as part of verification step.',
+  'fd.ef.whitelist' => 'Return URL Whitelist',
+  'fd.ef.whitelist.desc' => 'Permitted regular expressions (one per line) for <i>return</i> parameter, which if specified overrides Finalization Redirect URL',
   // (End enrollment configuration fields)
   // Enrollment Flow Template Names
   'fd.ef.tmpl.arl' => 'Additional Role (Template)',
@@ -1130,6 +1171,7 @@ original notification at
   'fd.el.gr.moderators.desc' => 'Members of this group will be provisioned as moderators of the list, if supported by the mailing list service',
   'fd.el.name.desc' => 'List name may only consist of alphanumeric characters, dot, dash, and underscore',
   // This must be named fd.model.validation-field
+  'fd.email_address.description' => 'Description',
   'fd.email_address.mail' => 'Email',
   'fd.email_address.verified' => 'Verified',
   'fd.email_address.unverified' => 'Unverified',
@@ -1180,6 +1222,7 @@ original notification at
   // fd.id.seq should be used only for database internal column IDs
   'fd.id.seq' =>      'ID',
   // The next set must be named fd.model.validation-field
+  'fd.identifier.description' => 'Description',
   'fd.identifier.identifier' => 'Identifier',
   'fd.identifier.login' => 'Login',
   'fd.identifier.login.desc' =>  'Allow this identifier to login to Registry',
@@ -1190,9 +1233,18 @@ original notification at
   'fd.inv.for' =>     'Invitation for %1$s',
   'fd.inv.to' =>      'Invitation to %1$s',
   'fd.ip' =>          'IP Address',
+  'fd.job.complete_time' => 'Finished',
+  'fd.job.finish_summary' => 'Finish Summary',
+  'fd.job.mode' =>    'Job Mode',
+  'fd.job.queue_time' => 'Queued',
+  'fd.job.register_summary' => 'Register Summary',
+  'fd.job.start_summary' => 'Start Summary',
+  'fd.job.start_time' => 'Started',
+  'fd.job.type' =>    'Job Type',
   'fd.key' =>         'Key',
   'fd.language' =>    'Language',
   'fd.lan.desc' =>    'Lowercase alphanumeric characters only',
+  'fd.lan.res.desc' => 'Lowercase alphanumeric characters only<br />Must not be a reserved word',
   'fd.link.location' => 'Link Location',  
   'fd.link.order' =>  'Link Order',
   'fd.link.title' =>  'Link Title',
@@ -1242,6 +1294,9 @@ original notification at
   'fd.ois.record' =>  'Source Record',
   'fd.ois.record.desc' => 'If the source record is empty, it likely indicates this record is no longer available from the datasource',
   'fd.ois.record.count' => '%1$s: %2$s records currently synced',
+  'fd.ois.record.hash' => 'Hash Source Records',
+  'fd.ois.record.hash.desc' => 'Store a hashed version of the cached source record used by Registry to detect changes',
+  'fd.ois.record.hashed' => 'Source Record (hashed)',
   'fd.ois.search.mail' => 'Please enter the email address associated with the Organizational Identity you would like to use to enroll',
   'fd.ois.search.select' => 'Please select the identity you would like to use from the following matches for "%1$s"',
   'fd.ois.search.select.disabled' => 'Disabled options are already attached to an Org Identity and so cannot be selected',
@@ -1310,6 +1365,7 @@ original notification at
   'fd.revision' =>    'Revision',
   'fd.roles' =>       'Roles',
   'fd.room' =>        'Room',
+  'fd.search.all' =>  'Search All Fields',
   'fd.searchbase' =>  'Search Base',
   'fd.set' =>         'Set',
   'fd.set.not' =>     'Not Set',
@@ -1324,7 +1380,7 @@ original notification at
   'fd.sponsor.inel' => 'The current sponsor is no longer eligible to act as a sponsor',
   'fd.sponsor.mode' => 'Sponsor Eligibility Mode',
   'fd.sponsor.mode.desc' => 'Which CO People are eligible to sponsor CO Person Roles',
-  'fd.ssp.default' => 'If permission is not explicitly granted here for a supported model, then self service updates are not permitted for that model. The permission will be Read Only. Default Read Write permission is required to add new values.',
+  'fd.ssp.default' => 'If permission is not explicitly granted here for a supported model, then self service updates are not permitted for that model. The permission will be Read Only.',
   'fd.ssp.type.desc' => '"Default" applies this permission to all types not otherwise specified',
   'fd.status' =>      'Status',
   'fd.status.filters' => 'Status filters',
@@ -1332,6 +1388,7 @@ original notification at
   'fd.status.change' => 'Manually changing the status of a CO Person when there is a Petition in progress will not change the status of the Petition',
   'fd.status.et.desc' => 'An Extended Type that is in use cannot be made inactive',
   'fd.subject' =>     'Subject',
+  'fd.svc.cou.desc' => 'COU this Service is attached to, for Service Portal rendering',
   'fd.svc.euri' =>    'Entitlement URI',
   'fd.svc.euri.desc' => 'Entitlement URI, as specified by <a href="http://software.internet2.edu/eduperson/internet2-mace-dir-eduperson-201602.html">eduPerson</a>',
   'fd.svc.group' =>   'Service Group',
@@ -1361,6 +1418,7 @@ original notification at
   'fd.telephone_number.area_code' => 'Area Code',
   'fd.telephone_number.number' => 'Number',
   'fd.telephone_number.extension' => 'Extension',
+  'fd.telephone_number.description' => 'Description',
   // This one is for rendering into a telephone number string (eg: 555 1212 x279)
   'fd.telephone.ext' => 'x',
   'fd.text' =>        'Text',
@@ -1386,6 +1444,10 @@ original notification at
   'fd.update.last' => 'Last Updated',
   'fd.unresolved' =>  'Unresolved',
   'fd.untitled' =>    'Untitled',
+  // This must be named fd.model.validation-field
+  'fd.url.description' => 'Description',
+  'fd.url.url' =>     'URL',
+  'fd.url.url.desc' => 'URL, including protocol (ie: http://myvo.org, not just myvo.org)',
   'fd.url' =>         'URL',
   'fd.username.api' => 'API User Name',
   'fd.valid_from' =>  'Valid From',
@@ -1476,6 +1538,7 @@ original notification at
   'jb.ois.sync.full.start' => 'Beginning sync of new org identities from source (%1$s in source; %2$s already known, %3$s new)',
   'jb.ois.sync.query.finish' => 'Query for matching org identities from source complete',
   'jb.ois.sync.query.start' => 'Beginning query for matching org identities from source (%1$s email addresses to query of %2$s known)',
+  'jb.ois.sync.update.changed' => '%1$s known record(s) changed, of %2$s reported by source',
   'jb.ois.sync.update.finish' => 'Sync of existing org identities from source complete',
   'jb.ois.sync.update.start' => 'Beginning sync of existing org identities from source (%1$s current total)',
 
@@ -1491,6 +1554,7 @@ original notification at
   'js.remove.id.prov' =>  'The identifier \x22{0}\x22 was created by the provisioning target, and removing it may cause operational problems. Are you sure you wish to remove it? This action cannot be undone.',
   'js.remove.member'  =>  'Are you sure you wish to remove this member from group \x22{0}\x22?  This action cannot be undone.',
   'js.reinvite'       =>  'Are you sure you wish to resend an invitation to {0}?  Any previous invitation will be invalidated.',
+  'js.cancel.job'     =>  'Are you sure you wish to cancel this job? Cancelation may not be immediate.',
   'js.confirm.verify' =>  'Are you sure you wish to send a verification request to {0}? Any previous request will be invalidated.',
 
   // Operations
@@ -1560,6 +1624,7 @@ original notification at
   'op.grm.my.groups' => 'My Groups',
   'op.grm.title' =>   '%1$s %2$s Membership For %3$s',
   'op.history' =>     'View History',
+  'op.history.job' => 'View Job History',
   'op.home.login' =>  'Welcome to %1$s.',
   'op.home.select' => 'Welcome to %1$s. Please select a collaboration.',
   'op.home.collabs' => 'Available Collaborations',
@@ -1708,6 +1773,8 @@ original notification at
   'rs.inv.dec' =>     'Invitation Declined',
   'rs.inv.dec-a' =>   'Invitation to %1$s declined',
   'rs.inv.sent' =>    'Invitation sent to %1$s',
+  'rs.jb.cxld' =>     'Job flagged as canceled, actual termination may not be immediate',
+  'rs.jb.cxld.by' =>  'Job canceled by %1$s',
   'rs.mail.verified' => 'Email Address "%1$s" verified',
   'rs.match.possible' => 'Possible Matches',
   'rs.moved.copr' =>  'CO Person Role "%1$s" (%2$s) moved from %3$s (%4$s) to %5$s (%6$s)',
@@ -1844,6 +1911,7 @@ original notification at
   'sh.ug.110.ef' =>       'Migrating enrollment flow configurations',
   'sh.ug.110.gr' =>       'Renaming and reconciling automatic groups (please wait, this may take some time)',
   'sh.ug.110.is' =>       'Updating inactive identifier status',
+  'sh.ug.310.url' =>      'Instantiating default URL Extended Types',
 );
 
 // Make a copy of the original texts, since CoLocalizations can override them
