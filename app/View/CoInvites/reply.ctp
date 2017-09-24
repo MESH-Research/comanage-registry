@@ -33,8 +33,11 @@
   $verifyEmail = !empty($invite['CoInvite']['email_address_id']);
 ?>
 
-<h2 class="ui-state-default"><?php print _txt(($verifyEmail ? 'fd.ev.for' : 'fd.inv.for'),
-                                              array(filter_var(generateCn($invitee['PrimaryName']),FILTER_SANITIZE_SPECIAL_CHARS))); ?></h2>
+<div class="invitation">
+  <span class="invitation-text">
+    <?php print _txt(($verifyEmail ? 'fd.ev.for' : 'fd.inv.for'),
+      array(filter_var(generateCn($invitee['PrimaryName']),FILTER_SANITIZE_SPECIAL_CHARS))); ?>
+  </span>
 
 <?php
   if($verifyEmail) {
@@ -78,7 +81,10 @@
       array('class' => 'cancelbutton')
     );
   }
-  
+?>
+</div>
+
+<?php
   $e = false;
 
   if(isset($co_petitions)) {
