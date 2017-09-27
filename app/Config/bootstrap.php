@@ -120,4 +120,5 @@ CakeLog::config('error', array(
 	'engine' => 'FileLog',
 	'types' => array('warning', 'error', 'critical', 'alert', 'emergency'),
 	'file' => 'error',
+        'size' => '100MB',
 ));

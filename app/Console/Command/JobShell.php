@@ -42,6 +42,22 @@ class JobShell extends AppShell {
         'boolean' => false,
         'default' => false
       )
+    )->addOption(
+      'oisid',
+      array(
+        'short' => 'u',
+        'help' => _txt('sh.job.arg.oisid'),
+        'boolean' => false,
+        'default' => false
+      )
+    )->addOption(
+      'skipnew',
+      array(
+        'short' => 's',
+        'help' => _txt('sh.job.arg.skipnew'),
+        'boolean' => true,
+        'default' => false
+      )
     )->epilog(_txt('sh.job.arg.epilog'));
     
     return $parser;
@@ -71,12 +87,12 @@ class JobShell extends AppShell {
    * @param  Integer  $coId       CO ID
    */
   
-  protected function syncOrgSources($coId) {
+  protected function syncOrgSources($coId, $oisId, $skipNew) {
     // First see if syncing is enabled
     
     if($this->CoSetting->oisSyncEnabled($coId)) {
       try {
-        $this->OrgIdentitySource->syncAll($coId);
+        $this->OrgIdentitySource->syncAll($coId, $oisId, $skipNew);
       }
       catch(Exception $e) {
         $this->out("- " . $e->getMessage());
@@ -104,6 +120,8 @@ class JobShell extends AppShell {
     // Now hand off to the various tasks
     $runAll = empty($this->args);
     $runCoId = $this->params['coid'];
+    $runOisId = $this->params['oisid'];
+    $runSkipNew = $this->params['skipnew'];
     
     foreach($cos as $co) {
       if(!$runCoId || $runCoId == $co['Co']['id']) {
@@ -113,8 +131,8 @@ class JobShell extends AppShell {
         }
         
         if($runAll || in_array('syncorgsources', $this->args)) {
-          $this->out(_txt('sh.job.sync.ois', array($co['Co']['name'], $co['Co']['id'])));
-          $this->syncOrgSources($co['Co']['id']);
+          $this->out(_txt('sh.job.sync.ois', array($co['Co']['name'], $co['Co']['id'], $runOisId, $runSkipNew)));
+          $this->syncOrgSources($co['Co']['id'], $runOisId, $runSkipNew);
         }
       }
     }    

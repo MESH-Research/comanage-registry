@@ -635,17 +635,20 @@ class OrgIdentitySource extends AppModel {
    *
    * @since  COmanage Registry v2.0.0
    * @param  integer $coId CO ID
+   * @param  integer $oisId COU ID
+   * @param  boolean $skipNew Search for new records after sync if False
    * @return boolean True on success
    * @throws RuntimeException
    */
   
-  public function syncAll($coId) {
+  public function syncAll($coId, $oisId, $skipNew) {
     $errors = array();
     
     // Select all org identity sources where status=active
     
     $args = array();
     $args['conditions']['OrgIdentitySource.co_id'] = $coId;
+    $args['conditions']['OrgIdentitySource.id'] = $oisId;
     $args['conditions']['OrgIdentitySource.status'] = SuspendableStatusEnum::Active;
     $args['contain'] = false;
     
@@ -656,7 +659,7 @@ class OrgIdentitySource extends AppModel {
       
       if($src['OrgIdentitySource']['sync_mode'] != SyncModeEnum::Manual) {
         try {
-          $this->syncOrgIdentitySource($src);
+          $this->syncOrgIdentitySource($src, $skipNew);
         }
         catch(Exception $e) {
           // What do we do with the exception? We don't want to abort the run,
@@ -1157,11 +1160,12 @@ class OrgIdentitySource extends AppModel {
    *
    * @since  COmanage Registry v2.0.0
    * @param  Array   $orgIdentitySource Org Identity Source to process
+   * @param  boolean $skipNew           Search for new records after sync if False
    * @return boolean                    True on success
    * @throws RuntimeException
    */
   
-  public function syncOrgIdentitySource($orgIdentitySource) {
+  public function syncOrgIdentitySource($orgIdentitySource, $skipNew) {
     // We don't check here that the source is in Manual mode in case an admin
     // wants to manually force a sync. (syncAll honors that setting.)
     
@@ -1414,7 +1418,7 @@ class OrgIdentitySource extends AppModel {
                                                    JobStatusEnum::Notice);
     }
     
-    if($orgIdentitySource['OrgIdentitySource']['sync_mode'] == SyncModeEnum::Query) {
+    if($orgIdentitySource['OrgIdentitySource']['sync_mode'] == SyncModeEnum::Query && !$skipNew) {
       // For each OrgIdentity (in the current CO), if there are any verified
       // email addresses, query this OIS for any new records to sync. (We've already
       // covered updates, above.)
