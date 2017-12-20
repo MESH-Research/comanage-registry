@@ -663,6 +663,15 @@
                   if($g['member'] || $g['owner']) {
                     print '<li class="field-data-container"><div class="field-data">';
                     print $this->Html->link($g['CoGroup']['name'], array('controller' => 'co_groups', 'action' => 'edit', $g['co_group_id'], 'co' => $cur_co['Co']['id']));
+                    if($g['owner']) {
+                      if($g['member']) {
+                        print ' ' . _txt('fd.group.grmemown');
+                      } else {
+                        print ' ' . _txt('fd.group.own.only');
+                      }
+                    } elseif($g['member']) {
+                      print ' ' . _txt('fd.group.mem');
+                    }
                     print '</div><div class="field-actions">';
                     // XXX we already checked for $permissions['edit'], but not ['delete']... should we?
                     print '<a class="deletebutton" title="' . _txt('op.delete')
@@ -1019,6 +1028,7 @@
                   print '<li class="field-data-container">';
                   print '<div class="field-data">';
                   print $this->Html->link($sk['comment'], array('controller' => 'ssh_keys', 'action' => 'edit', $sk['id']));
+                  print ' (' . _txt('en.sshkey.type', null, $sk['type']). ')';
                   print '</div>';
                   print '<div class="field-actions">';
                   // XXX we already checked for $permissions['edit'], but not ['delete']... should we?

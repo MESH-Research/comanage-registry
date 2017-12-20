@@ -214,13 +214,13 @@ $cm_texts['en_US'] = array(
   'em.expiration.body'       => 'Placeholder expiration body',
   'em.invite.subject'        => 'Invitation to join %1$s',
   'em.invite.subject.ef'     => 'Invitation to join (@CO_NAME)',
-  'em.invite.subject.ver'    => 'Please confirm your email address (@CO_NAME)',
+  'em.invite.subject.ver'    => 'Please confirm your email address',
   'em.invite.body'           => 'You have been invited to join %1$s.  Please click the link below to accept or decline.',
   'em.invite.body.ef'        => 'You have been invited to join (@CO_NAME).
 Please click the link below to accept or decline.
 
 (@INVITE_URL)',
-  'em.invite.body.ver'       => 'You or an administrator for @CO_NAME has added or updated an email address.
+  'em.invite.body.ver'       => 'You or an administrator for (@CO_NAME) has added or updated an email address.
 Please click the link below to confirm that this is a valid request.
 
 (@INVITE_URL)
@@ -303,6 +303,7 @@ original notification at
     ActionEnum::InvitationDeclined          => 'Invitation Declined',
     ActionEnum::InvitationExpired           => 'Invitation Expired',
     ActionEnum::InvitationSent              => 'Invitation Sent',
+    ActionEnum::InvitationViewed            => 'Invitation Viewed',
     ActionEnum::NotificationAcknowledged    => 'Notification Acknowledged',
     ActionEnum::NotificationCanceled        => 'Notification Canceled',
     ActionEnum::NotificationDelivered       => 'Notification Delivered',
@@ -340,6 +341,7 @@ original notification at
     PetitionActionEnum::IdentityRelinked    => 'Identity Relinked',
     PetitionActionEnum::InviteConfirmed     => 'Invitation Confirmed',
     PetitionActionEnum::InviteSent          => 'Invitation Sent',
+    PetitionActionEnum::InviteViewed        => 'Invitation Viewed',
     PetitionActionEnum::NotificationSent    => 'Notification Sent',
     PetitionActionEnum::OrgIdentitySourced  => 'Org Identity Created From Source',
     PetitionActionEnum::StepFailed          => 'Step Failed',
@@ -474,6 +476,7 @@ original notification at
   'en.enrollment.orgid' => array(
     EnrollmentOrgIdentityModeEnum::OISAuthenticate    => 'Authenticate',
     EnrollmentOrgIdentityModeEnum::OISClaim           => 'Claim',
+    EnrollmentOrgIdentityModeEnum::OISIdentify        => 'Identify',
     EnrollmentOrgIdentityModeEnum::OISSearch          => 'Search',
     EnrollmentOrgIdentityModeEnum::OISSearchRequired  => 'Search, Required',
     EnrollmentOrgIdentityModeEnum::OISSelect          => 'Select',
@@ -659,9 +662,11 @@ original notification at
                                     SponsorEligibilityEnum::None          => 'Disable Sponsors'),
 
   'en.sshkey.type' => array(
-    SshKeyTypeEnum::DSA  => 'DSA',
-    SshKeyTypeEnum::RSA  => 'RSA',
-    SshKeyTypeEnum::RSA1 => 'RSA1'
+    SshKeyTypeEnum::DSA      => 'DSA',
+    SshKeyTypeEnum::ECDSA    => 'ECDSA',
+    SshKeyTypeEnum::ED25519  => 'ed25519',
+    SshKeyTypeEnum::RSA      => 'RSA',
+    SshKeyTypeEnum::RSA1     => 'RSA1'
   ),
   
   'en.status' =>      array(StatusEnum::Active              => 'Active',
@@ -899,6 +904,7 @@ original notification at
   'er.id.format-a' => 'The identifier "%1$s" does not meet the required format (%2$s)',
   'er.id.unk' =>      'Unknown Identifier',
   'er.id.unk-a' =>    'Unknown Identifier "%1$s"',
+  'er.input.blank' => 'Value cannot consist of only blank characters',
   'er.input.invalid' => 'Invalid character found',
   'er.input.range' => 'Value not in permitted range',
   'er.inv.exp' =>     'Invitation Expired',
@@ -1058,7 +1064,7 @@ original notification at
   // Enrollment configuration fields
   'fd.ea.attr.copy2cop' => 'Copy this attribute to the CO Person record',
   'fd.ea.ignauth' =>  'Ignore Authoritative Values',
-  'fd.ea.ignauth.flow.desc' => 'Ignore authoritative values for attributes attached to this flow, such as those provided via environment variables, SAML, or LDAP',
+  'fd.ea.ignauth.flow.desc' => 'Ignore authoritative values for attributes attached to this flow, such as those provided via environment variables, SAML, or LDAP (CMP Enrollment Attributes only, setting does not apply to Enrollment Sources)',
   'fd.ea.ignauth.desc' => 'Ignore authoritative values for this attribute, such as those provided via environment variables, SAML, or LDAP',
   'fd.ea.default_env' => 'Environment Variable For Default Value',
   'fd.ea.default_env.desc' => 'If populated, the value of this environment variable will be used as the default value for this attribute (See also <a href="https://spaces.internet2.edu/x/mA39Bg#ConsumingExternalAttributesviaWebServerEnvironmentVariables-PopulatingDefaultValuesDuringEnrollment">this documentation</a>)',
@@ -1176,7 +1182,7 @@ original notification at
   'fd.el.gr.members.desc' => 'Members of this group will be provisioned as recipients of messages to the list',
   'fd.el.gr.moderators' =>  'Moderators Group',
   'fd.el.gr.moderators.desc' => 'Members of this group will be provisioned as moderators of the list, if supported by the mailing list service',
-  'fd.el.name.desc' => 'List name may only consist of alphanumeric characters, dot, dash, and underscore',
+  'fd.el.name.desc' => 'List name may only consist of alphanumeric characters, dot, dash, and underscore. Although the list name may be changed here, not all Provisioning Targets may support renaming a list.',
   // This must be named fd.model.validation-field
   'fd.email_address.description' => 'Description',
   'fd.email_address.mail' => 'Email',
@@ -1523,6 +1529,7 @@ original notification at
   'in.orgid.pi.role'   => 'CO Person Role created from this Org Identity via Pipeline',
   'in.orgid.pi.group'  => '%1$s Group Membership created from this Org Identity via Pipeline',
   'in.pagination.format' =>  'Page {:page} of {:pages}, Viewing {:start}-{:end} of {:count}',
+  'in.pl.noconfig'     => 'This provisioner has no configurable options',
   
   // Menu
   'me.account'         => 'My Account',
@@ -1591,7 +1598,7 @@ original notification at
   'op.dashboard.configuration' => 'Configuration for %1$s',
   'op.dashboard.select' => 'Welcome to %1$s. Please select an action from the menus.',
   'op.db.ok' =>       'Database schema update successful',
-  'op.db.schema' =>   'Loading schema from file %1$s...',
+  'op.db.schema' =>   'Loading schema from file %1$s...' . "\nThis make take a few minutes for large datasets, please do not interrupt.",
   'op.decline' =>     'Decline',
   'op.delete' =>      'Delete',
   'op.delete-a' =>    'Delete %1$s',

@@ -85,6 +85,7 @@ class ActionEnum
   const InvitationDeclined              = 'INVD';
   const InvitationExpired               = 'INVE';
   const InvitationSent                  = 'INVS';
+  const InvitationViewed                = 'INVV';
   const NameAdded                       = 'ANAM';
   const NameDeleted                     = 'DNAM';
   const NameEdited                      = 'ENAM';
@@ -244,6 +245,7 @@ class EnrollmentMatchPolicyEnum {
 class EnrollmentOrgIdentityModeEnum {
   const OISAuthenticate   = "OA";
   const OISClaim          = "OC";
+  const OISIdentify       = "OI";
   const OISSearch         = "OS";
   const OISSearchRequired = "SR";
   const OISSelect         = "SL";
@@ -457,6 +459,7 @@ class PetitionActionEnum
   const IdentityRelinked        = 'IR';
   const InviteConfirmed         = 'IC';
   const InviteSent              = 'IS';
+  const InviteViewed            = 'IV';
   const NotificationSent        = 'NS';
   const OrgIdentitySourced      = 'OC';
   const StatusUpdated           = 'SU';
@@ -552,6 +555,8 @@ class SshKeyTypeEnum
 {
   // Protocol v2
   const DSA         = 'DSA';
+  const ECDSA       = 'ECDSA';
+  const ED25519     = 'ed25519';
   const RSA         = 'RSA';
   // Protocol v1
   const RSA1        = 'RSA1';
@@ -673,6 +678,20 @@ class VisibilityEnum
   const CoGroupMember   = 'CG';
   const CoMember        = 'CP';
   const Unauthenticated = 'P';
+  
+  public static $from_api = array(
+    'CoAdmin'         => VisibilityEnum::CoAdmin,
+    'CoGroupMember'   => VisibilityEnum::CoGroupMember,
+    'CoMember'        => VisibilityEnum::CoMember,
+    'Unauthenticated' => VisibilityEnum::Unauthenticated
+  );
+  
+  public static $to_api = array(
+    VisibilityEnum::CoAdmin         => 'CoAdmin',
+    VisibilityEnum::CoGroupMember   => 'CoGroupMember',
+    VisibilityEnum::CoMember        => 'CoMember',
+    VisibilityEnum::Unauthenticated => 'Unauthenticated'
+  );
 }
 
 // Old style enums below, deprecated
@@ -762,9 +781,11 @@ $name_ti = array(
 );
 
 $ssh_ti = array(
-  'DSA'  => 'ssh-dss',
-  'RSA'  => 'ssh-rsa',
-  'RSA1' => 'ssh-rsa1'
+  'DSA'     => 'ssh-dss',
+  'ECDSA'   => 'ecdsa-sha2-nistp256',
+  'ED25519' => 'ssh-ed25519',
+  'RSA'     => 'ssh-rsa',
+  'RSA1'    => 'ssh-rsa1'
 );
 
 $status_t = array(
