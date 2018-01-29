@@ -65,12 +65,15 @@ global $cm_lang, $cm_texts;
   <?php
   print $this->Form->create('CoPerson',array('url' => array('action'=>'search')));
   print $this->Form->hidden('CoPerson.co_id', array('default' => $cur_co['Co']['id'])). "\n";
+  if(!empty($this->request->params['named']['copetitionid'])) {
+    print $this->Form->hidden('CoPetition.id', array('default' => filter_var($this->request->params['named']['copetitionid'],FILTER_SANITIZE_SPECIAL_CHARS))). "\n";
+  }
   ?>
   <fieldset>
     <legend>
       <a href="#" id="top-search-toggle">
         <em class="material-icons">search</em>
-        <?php print _txt('op.search');?>
+        <?php print _txt('op.filter');?>
         <em class="material-icons drop-arrow">arrow_drop_down</em>
       </a>
     </legend>
@@ -147,9 +150,9 @@ global $cm_lang, $cm_texts;
         //$args['type'] = 'button';
 
         // search button (submit)
-        $args['aria-label'] = _txt('op.search');
+        $args['aria-label'] = _txt('op.filter');
         $args['class'] = 'submit-button spin mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect';
-        print $this->Form->submit(_txt('op.search'),$args);
+        print $this->Form->submit(_txt('op.filter'),$args);
 
         // clear button
         $args['class'] = 'clear-button spin mdl-button';

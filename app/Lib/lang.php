@@ -164,6 +164,7 @@ $cm_texts['en_US'] = array(
   'ct.navigation_links.1' =>    'Navigation Link',
   'ct.navigation_links.pl' =>   'Navigation Links',
   'ct.org_identities.1' =>      'Organizational Identity',
+  'ct.org_identities.fi' =>     'Organizational Identity Filter',
   'ct.org_identities.se' =>     'Organizational Identity Search',
   'ct.org_identities.pl' =>     'Organizational Identities',
   'ct.org_identity_sources.1' => 'Organizational Identity Source',
@@ -1033,6 +1034,7 @@ original notification at
   'fd.cou-a' =>       '%1$s COU',
   'fd.co_group.auto' => 'Automatic',
   'fd.co_group.group_type' => 'Group Type',
+  'fd.co_people.filter' => 'CO Person Filter',
   'fd.co_people.search' => 'CO Person Search',
   'fd.co_people.status' => 'CO Person Status',
   'fd.created' =>     'Created',
@@ -1429,6 +1431,8 @@ original notification at
   'fd.tc.mode.login.desc' => 'How to handle Terms and Conditions at login, if any are defined. See <a href="https://spaces.internet2.edu/display/COmanage/Registry+Terms+and+Conditions">Terms and Conditions</a>',
   'fd.tc.none' =>     'There are no applicable Terms and Conditions',
   'fd.tc.url.desc' => 'The URL to the Terms and Conditions, which will be displayed in a popup',
+  'fd.tc.order'   =>  'Order',
+  'fd.tc.order.desc' => 'The order in which this Terms and Conditions will be presented',
   // These must be named fd.model.validation-field
   'fd.telephone_number.country_code' => 'Country Code',
   'fd.telephone_number.area_code' => 'Area Code',
@@ -1726,6 +1730,7 @@ original notification at
   'op.save' =>        'Save',
   'op.search' =>      'Search',
   'op.search-a' =>    'Search %1$s',
+  'op.search.global' => 'Global Search',
   'op.search.restore' =>  'Restore default listing',
   'op.see.notifications' =>  'View all notifications',
   'op.see.notification.num' =>  'notification #%1$s',
@@ -1859,6 +1864,7 @@ original notification at
   'rs.pt.tc.implied' => 'Implied agreement to Terms and Conditions "%1$s"',
   'rs.search.1' =>    'Exact match for "%1$s" found (%2$s)',
   'rs.search.none' => 'No results found',
+  'rs.search.noquery' => 'No search query was submitted.  Please enter a search query above.',
   'rs.saved' =>       'Saved',
   'rs.svc.grmem' =>   'Group membership successfully updated',
   'rs.tc.agree' =>    'Terms and Conditions "%1$s" agreed to',
@@ -1961,6 +1967,10 @@ function _txt($key, $vars=null, $index=null)
   // XXX need to figure out how to pass arbitrary # of args to sprintf
   
   $s = (isset($index) ? $cm_texts[ $cm_lang ][$key][$index] : $cm_texts[ $cm_lang ][$key]);
+  
+  if(!$vars) {
+    return $s;
+  }
   
   switch(count($vars))
   {
