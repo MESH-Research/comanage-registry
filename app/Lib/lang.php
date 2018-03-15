@@ -527,6 +527,7 @@ original notification at
                                  IdentifierEnum::Network => 'Network',
                                  IdentifierEnum::OpenID => 'OpenID',
                                  IdentifierEnum::ORCID => 'ORCID iD',
+                                 'wpid' => 'WordPress ID',
                                  IdentifierEnum::ProvisioningTarget => 'Provisioning Target',
                                  IdentifierEnum::Reference => 'Match Reference',
                                  IdentifierEnum::SORID => 'System of Record ID',
@@ -1993,6 +1994,10 @@ original notification at
   
   'sh.job.arg.coid' =>    'Numeric CO ID to run tasks for (all COs if not specified)',
   'sh.job.arg.epilog' =>  "If no task specified, all run.\nAvailable tasks: expirations, groupvalidity, syncorgsources, forcesyncorgsources",
+
+  'sh.job.arg.oisid' =>   'Numeric OIS ID to run tasks for (all OISs if not specified)',
+  'sh.job.arg.skipnew' => 'If set do not search emails for new memberships after sync',
+
   'sh.job.done' =>        'Job shell finished',
   'sh.job.gv' =>          'Reprovisioning group memberships based on validity dates for CO %1$s (%2$s)',
   'sh.job.gv.disabled' => 'Reprovisioning group memberships is disabled for this CO',
