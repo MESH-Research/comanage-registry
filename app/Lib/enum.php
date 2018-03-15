@@ -45,6 +45,8 @@ class ActionEnum
   const CoGroupMemberDeleted            = 'DCGM';
   const CoGroupMemberDeletedPipeline    = 'DCGL';
   const CoGroupMemberEdited             = 'ECGM';
+  const CoGroupMemberEditedPipeline     = 'ECGL';
+  const CoGroupMemberValidityTriggered  = 'VCGM';
   const CoGroupProvisioned              = 'PCGA';
   const CoPersonAddedManual             = 'ACPM';
   const CoPersonAddedPetition           = 'ACPP';
@@ -320,7 +322,9 @@ class JobStatusEnum
 
 class JobTypeEnum
 {
+  // Reserve X* for local plugins/jobs
   const Expiration      = 'EX';
+  const GroupValidity   = 'GV';
   const OrgIdentitySync = 'OS';
 }
 
@@ -401,6 +405,13 @@ class NSFRaceEnum
   const White            = 'W';
 }
 
+class Oauth2GrantEnum
+{
+  const AuthorizationCode = 'AC';
+  const ClientCredentials = 'CC';
+  // We don't currently support Implicit or Password Credentials
+}
+
 class OrgIdentityMismatchEnum
 {
   const CreateNew        = 'N';
@@ -456,6 +467,7 @@ class PetitionActionEnum
   const IdentifierAuthenticated = 'ID';
   const IdentifiersAssigned     = 'IA';
   const IdentityLinked          = 'IL';
+  const IdentityNotLinked       = 'IX';
   const IdentityRelinked        = 'IR';
   const InviteConfirmed         = 'IC';
   const InviteSent              = 'IS';
@@ -487,6 +499,7 @@ class ProvisionerStatusEnum
 {
   const AutomaticMode       = 'A';
   const Disabled            = 'X';
+  const EnrollmentMode      = 'E';
   const ManualMode          = 'M';
 }
 
@@ -543,12 +556,29 @@ class RequiredNameFieldsEnum
   const GivenFamily = "given,family";
 }
 
+class ServerEnum
+{
+  const LdapServer    = 'LD';
+  const Oauth2Server  = 'O2';
+  // Generic SQL Server, not "MS SQL Server"
+  const SqlServer     = 'SQ';
+}
+
 class SponsorEligibilityEnum {
   const CoAdmin       = 'CA';
   const CoGroupMember = 'CG';
   const CoOrCouAdmin  = 'A';
   const CoPerson      = 'CP';
   const None          = 'N';
+}
+
+class SqlServerEnum
+{
+  // Initially we only support Cake-supported types, though that should
+  // probably expand at some point
+  const Mysql     = 'MY';
+  const Postgres  = 'PG';
+  const SqlServer = 'MS';
 }
 
 class SshKeyTypeEnum
