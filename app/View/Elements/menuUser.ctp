@@ -27,7 +27,32 @@
  */
 ?>
 
+<?php if(!empty($cur_co['Co']['id']) && $this->Session->check('Auth.User.name')): ?>
+
+  <div id="global-search" class="topMenu">
+    <?php
+      $options = array(
+        'type' => 'get',
+        'url' => array('action' => 'search')
+      );
+      print $this->Form->create('CoDashboard', $options);
+      print $this->Form->label('q', '<span class="visuallyhidden">' . _txt('op.search') . '</span><em class="material-icons">search</em>');
+      print '<div id="global-search-box">';
+      $options = array(
+        'label' => false,
+      );
+      print $this->Form->input('q', $options);
+      print $this->Form->submit(_txt('op.search'));
+      print $this->Form->hidden('co', array('default' => $cur_co['Co']['id']));
+      print '</div>';
+      print $this->Form->end();
+    ?>
+  </div>
+
+<?php endif; ?>
+
 <?php if(isset($vv_my_notifications)): ?>
+
   <div id="notifications">
     <a href="#" class="topMenu" id="user-notifications">
       <span id="user-notification-count">
@@ -126,7 +151,7 @@
         foreach(array_keys($menuContent['plugins']) as $plugin) {
           if(isset($menuContent['plugins'][$plugin]['coperson'])) {
             foreach(array_keys($menuContent['plugins'][$plugin]['coperson']) as $label) {
-              print '<li class="mdl-menu__item"> 
+              print '<li> 
                        <a href="#">'.$label.'</a>
                        <span class="sf-sub-indicator"> »</span>
                        <ul>';
@@ -137,10 +162,10 @@
 
                 $args = $menuContent['plugins'][$plugin]['coperson'][$label];
 
-                $args[] = $co['co_person_id'];
+                $args[] = 'copersonid:' . $co['co_person_id'];
                 $args['plugin'] = Inflector::underscore($plugin);
 
-                print "<li>" . $this->Html->link($co['co_name'], $args) . "</li>\n";
+                print '<li class="mdl-menu__item">' . $this->Html->link($co['co_name'], $args) . "</li>\n";
               }
 
               print "</ul></li>";

@@ -46,6 +46,20 @@ class UsersController extends AppController {
     'RequestHandler',
     'Session'
   );
+
+  /**
+   * Callback before other controller methods are invoked or views are rendered.
+   *
+   * @since  COmanage Registry 3.1.0
+   */
+  
+  function beforeFilter() {
+    // Since we're overriding, we need to call the parent to run the authz check.
+    parent::beforeFilter();
+
+    // Allow logout to process without a login page.
+    $this->Auth->allow('logout');
+  }
   
   /**
    * Authorization for this Controller, called by Auth component
@@ -205,7 +219,17 @@ class UsersController extends AppController {
               
               $params = array(
                 'conditions' => array(
-                  'CoGroupMember.co_person_id' => $l['co_person_id']
+                  'CoGroupMember.co_person_id' => $l['co_person_id'],
+                  'AND' => array(
+                    array('OR' => array(
+                      'CoGroupMember.valid_from IS NULL',
+                      'CoGroupMember.valid_from < ' => date('Y-m-d H:i:s', time())
+                    )),
+                    array('OR' => array(
+                      'CoGroupMember.valid_through IS NULL',
+                      'CoGroupMember.valid_through > ' => date('Y-m-d H:i:s', time())
+                    ))
+                  )
                 ),
                 'contain' => false
               );

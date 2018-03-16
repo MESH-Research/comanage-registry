@@ -456,7 +456,7 @@
               ?>
             </div>
           </li>
-          <li>
+          <li class="modelbox-data">
             <div class="field-name">
               <?php
                 if($e) {
@@ -496,7 +496,7 @@
               ?>
             </div>
           </li>
-          <li>
+          <li class="modelbox-data">
             <div class="field-name">
               <?php
                 if($e) {
@@ -506,7 +506,7 @@
                 }
               ?>
               <div class="field-desc">
-                <?php print _txt('fd.valid_from.desc'); ?>
+                <?php print _txt('fd.valid_through.desc'); ?>
               </div>
             </div>
             <div class="field-info">
