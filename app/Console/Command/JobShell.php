@@ -109,7 +109,7 @@ class JobShell extends AppShell {
    */
   
 
-  protected function syncOrgSources($coId, $force=false, $skipNew) {
+  protected function syncOrgSources($coId, $force=false, $oisId='', $skipNew=false) {
 
     // First see if syncing is enabled
     
@@ -157,7 +157,7 @@ class JobShell extends AppShell {
         
         if($runAll || in_array('forcesyncorgsources', $this->args)) {
           $this->out(_txt('sh.job.sync.ois', array($co['Co']['name'], $co['Co']['id'], _txt('fd.yes'))));
-          $this->syncOrgSources($co['Co']['id'], true);
+          $this->syncOrgSources($co['Co']['id'], true, $runOisId, $runSkipNew);
         }
         
         if($runAll || in_array('groupvalidity', $this->args)) {
@@ -168,7 +168,7 @@ class JobShell extends AppShell {
         if($runAll || in_array('syncorgsources', $this->args)) {
 
           $this->out(_txt('sh.job.sync.ois', array($co['Co']['name'], $co['Co']['id'], _txt('fd.no'), $runOisId, $runSkipNew)));
-          $this->syncOrgSources($co['Co']['id'], $runOisId, $runSkipNew);
+          $this->syncOrgSources($co['Co']['id'], false, $runOisId, $runSkipNew);
 
         }
       }

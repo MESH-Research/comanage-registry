@@ -667,7 +667,7 @@ class OrgIdentitySource extends AppModel {
    */
   
 
-  public function syncAll($coId, $force=false, $oisId, $skipNew) {
+  public function syncAll($coId, $force=false, $oisId='', $skipNew=false) {
 
     $errors = array();
     
