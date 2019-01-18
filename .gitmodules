@@ -4,3 +4,6 @@
 [submodule "local/Plugin/HumanitiesCommonsIdpEnroller"]
 	path = local/Plugin/HumanitiesCommonsIdpEnroller
 	url = git@github.com:mlaa/HumanitiesCommonsIdpEnroller.git
+[submodule "app/Plugin/Recaptcha"]
+	path = app/Plugin/Recaptcha
+	url = git@github.com:CakeDC/recaptcha.git

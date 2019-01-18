@@ -206,9 +206,16 @@ class CoPetitionsController extends StandardController {
    * @since  COmanage Registry v0.5
    */
   
-  function beforeFilter() {
-    $steps = null;
-    
+  function beforeFilter() { 
+  $steps = null;
+
+   if ($this->request->is('post')) {
+	if (!$this->Recaptcha->verify()) {	
+		 $this->redirect("/co_petitions/start/coef:158");
+	}
+} 
+
+
     if($this->enrollmentFlowID() > -1) {
       $steps = $this->CoPetition->CoEnrollmentFlow->configuredSteps($this->enrollmentFlowID());
     }

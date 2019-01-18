@@ -122,3 +122,8 @@ CakeLog::config('error', array(
 	'file' => 'error',
         'size' => '100MB',
 ));
+
+CakePlugin::load('Recaptcha');
+
+Configure::write('Recaptcha.publicKey', '6Lcfs4oUAAAAAOi9S8_k_4eaiDptX2J6ttJszCgQ');
+Configure::write('Recaptcha.privateKey', '6Lcfs4oUAAAAAJ02_xINWGzEryR8k734V0KJmx3r');

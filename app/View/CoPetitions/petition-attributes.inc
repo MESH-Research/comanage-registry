@@ -568,6 +568,9 @@
                 print $this->Form->checkbox($fieldName, $args);
                 print $this->Form->label($fieldName, _txt('op.tc.agree.i'));
                 print '</span>';
+$this->Form->unlockField('g-recaptcha-response');
+$this->Form->unlockField('recaptcha_response_field');
+echo $this->Recaptcha->display();
               ?>
           </li>
         <?php endforeach; ?>
