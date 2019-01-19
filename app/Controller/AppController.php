@@ -47,12 +47,13 @@ class AppController extends Controller {
                              'Role',
                              'Security',
                              'Session',
-                             'Paginator');
+                             'Paginator',
+			     'Recaptcha.Recaptcha');
   
   // We should probably add helpers here instead of in each Controller. To do so,
   // make sure to define the default Html and Form helpers (and Flash).
   // public $helpers = array('Form', 'Html', 'Time', 'Js', 'Permission', 'Session', 'Flash');
-  
+ public $helpers = array('Recaptcha.Recaptcha');  
   // Determine if controller requires a CO to be selected
   public $requires_co = false;
   
