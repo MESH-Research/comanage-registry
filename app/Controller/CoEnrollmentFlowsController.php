@@ -131,13 +131,13 @@ class CoEnrollmentFlowsController extends StandardController {
         MessageTemplateEnum::EnrollmentVerification
       );
       $args['fields'] = array(
-        'CoEnrollmentFlowApprovalMessageTemplate.id',
-        'CoEnrollmentFlowApprovalMessageTemplate.description',
-        'CoEnrollmentFlowApprovalMessageTemplate.context'
+        'CoEnrollmentFlowAppMessageTemplate.id',
+        'CoEnrollmentFlowAppMessageTemplate.description',
+        'CoEnrollmentFlowAppMessageTemplate.context'
       );
       
       $this->set('vv_message_templates',
-                 $this->CoEnrollmentFlow->CoEnrollmentFlowApprovalMessageTemplate->find('list', $args));
+                 $this->CoEnrollmentFlow->CoEnrollmentFlowAppMessageTemplate->find('list', $args));
       
       // Pull the set of available themes
       $args = array();
@@ -309,7 +309,7 @@ class CoEnrollmentFlowsController extends StandardController {
     
     $args = array();
     $args['conditions']['CoEnrollmentFlow.co_id'] = $this->cur_co['Co']['id'];
-    $args['conditions']['CoEnrollmentFlow.status'] = EnrollmentFlowStatusEnum::Active;
+    $args['conditions']['CoEnrollmentFlow.status'] = TemplateableStatusEnum::Active;
     $args['order']['CoEnrollmentFlow.name'] = 'asc';
     $args['contain'][] = false;
     

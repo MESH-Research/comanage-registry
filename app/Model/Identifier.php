@@ -250,7 +250,7 @@ class Identifier extends AppModel {
     $args = array();
     $args['conditions']['Identifier.co_person_id'] = $coPersonID;
     $args['conditions']['Identifier.type'] = $identifierType;
-    $args['conditions']['Identifier.status'] = StatusEnum::Active;
+    $args['conditions']['Identifier.status'] = SuspendableStatusEnum::Active;
     
     $r = $this->findForUpdate($args['conditions'], array('identifier'));
     

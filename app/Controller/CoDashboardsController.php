@@ -69,7 +69,7 @@ class CoDashboardsController extends StandardController {
       }
     }
   }
-      
+  
   /**
    * Callback after controller methods are invoked but before views are rendered.
    * - precondition: Request Handler component has set $this->request->params
@@ -136,7 +136,9 @@ class CoDashboardsController extends StandardController {
       $args = array();
       $args['conditions']['CoDashboard.id'] = $dashboardid;
       $args['conditions']['CoDashboard.status'] = StatusEnum::Active;
-      $args['contain'][] = 'CoDashboardWidget';
+      $args['contain'] = array(
+        'CoDashboardWidget' => array('order' => 'CoDashboardWidget.ordr ASC')
+      );
       // This doesn't work because the widget model is not (necessarily) Changelog enabled.
       //$args['contain']['CoDashboardWidget'] = $pcontain;
       
@@ -238,7 +240,7 @@ class CoDashboardsController extends StandardController {
       // to any registered CO Person. (However the widgets will honor the dashboard's
       // visibility, and so the content of the dashboard might not render.)
       
-      $p['dashboard'] = $roles['comember'];
+      $p['dashboard'] = ($roles['cmadmin'] || $roles['coadmin'] || $roles['comember']);
     }
     
     // Delete an existing Dashboard?
@@ -293,6 +295,7 @@ class CoDashboardsController extends StandardController {
   public function search() {
     $results = array();
     $roles = array();
+    $models = array();
     
     if(!empty($this->request->query['q'])) {
       /* To add a new backend to search:
@@ -304,19 +307,76 @@ class CoDashboardsController extends StandardController {
        */
       
       $models = array(
-        'Address' => array('cmadmin', 'coadmin', 'couadmin'),
-        'CoDepartment' => array('cmadmin', 'coadmin', 'couadmin', 'comember'),
-        'CoEmailList' => array('cmadmin', 'coadmin', 'couadmin'),
-        'CoEnrollmentFlow' => array('cmadmin', 'coadmin'),
-        'CoGroup' => array('cmadmin', 'coadmin', 'couadmin', 'comember'),
-        'CoPersonRole' => array('cmadmin', 'coadmin', 'couadmin'),
+        'Address' => array(
+          'parent' => 'CoPersonRole',
+          'roles' => array('cmadmin', 'coadmin', 'couadmin')
+        ),
+        'CoDepartment' => array(
+          'parent' => 'Co',
+          'roles' => array('cmadmin', 'coadmin', 'couadmin', 'comember')
+        ),
+        'CoEmailList' => array(
+          'parent' => 'Co',
+          'roles' => array('cmadmin', 'coadmin', 'couadmin')
+        ),
+        'CoEnrollmentFlow' => array(
+          'parent' => 'Co',
+          'roles' => array('cmadmin', 'coadmin')
+        ),
+        'CoGroup' => array(
+          'parent' => 'Co',
+          'roles' => array('cmadmin', 'coadmin', 'couadmin', 'comember')
+        ),
+        'CoPersonRole' => array(
+          'parent' => 'CoPreson',
+          'roles' => array('cmadmin', 'coadmin', 'couadmin')
+        ),
         // CoService does not allow comember since portals may be constrained by cou
-        'CoService' => array('cmadmin', 'coadmin', 'couadmin'),
-        'EmailAddress' => array('cmadmin', 'coadmin', 'couadmin'),
-        'Identifier' => array('cmadmin', 'coadmin', 'couadmin'),
-        'Name' => array('cmadmin', 'coadmin', 'couadmin'),
-        'TelephoneNumber' => array('cmadmin', 'coadmin', 'couadmin'),
+        'CoService' => array(
+          'parent' => 'Co',
+          'roles' => array('cmadmin', 'coadmin', 'couadmin')
+        ),
+        'EmailAddress' => array(
+          'parent' => 'CoPerson',
+          'roles' => array('cmadmin', 'coadmin', 'couadmin')
+        ),
+        'Identifier' => array(
+          'parent' => 'CoPerson',
+          'roles' => array('cmadmin', 'coadmin', 'couadmin')
+        ),
+        'Name' => array(
+          'parent' => 'CoPerson',
+          'roles' => array('cmadmin', 'coadmin', 'couadmin')
+        ),
+        'TelephoneNumber' => array(
+          'parent' => 'CoPersonRole',
+          'roles' => array('cmadmin', 'coadmin', 'couadmin')
+        )
       );
+      
+      // Determine which plugin models are searchable
+      $plugins = $this->loadAvailablePlugins('all', 'simple');
+      
+      // And track the display fields for the view
+      $pdisplay = array();
+
+      foreach($plugins as $plugin) {
+        if(method_exists($this->$plugin, 'cmPluginSearchModels')) {
+          $pSearchInfo = $this->$plugin->cmPluginSearchModels();
+          
+          foreach($pSearchInfo as $pmodel => $pcfg) {
+            $models[$pmodel] = array(
+              // Hardcoding parent probably isn't right, but it covers our
+              // immediate use case (filtering duplicate search results)
+              'parent' => 'Co',
+              'roles' => $pcfg['permissions']
+            );
+            $pdisplay[$pmodel] = $pcfg['displayField'];
+          }
+        }
+      }
+      
+      $this->set('vv_plugin_display_fields', $pdisplay);
       
       // Which models we search depends on our permissions
       
@@ -325,7 +385,7 @@ class CoDashboardsController extends StandardController {
       foreach(array_keys($models) as $m) {
         $authorized = false;
         
-        foreach($models[$m] as $role) {
+        foreach($models[$m]['roles'] as $role) {
           if(isset($roles[$role]) && $roles[$role]) {
             $authorized = true;
             break;
@@ -338,24 +398,47 @@ class CoDashboardsController extends StandardController {
           
           $this->loadModel($m);
           
-          $results[$m] = $this->$m->search($this->cur_co['Co']['id'],
-                                           $this->request->query['q']);
+          // If we're searching a plugin model, we need the base name of the 
+          // model itself (not the full plugin.model name)
+          $smodel = preg_replace('/.*\./', '', $m);
+          
+          $results[$m] = $this->$smodel->search($this->cur_co['Co']['id'],
+                                                $this->request->query['q']);
         }
       }
     }
     
-    // If we get exactly search result, redirect to that record. This is slightly
+    // If we get exactly one search result, redirect to that record. This is slightly
     // tricky in that we could get multiple results that point to the same object
     // (eg: because there are multiple similar names attached to a CO Person).
+    // So we sort the results according to the parent model. Models with a parent
+    // of CO are not considered duplicates.
     
-    $matches = Hash::extract($results, '{s}.{n}');
-    $pmatches = array_filter(array_unique(Hash::extract($results, '{s}.{n}.{s}.co_person_id')));
-    $prmatches = array_filter(array_unique(Hash::extract($results, '{s}.{n}.{s}.co_person_role_id')));
+    $c = array(
+      // For models with a parent of CO, we just need a count
+      'Co' => 0,
+      // Otherwise we need to track which IDs we've seen
+      'CoPerson' => array(),
+      'CoPersonRole' => array()
+    );
+    
+    foreach(array_keys($models) as $m) {
+      $p = $models[$m]['parent'];
+      
+      if($p == 'Co') {
+        $c[$p] += count($results[$m]);
+      } elseif($p == 'CoPerson') {
+        $c['CoPerson'] = array_filter(array_unique(array_merge($c['CoPerson'], Hash::extract($results, $m.'.{n}.'.$m.'.co_person_id'))));
+      } else {
+        $c['CoPersonRole'] = array_filter(array_unique(array_merge($c['CoPersonRole'], Hash::extract($results, $m.'.{n}.'.$m.'.co_person_role_id'))));
+      }
+    }
     
     // It's a single match if there is a single person or person role result,
     // or if there is a single result overall, redirect to that result.
-    if(((count($pmatches) + count($prmatches)) == 1)
-       || count($matches) == 1) {
+    if(($c['Co'] == 0 && (count($c['CoPerson']) + count($c['CoPersonRole']) == 1))
+       || $c['Co'] == 1 && (count($c['CoPerson']) + count($c['CoPersonRole']) == 0)) {
+      $matches = Hash::extract($results, '{s}.{n}');
       $match = Hash::get($matches, '0');
       
       // Figure out what model the results are for
@@ -391,7 +474,30 @@ class CoDashboardsController extends StandardController {
       // Otherwise redirect to the model's view. We don't really know if the current
       // person can edit or just view, so if they're an admin we redirect them to edit
       // otherwise view.
+      
+      $plugin = null;
+      
+      if(!isset($models[$matchModel])) {
+        // This is probably a plugin model, so we need to walk through the list
+        // of models looking for the right one
+        
+        foreach($models as $m => $d) {
+          if(strpos($m, '.')) {
+            // We have something of the form Plugin.Model
+            
+            $ms = explode('.', $m, 2);
+            
+            if($ms[1] == $matchModel) {
+              // This is the right plugin
+              $plugin = Inflector::underscore($ms[0]);
+              break;
+            }
+          }
+        }
+      }
+      
       $args = array(
+        'plugin'     => $plugin,
         'controller' => Inflector::tableize($matchModel),
         'action'     => ((isset($roles['cmadmin']) && $roles['cmadmin'])
                          || (isset($roles['coadmin']) && $roles['coadmin'])
