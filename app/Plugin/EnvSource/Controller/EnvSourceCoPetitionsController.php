@@ -50,12 +50,21 @@ class EnvSourceCoPetitionsController extends CoPetitionsController {
     // This is loosely based on parent::beforeFilter().
     $noAuth = false;
     
+    $steps = null;
+
+    if($this->enrollmentFlowID() > -1) {
+      $steps = $this->CoPetition->CoEnrollmentFlow->configuredSteps($this->enrollmentFlowID());
+    }
+
     // For self signup, we simply require a token (and for the token to match).
-    $token = $this->CoPetition->field('petitioner_token', array('CoPetition.id' => $this->parseCoPetitionId()));
+    $petitionerToken = $this->CoPetition->field('petitioner_token', array('CoPetition.id' => $this->parseCoPetitionId()));
+    $enrolleeToken = $this->CoPetition->field('enrollee_token', array('CoPetition.id' => $this->parseCoPetitionId()));
     $passedToken = $this->parseToken();
-    
-    if($token && $token != '' && $passedToken) {
-      if($token == $passedToken) {
+    $enrolleePhase = !empty($steps) && isset($steps[$this->action]) && $steps[$this->action]['role'] == EnrollmentRole::Enrollee;
+
+    if(!(empty($petitionerToken) && empty($enrolleeToken)) && !empty($passedToken)) {
+      if(   ($enrolleePhase && $enrolleeToken == $passedToken) 
+         || (!$enrolleePhase && $petitionerToken == $passedToken)) {
         // If we were passed a reauth flag, we require authentication even though
         // the token matched. This enables account linking.
         if(!isset($this->request->params['named']['reauth'])
@@ -69,7 +78,7 @@ class EnvSourceCoPetitionsController extends CoPetitionsController {
         }
         
         // Dump the token into a viewvar in case needed
-        $this->set('vv_petition_token', $token);
+        $this->set('vv_petition_token', $passedToken);
       } else {
         $this->Flash->set(_txt('er.token'), array('key' => 'error'));
         $this->redirect("/");
@@ -242,13 +251,14 @@ class EnvSourceCoPetitionsController extends CoPetitionsController {
     
     // selectEnrollee hasn't run yet so we can't pull the target CO Person from the
     // petition, but for OISAuthenticate, it's the current user (ie: $actorCoPersonId)
-    // that we always want to link to.
+    // that we always want to link to. Actually, it isn't (CO-1619), but the enrollment
+    // flow should later correctly link the identity.
       
     $newOrgId = $this->OrgIdentitySource->createOrgIdentity($oiscfg['OrgIdentitySource']['id'],
                                                             $sorid,
                                                             $actorCoPersonId,
                                                             $this->cur_co['Co']['id'],
-                                                            $actorCoPersonId,
+                                                            null,
                                                             false,
                                                             $id);
     
