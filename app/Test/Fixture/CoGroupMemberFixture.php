@@ -27,6 +27,6 @@
 
 class CoGroupMemberFixture extends CakeTestFixture {
 
-  // Import schema for the model from the default database
-  public $import = array('model' => 'CoGroupMember');
+  // Import schema and records for the model from the default database
+  public $import = array('model' => 'CoGroupMember', 'records' => true);
 }

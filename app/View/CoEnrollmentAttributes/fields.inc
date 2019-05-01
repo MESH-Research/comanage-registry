@@ -42,7 +42,7 @@
     switch(attrname) {
     <?php foreach(array_keys($vv_enums) as $k): ?>
       case "<?php print $k; ?>":
-        ret = new Array(<?php print '"' . join('","', array_values(filter_var($vv_enums[$k],FILTER_SANITIZE_SPECIAL_CHARS))) . '"'; ?>);
+        ret = new Array(<?php print '"' . join('","', array_map(function($v) { return filter_var($v, FILTER_SANITIZE_SPECIAL_CHARS); }, array_values($vv_enums[$k]))) . '"'; ?>);
         break;
     <?php endforeach; ?>
     }
@@ -654,7 +654,7 @@
         <td>
           <?php
           if($e) {
-            print $this->Form->submit($submit_label, array('onClick' => 'on_submit()'));
+            print $this->Form->submit($submit_label);
           }
           ?>
         </td>

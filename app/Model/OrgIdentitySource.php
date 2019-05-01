@@ -58,6 +58,12 @@ class OrgIdentitySource extends AppModel {
     )
   );
   
+  public $hasManyPlugins = array(
+    "orgidsource" => array(
+      'coreModelFormat' => '%s'
+    )
+  );
+  
   // Default display field for cake generated views
   public $displayField = "description";
   
@@ -66,14 +72,14 @@ class OrgIdentitySource extends AppModel {
     'co_id' => array(
       'content' => array(
         'rule' => 'numeric',
-        'required' => false,
-        'allowEmpty' => true
+        'required' => true,
+        'allowEmpty' => false
       )
     ),
     'description' => array(
       'rule' => array('validateInput'),
-      'required' => false,
-      'allowEmpty' => true
+      'required' => true,
+      'allowEmpty' => false
     ),
     'plugin' => array(
       // XXX This should be a dynamically generated list based on available plugins
@@ -764,7 +770,10 @@ class OrgIdentitySource extends AppModel {
             }
             catch(Exception $e) {
               // XXX We don't want to break the loop on an exception, and it's not really
-              // clear what we should do with it. Maybe register as a Notification to admins?
+              // clear what we should do with it. We log it so we don't lose it entirely,
+              // but perhaps we should register as a Notification to admins? Or render a
+              // popup to the user logging in?
+              $this->log(_txt('er.ois.sync.login', array($identifier, $e->getMessage())));
             }
           }
         }
@@ -1436,6 +1445,8 @@ class OrgIdentitySource extends AppModel {
       // For each record in the source, if there is no OrgIdentity linked
       // run createOrgIdentity
       
+      $sourceKeys = array();
+      $knownKeys = array();
       $newKeys = array();
       
       try {

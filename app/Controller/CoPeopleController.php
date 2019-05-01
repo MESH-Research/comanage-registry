@@ -114,7 +114,7 @@ class CoPeopleController extends StandardController {
       
       $args = array();
       $args['conditions']['CoEnrollmentFlow.co_id'] = $this->cur_co['Co']['id'];
-      $args['conditions']['CoEnrollmentFlow.status'] = EnrollmentFlowStatusEnum::Active;
+      $args['conditions']['CoEnrollmentFlow.status'] = TemplateableStatusEnum::Active;
       $args['contain'] = false;
       
       $this->set('co_enrollment_flows', $this->Co->CoEnrollmentFlow->find('all', $args));
@@ -723,8 +723,7 @@ class CoPeopleController extends StandardController {
                                                                                     array('CoEnrollmentFlow.id' => $this->request->named['coef']));
       $p['match'] = (($roles['cmadmin'] || $flowAuthorized)
                      &&
-                     ($p['match_policy'] == EnrollmentMatchPolicyEnum::Advisory
-                      || $p['match_policy'] == EnrollmentMatchPolicyEnum::Automatic));
+                     ($p['match_policy'] == EnrollmentMatchPolicyEnum::Advisory));
     }
     
     if(!empty($this->request->params['named']['copetitionid'])) {

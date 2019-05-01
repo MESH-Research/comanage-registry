@@ -28,6 +28,7 @@
 class ActionEnum
 {
   // Codes beginning with 'X' (eg: 'XABC') are reserved for local use
+  // Codes beginning with a lowercase 'p' (eg: 'pABC') are reserved for plugin use
   const AuthenticatorDeleted            = 'DAUT';
   const AuthenticatorEdited             = 'EAUT';
   const AuthenticatorStatusEdited       = 'EATS';
@@ -227,13 +228,6 @@ class EnrollmentDupeModeEnum
   const Merge           = 'M';
   const NewRole         = 'R';
   const NewRoleCouCheck = 'C';
-}
-
-class EnrollmentFlowStatusEnum
-{
-  const Active              = 'A';
-  const Suspended           = 'S';
-  const Template            = 'T';
 }
 
 class EnrollmentMatchPolicyEnum {
@@ -558,6 +552,8 @@ class RequiredNameFieldsEnum
 
 class ServerEnum
 {
+  // When adding a new server type, be sure to add it to ServersController::view_contains
+  const HttpServer    = 'HT';
   const LdapServer    = 'LD';
   const Oauth2Server  = 'O2';
   // Generic SQL Server, not "MS SQL Server"
@@ -586,6 +582,8 @@ class SshKeyTypeEnum
   // Protocol v2
   const DSA         = 'DSA';
   const ECDSA       = 'ECDSA';
+  const ECDSA384    = 'ECDSA384';
+  const ECDSA521    = 'ECDSA521';
   const ED25519     = 'ed25519';
   const RSA         = 'RSA';
   // Protocol v1
@@ -688,6 +686,13 @@ class TAndCLoginModeEnum
   const NotEnforced        = 'X';
   const RegistryLogin      = 'R';
   const DisableAllServices = 'D';
+}
+
+class TemplateableStatusEnum
+{
+  const Active              = 'A';
+  const Suspended           = 'S';
+  const Template            = 'T';
 }
 
 class UrlEnum {
@@ -811,11 +816,13 @@ $name_ti = array(
 );
 
 $ssh_ti = array(
-  'DSA'     => 'ssh-dss',
-  'ECDSA'   => 'ecdsa-sha2-nistp256',
-  'ED25519' => 'ssh-ed25519',
-  'RSA'     => 'ssh-rsa',
-  'RSA1'    => 'ssh-rsa1'
+  'DSA'      => 'ssh-dss',
+  'ECDSA'    => 'ecdsa-sha2-nistp256',
+  'ECDSA384' => 'ecdsa-sha2-nistp384',
+  'ECDSA521' => 'ecdsa-sha2-nistp521',
+  'ED25519'  => 'ssh-ed25519',
+  'RSA'      => 'ssh-rsa',
+  'RSA1'     => 'ssh-rsa1'
 );
 
 $status_t = array(
