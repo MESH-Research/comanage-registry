@@ -69,7 +69,7 @@ h3 {
   margin: 0;
 }
 a {
-  color: #07b; /* slightly darker: passes accessibility contrast checks */
+  color: #06c; /* passes accessibility contrast checks against white down to #eee */
   text-decoration: none;
 }
 #main a:active,
@@ -95,7 +95,7 @@ a {
 }
 #skip-to-content {
   position: relative;
-  background-color: #07b;
+  background-color: #06c;
   color: white;
   padding: 0 1em 0.25em ;
   border-bottom-left-radius: 10px;
@@ -228,7 +228,6 @@ body.logged-in #user-menu {
 #user {
   margin-top: 2px;
 }
-
 #user-panel {
   position: absolute;
   right: 0;
@@ -274,20 +273,10 @@ body.logged-in #user-menu {
 #user-panel .co-info-topbox strong {
   font-weight: normal;
 }
-#user-panel #co-profile-link {
-  display: block;
-  vertical-align: middle;
-  background-color: #f4f4f4;
-  /*border: 1px solid #eee;*/
-  margin-top: 1em;
-  font-weight: normal;
-  font-size: 1.1em;
-  /*text-transform: unset;*/
-}
-#user-panel #co-profile-link:hover {
+#user-panel .co-profile-button:hover {
   background-color: #eee;
 }
-#user-panel #co-profile-link .material-icons {
+#user-panel .co-profile-button .material-icons {
   vertical-align: middle;
   margin-right: 0.25em;
   font-size: 16px;
@@ -328,7 +317,6 @@ body.logged-in #user-menu {
 }
 #notifications #notifications-menu {
   width: 220px;
-  background-color: #f55;
 }
 #notifications .notification {
   line-height: 1.3em;
@@ -343,7 +331,7 @@ body.logged-in #user-menu {
   background-color: #fff;
 }
 #notifications .notification:nth-child(even) {
-  background-color: #fafafa;
+  background-color: #f8f8f8;
 }
 #notifications li.notification:nth-child(n+4) {
   /* only show three notifications on mobile phones. */
@@ -357,6 +345,9 @@ body.logged-in #user-menu {
 }
 #notifications .notification-created a {
   color: #444;
+}
+#see-all a.co-raised-button {
+  margin: 1em 1em 0.5em;
 }
 /* Notification page */
 ul.form-list.notification-list .field-name {
@@ -411,9 +402,9 @@ form#notificationStatus {
   margin: 4px 0 -8px;
   text-align: right;
 }
+/* Specialty Buttons */
 .co-menu-button a {
   background-color: #2395E0;
-  /*background-color: #186696;*/
   color: white;
   text-align: center;
   padding: 0.4em;
@@ -422,6 +413,15 @@ form#notificationStatus {
 }
 .co-menu-button a:hover {
   background-color: #53B1F4;
+}
+.co-raised-button { /* should be used with mdl-button--raised */
+  display: block;
+  text-align: center;
+  vertical-align: middle;
+  background-color: #f4f4f4;
+  margin-top: 1em;
+  font-weight: normal;
+  font-size: 1.1em;
 }
 /* Shib IDP */
 #idp-select-container {
@@ -520,7 +520,7 @@ form#notificationStatus {
   font-size: 0.9em;
   padding: 7px 8px 7px 16px;
   line-height: 1.4em;
-  color: #2395E0;
+  color: #06c;
   border: 1px solid transparent;
 }
 #main-menu > li a:hover,
@@ -529,6 +529,16 @@ form#notificationStatus {
 }
 #main-menu > li li a:focus {
   border: 1px dotted #53B1F4;
+}
+#main-menu a.selected {
+  background-color: #f5f5f5;
+}
+#main-menu li li a.selected {
+  color: #06c;
+  background-color: #fafafa;
+  /* keep these if we find a better method of selecting sub-menu items:
+  color: #0067A3;
+  background-color: #e6f4ff; */
 }
 #main-menu .fa-fw {
   width: 2em;
@@ -546,7 +556,7 @@ form#notificationStatus {
   margin-right: 6px;
   vertical-align: bottom;
 }
-#main-menu .serviceMenu ul .material-icons {
+#main-menu #serviceMenu ul .material-icons {
   font-size: 1.1em;
   position: relative;
   top: -2px;
@@ -754,11 +764,13 @@ body.co_people.canvas .titleNavContainer {
 .widget-actions li {
   display: inline-block;
   list-style: none;
-  font-size: 0.9em;
 }
 .widget-actions .material-icons {
-  /* color: #2395E0; - original blue; doesn't pass WCAG contrast ratios at small sizes */
-  color: #07b;
+  color: #06c;
+}
+.widget-actions .ui-button {
+  background: none;
+  border: none;
 }
 /* REDIRECT PAGE */
 #redirect-box {
@@ -963,7 +975,8 @@ iframe#tandc_content {
 }
 /* PETITIONS */
 #view_co_petition .status {
-  margin: 0 1em 0 0;
+  display: inline-block;
+  font-size: 1.4em;
 }
 #view_co_petition .status.N,
 #view_co_petition .status.Y,
@@ -981,7 +994,8 @@ iframe#tandc_content {
   color: white;
 }
 #view_co_petition .ui-button {
-  margin: 0 0 0 0.25em;
+  margin: 0.5em 0.5em 1.5em 0;
+  padding: 0 2em;
 }
 body.co_petitions.view th,
 body.co_petitions.view td,
@@ -1038,25 +1052,27 @@ body.co_petitions .approve-button .ui-icon,
 body.co_petitions .deny-button .ui-icon {
   background-image: url("../js/jquery/jquery-ui-1.11.4.custom/images-comanage/ui-icons_ffffff_256x240.png");
 }
-body.co_petitions .approve-button {
-  background-color: #2a2;
-  background-image: none;
-  border: 1px solid #191;
+body.co_petitions .approve-button,
+body.co_petitions .deny-button {
   color: white !important;
-  font-weight: bold;
+  font-weight: normal;
+  letter-spacing: 1px;
+  border: none;
+}
+body.co_petitions .approve-button {
+  float: left;
+  background-color: #2a2 !important;
+  background-image: none;
 }
 body.co_petitions .approve-button:hover {
   background-color: #3b3;
 }
 body.co_petitions .deny-button {
-  background-color: #c33;
+  background-color: #c33 !important;
   background-image: none;
-  border: 1px solid #b22;
-  color: white !important;
-  font-weight: bold;
 }
 body.co_petitions .deny-button:hover {
-  background-color: #d44;
+  background-color: #d44 !important;
 }
 /* for T&Cs */
 .tc-checkbox-and-label {
@@ -1077,7 +1093,7 @@ body.co_petitions .ui-dialog {
   min-height: 1.5em;
   padding: 0.5em;
   /*background-color: #9FC6E2;*/
-  background-color: #186696;
+  background-color: #1D7AB4;
   color: white;
   text-align: center;
 }
@@ -1255,6 +1271,7 @@ body.co_petitions .ui-dialog {
   display: block;
 }
 #co_people .role-panel {
+  display: none;
   margin-left: 25px;
   clear: both;
   position: relative;
@@ -1319,7 +1336,8 @@ body.co_petitions .ui-dialog {
 #co_people .ui-widget-content .ui-state-focus,
 #co_people .ui-widget-header .ui-state-focus {
   border: 1px solid #79b7e7;
-  background-color: #d0e5f5;
+  /*background-color: #d0e5f5;*/
+  background-color: #e6f4ff;
   color: #1d5987;
 }
 #co_people .ui-state-active,
@@ -1350,8 +1368,7 @@ a.ui-button:visited,
    and Side Search (person canvas) */
 .top-search {
   margin-top: 0.5em;
-  padding: 0.5em;
-  background-color: #eee;
+  padding: 0;
 }
 .side-search {
   margin-top: 2em;
@@ -1366,23 +1383,26 @@ a.ui-button:visited,
   top: -1px;
 }
 .top-search fieldset {
+  clear: both;
   position: relative;
-  padding: 0;
+  padding: 0.5em 0.5em 0;
   margin: 0;
+  background-color: #f5f5f5;
+}
+.top-search.open fieldset {
+  padding-bottom: 0.5em;
 }
 .top-search legend {
   width: 100%;
-}
-a#top-search-toggle {
-  display: block;
-  width: 100%;
-  color: #222;
-}
-a#top-search-toggle:hover {
-  text-decoration: none;
+  background-color: #f5f5f5;
+  margin: 0 -0.5em;
+  padding: 0.5em 0.5em 0;
+  line-height: 2em;
+  cursor: pointer;
 }
 #top-search-fields {
   display: none;
+  padding: 0.25em 0.5em;
 }
 .top-search input[type=text],
 .top-search select,
@@ -1420,6 +1440,27 @@ a#top-search-toggle:hover {
 .top-search label,
 .side-search label {
   display: none;
+}
+#top-search-active-filters {
+  margin-left: 1em;
+  font-style: italic;
+  padding: 0.5em 0;
+}
+.top-search-active-filter {
+  margin: 0 1em 0 0;
+  white-space: nowrap;
+  color: #b00;
+}
+.top-search-active-filter-title::after {
+  content: ": ";
+}
+.top-search-active-filters-remove button {
+  margin-left: 2em;
+  font-size: 0.9em;
+  background-color: #f5f5f5;
+}
+.top-search-active-filters-remove button:hover {
+  background-color: #eee;
 }
 /* top filter form, similar to top search */
 .top-filter {
@@ -1465,7 +1506,7 @@ a#top-search-toggle:hover {
   border: 1px solid #eee;
 }
 .co-card.is-member {
-  border-bottom: 1px solid #07b;
+  border-bottom: 1px solid #06c;
 }
 .co-card img {
   min-width: 100%;
@@ -1543,6 +1584,10 @@ a#top-search-toggle:hover {
 .coAddEditButtons {
   float: right;
   clear: left;
+}
+body.co_people .addbutton {
+  border: none;
+  background: none;
 }
 /* DATA LISTS */
 /*** ul.data-list is the main structure for representing data
@@ -1676,13 +1721,13 @@ ul.form-list {
   padding: 0;
 }
 ul.form-list li {
-  background-color: #f5f5f5;
+  background-color: #f8f8f8;
   margin: 0 0 2px;
   padding: 0.5em;
   list-style: none;
 }
 ul.form-list li:nth-child(even) {
-  background-color: #e5e5e5;
+  background-color: #eee;
 }
 ul.form-list li.fields-submit {
   background-color: unset;
@@ -1867,7 +1912,7 @@ ul, ol { /* MDL override */
   font-size: 0.9em;
 }
 .required {
-  color: red;
+  color: #c00;
 }
 .center {
   text-align: center;
@@ -1901,11 +1946,12 @@ a.desc::before {
 }
 .ui-widget-header {
   /*background-color: #9FC6E2;*/
-  background-color: #186696;
+  background-color: #1D7AB4;
 }
 .ui-button {
   font-size: 0.9em !important;
   padding: 0.3em 0.75em 0.3em 0.5em;
+  /*margin: 0.25em 0.25em 0.25em 0; keep for now */
 }
 .co-grid {
   clear: both;
@@ -1935,6 +1981,9 @@ table {
   overflow: auto;
   clear: both;
 }
+table.common-table {
+  margin-bottom: 1em;
+}
 th, td {
   padding: 0.5em;
   text-align: left;
@@ -1942,15 +1991,18 @@ th, td {
   border-bottom: 2px solid #fff;
   font-weight: normal;
 }
+table.common-table td {
+  padding: 0.25em 0.25em 0.25em 0.5em;
+}
 th {
-  /*background-color: #9fc6e2;*/
-  background-color: #186696;
+  background-color: #1D7AB4;
   color: white;
 }
 th a {
   color: white;
 }
-th a:hover {
+th a:hover,
+#main th a:hover {
   color: #ff3;
   text-decoration: none !important;
 }
@@ -1968,15 +2020,18 @@ th.actionButtons {
   width:70px;
 }
 /* legacy zebra stripes for rows;
-   0 used for autoincrementing line counters; */
+   0 used for autoincrementing line counters;
+   Use table.common-table for newer CSS approach to zebra stripes. */
 .line0 {
-  background-color: #e5e5e5;
+  background-color: #eee;
 }
+table.common-table tr:nth-child(odd) td,
 .line1 {
-  background-color: #f5f5f5;
+  background-color: #f8f8f8;
 }
+table.common-table tr:nth-child(even) td,
 .line2 {
-  background-color: #e5e5e5;
+  background-color: #eee;
 }
 td.indented {
   border-left: 3em solid #fff;
@@ -2005,6 +2060,7 @@ td.indented {
 }
 .mdl-button--raised.mdl-button--colored:hover {
   background-color: #222 !important;
+  color: white !important;
 }
 .mdl-button:hover {
   background-color: #f2f2f2;

@@ -110,10 +110,6 @@ class ActionEnum
   const OrgIdRemovedSource              = 'ROIS';
   const ProvisionerAction               = 'PRVA';
   const ProvisionerFailed               = 'PRVX';
-  const SshKeyAdded                     = 'SSHA';
-  const SshKeyDeleted                   = 'SSHD';
-  const SshKeyEdited                    = 'SSHE';
-  const SshKeyUploaded                  = 'SSHU';
 }
 
 class AdministratorEnum
@@ -577,19 +573,6 @@ class SqlServerEnum
   const SqlServer = 'MS';
 }
 
-class SshKeyTypeEnum
-{
-  // Protocol v2
-  const DSA         = 'DSA';
-  const ECDSA       = 'ECDSA';
-  const ECDSA384    = 'ECDSA384';
-  const ECDSA521    = 'ECDSA521';
-  const ED25519     = 'ed25519';
-  const RSA         = 'RSA';
-  // Protocol v1
-  const RSA1        = 'RSA1';
-}
-
 class StatusEnum
 {
   const Active              = 'A';
@@ -693,6 +676,18 @@ class TemplateableStatusEnum
   const Active              = 'A';
   const Suspended           = 'S';
   const Template            = 'T';
+  
+  public static $from_api = array(
+    'Active'    => TemplateableStatusEnum::Active,
+    'Suspended' => TemplateableStatusEnum::Suspended,
+    'Template'  => TemplateableStatusEnum::Template
+  );
+
+  public static $to_api = array(
+    TemplateableStatusEnum::Active    => 'Active',
+    TemplateableStatusEnum::Suspended => 'Suspended',
+    TemplateableStatusEnum::Template  => 'Template'
+  );
 }
 
 class UrlEnum {
@@ -739,7 +734,6 @@ global $contact_t, $contact_ti;
 global $extattr_t, $extattr_ti;
 global $identifier_t, $identifier_ti;
 global $name_t, $name_ti;
-global $ssh_ti;  // Used for ldap and github provisioner
 global $status_t, $status_ti;
 
 $affil_t = array(
@@ -813,16 +807,6 @@ $name_ti = array(
   'FKA' => 'fka',
   'Official' => 'official',
   'Preferred' => 'preferred'
-);
-
-$ssh_ti = array(
-  'DSA'      => 'ssh-dss',
-  'ECDSA'    => 'ecdsa-sha2-nistp256',
-  'ECDSA384' => 'ecdsa-sha2-nistp384',
-  'ECDSA521' => 'ecdsa-sha2-nistp521',
-  'ED25519'  => 'ssh-ed25519',
-  'RSA'      => 'ssh-rsa',
-  'RSA1'     => 'ssh-rsa1'
 );
 
 $status_t = array(

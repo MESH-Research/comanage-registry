@@ -98,9 +98,9 @@
           ?>
         </li>
       <?php endforeach; ?>
-      <li id="see-all" class="co-menu-button">
+      <li id="see-all">
         <a href="/registry/co_notifications/index/recipientcopersonid:<?php print $vv_co_person_id_notifications; ?>/sort:created/direction:desc"
-           class="mdl-button mdl-js-button mdl-js-ripple-effect"><?php print _txt('op.see.notifications')?></a>
+           class="co-raised-button mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect"><?php print _txt('op.see.notifications')?></a>
       </li>
     </ul>
   </div>
@@ -147,6 +147,9 @@
             foreach($menuContent['cos'] as $co) {
               // Only display a profile link for the current CO
               if($co['co_id'] == $cur_co['Co']['id']) {
+
+                print '<div id="co-profile-buttons">';
+
                 // The person must have an Active/GracePeriod status and at least
                 // one defined role.
                 if(isset($co['co_person']['status'])
@@ -161,8 +164,24 @@
                     $co['co_person_id']
                   );
                   print $this->Html->link('<em class="material-icons" aria-hidden="true">account_circle</em>' . _txt('me.profile.for', array($co['co_name'])), $args,
-                    array('escape' => false, 'id' => 'co-profile-link', 'class' => 'mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect'));
+                    array('escape' => false, 'id' => 'co-profile-link', 'class' => 'co-profile-button co-raised-button mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect'));
                 }
+
+                // Groups
+                // Show the groups link too, if permissions allow
+                if(isset($permissions['menu']['cogroups']) && $permissions['menu']['cogroups']) {
+                  $args = array(
+                    'plugin' => '',
+                    'controller' => 'co_groups',
+                    'action' => 'select',
+                    'copersonid' => $co['co_person_id'],
+                    'co' => $co['co_id']
+                  );
+                  print $this->Html->link('<em class="material-icons" aria-hidden="true">group_work</em>' . _txt('op.grm.my.groups'), $args,
+                    array('escape' => false, 'id' => 'co-mygroups-link', 'class' => 'co-profile-button co-raised-button mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect'));
+                }
+
+                print '</div>';
               }
             }
           }
@@ -198,34 +217,45 @@
 
         // Plugin submenus
         // This rendering is a bit different from how render_plugin_menus() does it...
-        if(!empty($menuContent['plugins'])) { // XXX This test is inadequate. See CO-1713.
-          print("<ul>");
+        if(!empty($menuContent['plugins'])) {
+          $userPluginsExist = false;
           foreach(array_keys($menuContent['plugins']) as $plugin) {
             if(isset($menuContent['plugins'][$plugin]['coperson'])) {
-              foreach(array_keys($menuContent['plugins'][$plugin]['coperson']) as $label) {
-                print '<li> 
-                         <a href="#">' . $label . '</a>
-                         <span class="sf-sub-indicator"> »</span>
-                         <ul>';
-
-                foreach($menuContent['cos'] as $co) {
-                  if(empty($co['co_person_id'])) {
-                    continue;
-                  }
-
-                  $args = $menuContent['plugins'][$plugin]['coperson'][$label];
-
-                  $args[] = 'copersonid:' . $co['co_person_id'];
-                  $args['plugin'] = Inflector::underscore($plugin);
-
-                  print '<li>' . $this->Html->link($co['co_name'], $args) . "</li>\n";
-                }
-
-                print "</ul></li>";
-              }
+              $userPluginsExist = true;
+              break;
             }
           }
-          print "</ul>";
+          if($userPluginsExist) {
+            print '<div id="user-panel-plugins-container">';
+            print '<h2>' . _txt('me.plugins') . '</h2>';
+            print '<ul id="user-panel-plugins">';
+            foreach(array_keys($menuContent['plugins']) as $plugin) {
+              if(isset($menuContent['plugins'][$plugin]['coperson'])) {
+                foreach(array_keys($menuContent['plugins'][$plugin]['coperson']) as $label) {
+                  print '<li>';
+                    print '<span class="user-plugin-label">' . $label . '</span>';
+                    print '<ul>';
+  
+                    foreach($menuContent['cos'] as $co) {
+                      if(empty($co['co_person_id'])) {
+                        continue;
+                      }
+  
+                      $args = $menuContent['plugins'][$plugin]['coperson'][$label];
+  
+                      $args[] = 'copersonid:' . $co['co_person_id'];
+                      $args['plugin'] = Inflector::underscore($plugin);
+  
+                      print '<li>' . $this->Html->link($co['co_name'], $args) . "</li>\n";
+                    }
+  
+                    print '</ul>';
+                  print '</li>';
+                }
+              }
+            }
+            print "</ul></div>";
+          }
         }
       ?>
 
