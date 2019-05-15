@@ -21,7 +21,7 @@
  * 
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
- * @since         COmanage Registry v0.9
+ * @since         COmanage Registry v3.3.0
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
  */
 
@@ -33,11 +33,12 @@ class SshKey extends AppModel {
   public $version = "1.0";
   
   // Add behaviors
-  public $actsAs = array('Provisioner',
+  public $actsAs = array('Containable',
                          'Changelog' => array('priority' => 5));
   
   // Association rules from this model to other models
   public $belongsTo = array(
+    "SshKeyAuthenticator.SshKeyAuthenticator",
     "CoPerson"
   );
   
@@ -47,10 +48,15 @@ class SshKey extends AppModel {
   // Validation rules for table elements
   // Validation rules must be named 'content' for petition dynamic rule adjustment
   public $validate = array(
+    'ssh_key_authenticator_id' => array(
+      'rule' => 'numeric',
+      'required' => true,
+      'allowEmpty' => false
+    ),
     'co_person_id' => array(
       'content' => array(
         'rule' => 'numeric',
-        'required' => false,
+        'required' => true,
         'allowEmpty' => false
       )
     ),
@@ -92,14 +98,15 @@ class SshKey extends AppModel {
   /**
    * Parse a file for an SSH key and attach the key to the specified CO Person.
    *
-   * @since  COmanage Registry v0.9
+   * @since  COmanage Registry v3.3.0
    * @param  string  Name of file holding SSH key (presumably from PHP upload parsing)
    * @param  integer Identifier of CO Person
+   * @param  integer SSH Key Authenticator ID
    * @return Array   SshKey object, as parsed from the key file
    * @throws InvalidArgumentException
    */
   
-  public function addFromKeyFile($keyfile, $coPersonId) {
+  public function addFromKeyFile($keyfile, $coPersonId, $sshKeyAuthenticatorId) {
     // First read the contents of the keyfile
     $key = rtrim(file_get_contents($keyfile));
     
@@ -139,21 +146,21 @@ class SshKey extends AppModel {
       case '-----BEGIN':
         if(strncmp($bits[2], 'PRIVATE', 7)==0) {
           // This is the private key, not the public key
-          throw new InvalidArgumentException(_txt('er.ssh.private'));
+          throw new InvalidArgumentException(_txt('pl.sshkeyauthenticator.private'));
         }
         // else unknown format, fall through for error
         break;
       case '----':
         if($bits[1] == 'BEGIN' && strncmp($bits[2], 'SSH2', 4)==0) {
           // This is an RFC 4716 key format, which is not currently supported (CO-859)
-          throw new InvalidArgumentException(_txt('er.ssh.rfc4716'));
+          throw new InvalidArgumentException(_txt('pl.sshkeyauthenticator.rfc4716'));
         }
         // else unknown format, fall through for error
         break;
     }
     
     if(!$keyType) {
-      throw new InvalidArgumentException(_txt('er.ssh.type', array(filter_var($bits[0],
+      throw new InvalidArgumentException(_txt('pl.sshkeyauthenticator.type', array(filter_var($bits[0],
         FILTER_SANITIZE_STRING,FILTER_FLAG_STRIP_HIGH |
         FILTER_FLAG_STRIP_LOW | FILTER_FLAG_STRIP_BACKTICK)))); /* was Cake's Sanitize::paranoid */
     }
@@ -162,10 +169,11 @@ class SshKey extends AppModel {
     $comment = $bits[2];
     
     if(!$key) {
-      throw new InvalidArgumentException(_txt('er.ssh.format'));
+      throw new InvalidArgumentException(_txt('pl.sshkeyauthenticator.format'));
     }
     
     $sk = array();
+    $sk['ssh_key_authenticator_id'] = $sshKeyAuthenticatorId;
     $sk['co_person_id'] = $coPersonId;
     $sk['comment'] = $comment;
     $sk['type'] = $keyType;
