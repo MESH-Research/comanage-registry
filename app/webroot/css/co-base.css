@@ -1007,7 +1007,7 @@ body.petitionerAttributes td {
   width: 50%;
   margin: 0 0 0 2px;
 }
-#statusFilters {
+.filters-box {
   background-color: #f5f5f5;
   border: 1px solid #a0c6e3;
   clear: both;
@@ -1015,19 +1015,19 @@ body.petitionerAttributes td {
   min-height: 2.2em;
   padding: 0 0.5em 0.5em;
 }
-#statusFilters .checkbox {
+.filters-box .checkbox {
   display: inline-block;
   margin: 0.25em 0.5em 0 0;
   color: #222;
   white-space: nowrap;
 }
-#statusFilters input {
+.filters-box input {
   margin: 4px 4px 0;
 }
-#statusFilters label {
+.filters-box label {
   vertical-align: top;
 }
-#statusFilters .submit-button {
+.filters-box .submit-button {
   float: right;
   font-size: 0.9em;
   height: 28px;
@@ -1102,7 +1102,6 @@ body.co_petitions .ui-dialog {
 }
 #pagination .paginationCounter {
   display: block;
-  margin: 0.4em 0.5em 0.4em 0;
 }
 #pagination .paginationFirst,
 #pagination .paginationPrev {
@@ -1134,8 +1133,9 @@ body.co_petitions .ui-dialog {
 }
 #pagination .pagination-form input[type="submit"] {
   width: auto;
-  height: 2em;
-  padding: 0 4px;
+  height: auto;
+  padding: 2px 4px;
+  top: -1px;
   min-width: 0;
   min-height: 0;
   line-height: initial;
@@ -1437,19 +1437,27 @@ a.ui-button:visited,
   height: 28px;
   margin: 0.5em;
 }
-.top-search label,
+.top-search .filter-clear-all-button {
+  font-size: 0.9em;
+  width: auto;
+  line-height: unset;
+}
+.top-search .filter-clear-all-button:hover {
+  background-color: unset;
+}
+.top-search.top-search-hide-fields label,
 .side-search label {
   display: none;
 }
 #top-search-active-filters {
   margin-left: 1em;
-  font-style: italic;
   padding: 0.5em 0;
 }
 .top-search-active-filter {
-  margin: 0 1em 0 0;
+  margin: 0 0.25em 0 0;
   white-space: nowrap;
-  color: #b00;
+  /*color: #b00;*/
+  font-style: italic;
 }
 .top-search-active-filter-title::after {
   content: ": ";
@@ -1493,8 +1501,18 @@ a.ui-button:visited,
 .co-services {
   clear: both;
 }
+.co-card.co-card-linked {
+  cursor: pointer;
+}
 .co-card h2  {
   font-size: 1.2em;
+}
+#main .co-card h2 a {
+  font-weight: bold;
+  color: #555;
+}
+#main .co-card h2 a:hover {
+  text-decoration: none;
 }
 .co-card {
   position: relative;

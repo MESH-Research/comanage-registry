@@ -164,6 +164,8 @@ $cm_texts['en_US'] = array(
   'ct.identifiers.pl' =>        'Identifiers',
   'ct.ldap_servers.1' =>        'LDAP Server',
   'ct.ldap_servers.pl' =>       'LDAP Servers',
+  'ct.match_servers.1' =>       'Match Server',
+  'ct.match_servers.pl' =>      'Match Servers',
   'ct.names.1' =>               'Name',
   'ct.names.pl' =>              'Names',
   'ct.navigation_links.1' =>    'Navigation Link',
@@ -316,6 +318,7 @@ original notification at
     ActionEnum::InvitationExpired           => 'Invitation Expired',
     ActionEnum::InvitationSent              => 'Invitation Sent',
     ActionEnum::InvitationViewed            => 'Invitation Viewed',
+    ActionEnum::MatchAttributesUpdated      => 'Update Match Attributes Request Sent',
     ActionEnum::NotificationAcknowledged    => 'Notification Acknowledged',
     ActionEnum::NotificationCanceled        => 'Notification Canceled',
     ActionEnum::NotificationDelivered       => 'Notification Delivered',
@@ -333,6 +336,7 @@ original notification at
     ActionEnum::OrgIdRemovedSource          => 'Org Identity Removed From Source',
     ActionEnum::ProvisionerAction           => 'Provisioner Action',
     ActionEnum::ProvisionerFailed           => 'Provisioner Failed',
+    ActionEnum::ReferenceIdentifierObtained => 'Reference Identifier Obtained From Match Server',
   ),
   
   'en.action.petition' => array(
@@ -587,8 +591,7 @@ original notification at
   
   'en.match.strategy' => array(
     MatchStrategyEnum::EmailAddress => 'EmailAddress',
-    // Not yet implemented (CO-298)
-//    MatchStrategyEnum::External   => 'External',
+    MatchStrategyEnum::External   => 'External',
     MatchStrategyEnum::Identifier   => 'Identifier',
     MatchStrategyEnum::NoMatching   => 'Do Not Match'
   ),
@@ -668,6 +671,7 @@ original notification at
   'en.server' => array(
     ServerEnum::HttpServer   => 'HTTP',
     ServerEnum::LdapServer   => 'LDAP',
+    ServerEnum::MatchServer  => 'Match',
     ServerEnum::Oauth2Server => 'OAuth2',
     ServerEnum::SqlServer    => 'SQL'
   ),
@@ -728,7 +732,17 @@ original notification at
     NotificationStatusEnum::PendingResolution     => 'Pending Resolution',
     NotificationStatusEnum::Resolved              => 'Resolved'
   ),
-  
+
+  'en.status.bool' => array(
+    TrueFalseEnum::True   => 'True',
+    TrueFalseEnum::False  => 'False'
+  ),
+
+  'en.status.open' => array(
+    TrueFalseEnum::True   => 'Open',
+    TrueFalseEnum::False  => 'Closed'
+  ),
+
   'en.status.org' => array(
     OrgIdentityStatusEnum::Removed => 'Removed',
     OrgIdentityStatusEnum::Synced  => 'Synced' 
@@ -941,6 +955,7 @@ original notification at
   'er.loc.exists' =>  'A localization already exists for the key "%1$s" and language "%2$s"',
   'er.lock' =>        'Error obtaining lock: %1$s',
   'er.lock.exists' => 'Lock #%1$s already held by pid %2$s since %3$s',
+  'er.match.response' => 'Match Server responded: %1$s',
   'er.multiple' =>    'Unexpectedly found multiple results',
   'er.nd.already'  => 'NSF Demographic data already exists for this person',
   'er.nm.official.et' => 'The Name type "official" cannot be deleted or renamed',
@@ -1059,7 +1074,9 @@ original notification at
   'fd.attrs.cop' =>   'Person Attributes',
   'fd.attrs.copr' =>  'Role Attributes',
   'fd.attrs.org' =>   'Organizational Attributes',
+  'fd.attrs.match' => 'Match Attributes',
   'fd.attrs.pet' =>   'Petition Attributes',
+  'fd.automatic' =>   'Automatic',
   'fd.bcc' =>         'BCC',
   'fd.bcc.desc' =>    'Comma separated list of valid email addresses to bcc',
   'fd.cc' =>          'CC',
@@ -1113,6 +1130,7 @@ original notification at
   'fd.de.disab'   =>  'Disability',
   'fd.de.enable'  =>  'Enable NSF Demographics',
   'fd.default'    =>  'Default',
+  'fd.date_of_birth' => 'Date of Birth',
   'fd.dp.group.admin' => 'Administrative Group',
   'fd.dp.group.admin.desc' => 'Group containing the Department administrators',
   'fd.dp.group.leader' => 'Leadership Group',
@@ -1470,6 +1488,10 @@ original notification at
   'fd.searchbase' =>  'Search Base',
   'fd.server' =>      'Server',
   'fd.server.hostname' => 'Hostname',
+  'fd.server.match.is_comanage_match' => 'COmanage Match',
+  'fd.server.match.is_comanage_match.desc' => 'If the match server is COmanage Match, checking this box will enable extra functionality',
+  'fd.server.match.sor_label' => 'SOR Label',
+  'fd.server.match.sor_label.desc' => 'SOR Label as configured on the match server',
   'fd.server.url'=>   'Server URL',
   'fd.server.username' => 'Username',
   'fd.server.warn' => 'Once a new server has been created, the type cannot be changed',
@@ -1512,6 +1534,7 @@ original notification at
   'fd.svc.label.short.desc' => 'Short label or identifier for this service, intended for use with LDAP attribute options. Alphanumeric characters only.',
   'fd.svc.mail' =>    'Service Contact Email',
   'fd.svc.mail.desc' => 'Email contact address for assistance with this Service',
+  'fd.svc.mail.prefix' => 'Service contact: %1$s',
   'fd.svc.portal' =>  'Service Portal',
   'fd.svc.url' =>     'Service URL',
   'fd.svc.url.desc' => 'URL at which this Service is available',
@@ -1705,8 +1728,10 @@ original notification at
   'op.back' =>        'Back',
   'op.begin' =>       'Begin',
   'op.cancel' =>      'Cancel',
-  'op.clear.all' =>   'Clear',
-  'op.clear.filters' =>  'Clear Filters',
+  'op.clear' =>       'Clear',
+  'op.clear.all' =>   'Clear All',
+  'op.clear.filters.1' =>  'clear filter',
+  'op.clear.filters.pl' =>  'Clear Filters',
   'op.clear.search' =>   'Clear search',
   'op.compare' =>     'Compare',
   'op.config' =>      'Configure',
@@ -1859,6 +1884,7 @@ original notification at
   'op.see.notification.num' =>  'notification #%1$s',
   'op.select' =>      'Select',
   'op.select-a' =>    'Select %1$s',
+  'op.select.all' =>    'All',
   'op.select.select' => 'Please select the CO Person you would like to attach to this Petition by clicking the associated select button.',
   'op.select.empty' => '(select...)',
   'op.select.empty-a' => '%1$s (select...)',
@@ -1936,7 +1962,9 @@ original notification at
   'rs.jb.started' =>  'Started via JobShell by %1$s (uid %2$s)',
   'rs.jb.started.web' => 'Started via JobShell by %1$s (CoPerson ID %2$s)',
   'rs.mail.verified' => 'Email Address "%1$s" verified',
-  'rs.match.possible' => 'Possible Matches',
+  'rs.match' =>       'Reference Identifier %1$s obtained from match server',
+  'rs.match.accepted' => 'Match request requires administrator intervention, Match Request ID: %1$s',
+  'rs.match.request' => 'Potential Match',
   'rs.moved.copr' =>  'CO Person Role "%1$s" (%2$s) moved from %3$s (%4$s) to %5$s (%6$s)',
   'rs.nm.primary' =>  'Primary name updated',
   'rs.nm.primary-a' => 'Primary name updated to "%1$s"',
