@@ -50,6 +50,9 @@ class CoEnrollmentAttributesController extends StandardController {
   // We don't directly require a CO, but indirectly we do.
   public $requires_co = true;
 
+  // We need various related models for index and search
+  public $view_contains = array();
+
   /**
    * Add an Enrollment Attribute.
    * - precondition: Model specific attributes in $this->request->data (optional)
