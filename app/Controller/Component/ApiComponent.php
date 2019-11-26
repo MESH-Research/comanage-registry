@@ -154,6 +154,9 @@ class ApiComponent extends Component {
           case 'Dept':
             $this->reqConvData['co_department_id'] = $this->reqData[$attr]['Id'];
             break;
+          case 'Group':
+            $this->reqConvData['co_group_id'] = $this->reqData[$attr]['Id'];
+            break;
           case 'Org':
             $this->reqConvData['org_identity_id'] = $this->reqData[$attr]['Id'];
             break;
@@ -375,7 +378,7 @@ class ApiComponent extends Component {
    * @param  string HTTP result comment
    */
   
-  public function restResultHeader($status, $txt) {
+  public function restResultHeader($status, $txt=null) {
     if(isset($txt)) {
       // We need to update the text associated with $status
       

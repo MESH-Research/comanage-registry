@@ -134,6 +134,8 @@ $cm_texts['en_US'] = array(
   'ct.co_petitions.pl' =>       'CO Petitions',
   'ct.co_pipelines.1' =>        'Pipeline',
   'ct.co_pipelines.pl' =>       'Pipelines',
+  'ct.co_provisioning_target_filters.1'  => 'Provisioning Target Filter',
+  'ct.co_provisioning_target_filters.pl' => 'Provisioning Target Filters',
   'ct.co_provisioning_targets.1'  => 'Provisioning Target',
   'ct.co_provisioning_targets.pl' => 'Provisioning Targets',
   'ct.co_self_service_permissions.1'  => 'Self Service Permission',
@@ -152,6 +154,8 @@ $cm_texts['en_US'] = array(
   'ct.cos.pl' =>                'COs',
   'ct.cous.1' =>                'COU',
   'ct.cous.pl' =>               'COUs',
+  'ct.data_filters.1' =>        'Data Filter',
+  'ct.data_filters.pl' =>       'Data Filters',
   'ct.email_addresses.1' =>     'Email Address',
   'ct.email_addresses.pl' =>    'Email Addresses',
   'ct.enrollment_flows.1'  =>   'Enrollment Flow',
@@ -386,17 +390,17 @@ original notification at
   ),
 
   'en.chars.permitted.re' => array(
-    PermittedCharacterEnum::AlphaNumeric      => '[A-Za-z]',
-    PermittedCharacterEnum::AlphaNumDotDashUS => '[A-Za-z\.\-_]',
-    PermittedCharacterEnum::AlphaNumDDUSQuote => '[A-Za-z\.\-_\']',
+    PermittedCharacterEnum::AlphaNumeric      => '[A-Za-z0-9]',
+    PermittedCharacterEnum::AlphaNumDotDashUS => '[A-Za-z0-9\.\-_]',
+    PermittedCharacterEnum::AlphaNumDDUSQuote => '[A-Za-z0-9\.\-_\']',
     PermittedCharacterEnum::Any               => '.*'
   ),
   
   // The inverse of the above (NOT permitted)
   'en.chars.permitted.re.not' => array(
-    PermittedCharacterEnum::AlphaNumeric      => '[^A-Za-z]',
-    PermittedCharacterEnum::AlphaNumDotDashUS => '[^A-Za-z\.\-_]',
-    PermittedCharacterEnum::AlphaNumDDUSQuote => '[^A-Za-z\.\-_\']',
+    PermittedCharacterEnum::AlphaNumeric      => '[^A-Za-z0-9]',
+    PermittedCharacterEnum::AlphaNumDotDashUS => '[^A-Za-z0-9\.\-_]',
+    PermittedCharacterEnum::AlphaNumDDUSQuote => '[^A-Za-z0-9\.\-_\']',
     PermittedCharacterEnum::Any               => ''
   ),
   
@@ -910,6 +914,7 @@ original notification at
   'er.et.inuse.ef' => 'The extended type "%1$s" is in use by at least one Enrollment Flow (as an attribute or default value) within this CO and cannot be removed.',
   'er.field.req' =>   'This field is required',
   'er.fields' =>      'Please recheck the highlighted fields',
+  'er.fields.api' =>  'Invalid fields: %1$s',
   'er.file.none' =>   'No file specified',
   'er.file.read' =>   'Unable to open "%1$s" for reading',
   'er.file.write' =>  'Unable to open "%1$s" for writing',
@@ -939,6 +944,8 @@ original notification at
   'er.ia.exists' =>   'The identifier "%1$s" is already in use',
   'er.ia.failed' =>   'Failed to find a unique identifier to assign',
   'er.ia.none' =>     'No identifier assignments configured',
+  'er.ia.id.type' =>  'No identifier of type "%$1s" found',
+  'er.ia.id.type.none' =>  'No identifier type specified',
   'er.id.exists-a' => 'The identifier "%1$s" is already in use (%2$s)',
   'er.id.format-a' => 'The identifier "%1$s" does not meet the required format (%2$s)',
   'er.id.unk' =>      'Unknown Identifier',
@@ -1421,6 +1428,7 @@ original notification at
   // We need fd.ordr as well fd.order for automatic key lookup in ChangesToString
   'fd.ordr' =>        'Order',
   'fd.order' =>       'Order',
+  'fd.order.filter.desc' => 'The order in which this Data Filter will be processed',
   'fd.order.es.desc' => 'The order in which this source will be queried, among all sources configured for this enrollment flow with this mode',
   'fd.order.prov.desc' => 'The order in which this provisioner will be run when automatic provisioning occurs (leave blank to run after all current provisioners)',
   'fd.organization_id' => 'Organization ID',
@@ -1725,6 +1733,7 @@ original notification at
   'op.api.key.generate' => 'Generate API Key',
   'op.api.key.confirm' => 'Are you sure you wish to generate a new API Key?',
   'op.approve' =>     'Approve',
+  'op.attach' =>      'Attach %1$s',
   'op.back' =>        'Back',
   'op.begin' =>       'Begin',
   'op.cancel' =>      'Cancel',
@@ -1964,6 +1973,7 @@ original notification at
   'rs.mail.verified' => 'Email Address "%1$s" verified',
   'rs.match' =>       'Reference Identifier %1$s obtained from match server',
   'rs.match.accepted' => 'Match request requires administrator intervention, Match Request ID: %1$s',
+  'rs.match.possible' => 'Possible Matches',
   'rs.match.request' => 'Potential Match',
   'rs.moved.copr' =>  'CO Person Role "%1$s" (%2$s) moved from %3$s (%4$s) to %5$s (%6$s)',
   'rs.nm.primary' =>  'Primary name updated',

@@ -352,7 +352,8 @@
   }
   .co-grid .co-grid-header {
     display: flex;
-    background-color: #e5e5e5 !important;
+    background-color: #186696 !important;
+    color: #ffffff;
     font-weight: bold;
   }
   .side-search {
@@ -391,6 +392,21 @@
     float: right;
   }
   /* PEOPLE LISTING */
+  /* Reset table for desktop */
+  #co-people-index thead {
+    display: table-header-group;
+  }
+  #co-people-index th {
+    padding: 0.5em 1em;
+  }
+  #co-people-index td,
+  #co-people-index td.person-name,
+  #co-people-index td.person-role,
+  #co-people-index td.actions {
+    display: table-cell;
+    padding: 0.75em 1em;
+    vertical-align: top;
+  }
   #co_people .person-info-inner {
     float: left;
     width: 200px;
