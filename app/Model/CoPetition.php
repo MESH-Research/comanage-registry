@@ -235,10 +235,9 @@ class CoPetition extends AppModel {
     $ret = true;
     
     $coPersonID = $this->field('enrollee_co_person_id', array('CoPetition.id' => $id));
-    $coID = $this->field('co_id', array('CoPetition.id' => $id));
     
-    if($coID && $coPersonID) {
-      $res = $this->EnrolleeCoPerson->Identifier->assign($coID, $coPersonID, $actorCoPersonId, false);
+    if($coPersonID) {
+      $res = $this->EnrolleeCoPerson->Identifier->assign('CoPerson', $coPersonID, $actorCoPersonId, false);
       
       if(!empty($res)) {
         // See if any identifiers were assigned, and if so create a history record
@@ -3046,7 +3045,7 @@ class CoPetition extends AppModel {
         
         $dbc->commit();
       } else {
-        throw new InvalidArgumentException(_txt('er.notprov.id', array('ct.org_identities.1')));
+        throw new InvalidArgumentException(_txt('er.notprov.id', array(_txt('ct.org_identities.1'))));
       }
     }
   }

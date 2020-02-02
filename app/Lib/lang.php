@@ -521,6 +521,12 @@ original notification at
   
   'en.ia.algorithm' => array(IdentifierAssignmentEnum::Random => 'Random',
                              IdentifierAssignmentEnum::Sequential => 'Sequential'),
+  
+  'en.ia.context' => array(
+    IdentifierAssignmentContextEnum::CoDepartment => 'CO Department',
+    IdentifierAssignmentContextEnum::CoGroup      => 'CO Group',
+    IdentifierAssignmentContextEnum::CoPerson     => 'CO Person'
+  ),
 
   // Extended type, key must be en.model.attribute
   'en.identifier.type' =>  array(IdentifierEnum::Badge => 'Badge',
@@ -943,8 +949,9 @@ original notification at
   'er.ia.already' =>  'Identifier already assigned',
   'er.ia.exists' =>   'The identifier "%1$s" is already in use',
   'er.ia.failed' =>   'Failed to find a unique identifier to assign',
+  'er.ia.gr.auto' =>  'Cannot assign identifiers for automatic groups',
   'er.ia.none' =>     'No identifier assignments configured',
-  'er.ia.id.type' =>  'No identifier of type "%$1s" found',
+  'er.ia.id.type' =>  'No identifier of type "%1$s" found',
   'er.ia.id.type.none' =>  'No identifier type specified',
   'er.id.exists-a' => 'The identifier "%1$s" is already in use (%2$s)',
   'er.id.format-a' => 'The identifier "%1$s" does not meet the required format (%2$s)',
@@ -1312,6 +1319,8 @@ original notification at
   // Identifier Assignment
   'fd.ia.algorithm' => 'Algorithm',
   'fd.ia.algorithm.desc' => 'The algorithm to use when generating identifiers',
+  'fd.ia.context' => 'Context',
+  'fd.ia.context.desc' => 'This Identifier Assignment will be applied to Identifiers attached to the specified context',
   'fd.ia.exclusions' => 'Exclusions',
   'fd.ia.exclusions.desc' => '(Not yet implemented)',
   'fd.ia.format' =>   'Format',
@@ -1452,6 +1461,8 @@ original notification at
   'fd.pi.match.type' => 'Match Field Type',
   'fd.pi.match.type.desc' => 'Required only for Identifier match strategy',
   'fd.pi.sync.add' => 'Sync on Add',
+  'fd.pi.sync.add.ef' => 'Enrollment Flow',
+  'fd.pi.sync.add.ef.desc' => 'Enrollment Flow to trigger on add action, see the <a href="https://spaces.at.internet2.edu/display/COmanage/Registry+Pipelines#RegistryPipelines-TriggeringEnrollmentFlowsFromPipelines">documentation</a> for more details',
   'fd.pi.sync.affil' => 'CO Person Role Affiliation',
   'fd.pi.sync.affil.desc' => 'If set, created CO Person Roles will be given this affiliation (not the affiliation of the Organizational Identity)',
   'fd.pi.sync.cou' => 'Sync to COU',
@@ -1807,7 +1818,7 @@ original notification at
   'op.home.no.collabs' => 'No collaborations are currently available.',
   'op.id.auto' =>     'Autogenerate Identifiers',
   'op.id.auto.all' => 'Autogenerate Identifiers For All',
-  'op.id.auto.all.confirm' => 'Are you sure you wish to autogenerate identifiers for all active CO People?',
+  'op.id.auto.all.confirm' => 'Are you sure you wish to autogenerate identifiers for all active CO People, CO Groups, and CO Departments?',
   'op.id.auto.confirm' => 'Are you sure you wish to autogenerate identifiers?',
   'op.id.auto.wait' => 'Generating identifiers, please wait...',
   'op.inv' =>         'Invite',
@@ -2085,8 +2096,8 @@ original notification at
   
   // Shell
   
-  'sh.job.arg.coid' =>    'Numeric CO ID to run tasks for (all COs if not specified)',
-  'sh.job.arg.epilog' =>  "If no task specified, all run.\nAvailable tasks: expirations, groupvalidity, syncorgsources, forcesyncorgsources",
+  'sh.job.arg.coid' =>    'Numeric CO ID to run tasks for',
+  'sh.job.arg.epilog' =>  'If no task specified, all run. Available tasks: expirations, groupvalidity, syncorgsources, forcesyncorgsources',
   'sh.job.arg.oisid' =>   'Numeric OIS ID to run tasks for (all OISs if not specified)',
   'sh.job.arg.skipnew' => 'If set do not search emails for new memberships after sync',
   'sh.job.arg.runqueue' => 'Process queued jobs',
@@ -2130,6 +2141,7 @@ original notification at
   'sh.ug.110.is' =>       'Updating inactive identifier status',
   'sh.ug.310.url' =>      'Instantiating default URL Extended Types',
   'sh.ug.330.api' =>      'Updating API User Permissions',
+  'sh.ug.330.ia' =>       'Adding context to Identifier Assignments',
   'sh.ug.330.ssh' =>      'Instantiating SSH Key Authenticators',
   'sh.ug.330.users' =>    'Dropping users View',
 );
