@@ -143,11 +143,12 @@ class CoPetitionsController extends StandardController {
     'sendConfirmation'             => 'waitForConfirmation',
     // execution continues here if confirmation not required
     'waitForConfirmation'          => 'checkEligibility',
-    'checkEligibility'             => 'establishAuthenticators',
+    //'checkEligibility'             => 'establishAuthenticators',
+    'checkEligibility'             => 'sendApproverNotification',
     // It might be preferable for establishAuthenticators to run after approval,
     // but we don't currently have a model to move from approver back to enrollee
     // (which would require something like "click here to upload your ssh key" in the approval message)
-    'establishAuthenticators'      => 'sendApproverNotification',
+    //'establishAuthenticators'      => 'sendApproverNotification',
     // We have both redirectOnConfirm and waitForApproval because depending on the
     // confirmation we might have different paths to completing the processConfirmation step
     'sendApproverNotification'     => 'waitForApproval',
