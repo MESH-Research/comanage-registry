@@ -47,6 +47,7 @@ class CoDepartmentsController extends StandardController {
 
   public $edit_contains = array(
     'Address',
+    'AdHocAttribute',
     'EmailAddress',
     'Identifier',
     'TelephoneNumber',
@@ -55,6 +56,7 @@ class CoDepartmentsController extends StandardController {
   
   public $view_contains = array(
     'Address',
+    'AdHocAttribute',
     'EmailAddress',
     'Identifier',
     'TelephoneNumber',
@@ -83,6 +85,9 @@ class CoDepartmentsController extends StandardController {
       $args['order'] = array('Cou.name ASC');
 
       $this->set('vv_cous', $this->CoDepartment->Cou->find("list", $args));
+
+      $types = $this->CoDepartment->types($this->cur_co['Co']['id'], 'type');
+      $this->set('vv_available_types', $types);
       
       // Mappings for extended types
       $this->set('vv_addresses_types', $this->CoDepartment->Address->types($this->cur_co['Co']['id'], 'type'));
@@ -140,6 +145,11 @@ class CoDepartmentsController extends StandardController {
     
     // View an existing CO Department?
     $p['view'] = ($roles['cmadmin'] || $roles['coadmin'] || $roles['comember']);
+
+    // View identifiers? This correlates with IdentifiersController
+    $p['identifiers'] = ($roles['cmadmin']
+                         || $roles['coadmin']
+                         || ($managed && $roles['couadmin']));
 
     $this->set('permissions', $p);
     return $p[$this->action];

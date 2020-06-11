@@ -18,7 +18,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
  * @since         COmanage Registry v0.1, CakePHP(tm) v 0.2.9
@@ -393,6 +393,7 @@ class AppController extends Controller {
     // Called before each render in case permissions change
     if(!$this->request->is('restful')) {
       $this->getTheme();
+      $this->getUImode();
       
       if($this->Session->check('Auth.User.org_identities')) {
         $this->menuAuth();
@@ -858,7 +859,8 @@ class AppController extends Controller {
     
     if(!empty($this->cur_co['Co']['id'])) {
       // First see if we're in an enrollment flow
-      if($this->name == 'CoPetitions') {
+      if($this->name === 'CoPetitions'
+         || $this->name === 'CoInvites') {
         $efId = $this->enrollmentFlowID();
         
         if($efId > -1) {
@@ -930,6 +932,19 @@ class AppController extends Controller {
   }
   
   /**
+   * Define the UI Mode
+   * - postcondition: UI View variable set
+   * @since  COmanage Registry v3.3.0
+   */
+  protected function getUImode() {
+    $this->set('vv_ui_mode', EnrollmentFlowUIMode::Full);
+    // Auth.User.name is emtpy during the entire Enrollment Flow
+    if(!$this->Session->check('Auth.User.name')) {
+      $this->set('vv_ui_mode', EnrollmentFlowUIMode::Basic);
+    }
+  }
+
+  /**
    * Called from beforeRender to set permissions for display in menus
    * - precondition: Session.Auth holds data used for authz decisions
    * - postcondition: permissions for menu are set
@@ -974,6 +989,9 @@ class AppController extends Controller {
     
     // Manage Authenticators?
     $p['menu']['authenticator'] = $roles['cmadmin'] || $roles['coadmin'];
+    
+    // Manage Clusters?
+    $p['menu']['clusters'] = $roles['cmadmin'] || $roles['coadmin'];
     
     // Manage CO level attribute enumerations?
     $p['menu']['coattrenums'] = $roles['cmadmin'] || $roles['coadmin'];
@@ -1205,9 +1223,9 @@ class AppController extends Controller {
     $menu['flows'] = $authedFlows;
 
 
-    // Gather up the appropriate OrgId identifiers for the current user.
+    // Gather up the appropriate OrgIds for the current user.
     // These will be presented on the user panel.
-    // Limit these to login identifiers that are active.
+    // Limit these to OrgIds with active login identifiers.
     $menu['orgIDs'] = array();
     if($this->Session->check('Auth.User.co_person_id')) {
       $userId = $this->Session->read('Auth.User.co_person_id');
@@ -1224,9 +1242,14 @@ class AppController extends Controller {
       $args['joins'][1]['alias'] = 'Identifier';
       $args['joins'][1]['type'] = 'INNER';
       $args['joins'][1]['conditions'][0] = 'OrgIdentity.id=Identifier.org_identity_id';
+
       $args['conditions']['CoOrgIdentityLink.co_person_id'] = $userId;
       $args['conditions']['Identifier.status'] = StatusEnum::Active;
       $args['conditions']['Identifier.login'] = true;
+      $args['contain']['CoOrgIdentityLink']['OrgIdentity'] = array('Identifier', 'EmailAddress');
+
+      // Specify fields so we can force the OrgIdentity ID to be distinct
+      $args['fields'] = array('DISTINCT OrgIdentity.org_identity_id','OrgIdentity.o','OrgIdentity.ou','OrgIdentity.title');
 
       $userOrgIDs = $this->CoOrgIdentityLink->OrgIdentity->find('all', $args);
 
@@ -1234,12 +1257,13 @@ class AppController extends Controller {
       $menuOrgIDs = array();
 
       foreach($userOrgIDs as $i => $uoid) {
-        $menuOrgIDs[$i]['orgName'] = $uoid['OrgIdentity']['o'];
         $menuOrgIDs[$i]['orgID_id'] = $uoid['OrgIdentity']['id'];
-        $menuOrgIDs[$i]['identifiers'] = array();
-        foreach ($uoid['Identifier'] as $j => $identifier) {
-          $menuOrgIDs[$i]['identifiers'][$j]['identifier'] = $identifier['identifier'];
-          $menuOrgIDs[$i]['identifiers'][$j]['identifier_id'] = $identifier['id'];
+        $menuOrgIDs[$i]['orgID_o'] = $uoid['OrgIdentity']['o'];
+        $menuOrgIDs[$i]['orgID_ou'] = $uoid['OrgIdentity']['ou'];
+        $menuOrgIDs[$i]['orgID_title'] = $uoid['OrgIdentity']['title'];
+        $menuOrgIDs[$i]['orgID_email'] = array();
+        foreach ($uoid['EmailAddress'] as $j => $emailAddr) {
+          $menuOrgIDs[$i]['orgID_email'][$j]['mail'] = $emailAddr['mail'];
         }
       }
 
@@ -1506,10 +1530,13 @@ class AppController extends Controller {
     }
     
     // Specifically whitelist the actions we ignore
-    if(!$this->action != 'index'
-       && $this->action != 'add'
-       && !($this->modelClass == 'CoInvite'
-            && ($this->action == 'authconfirm' || $this->action == 'confirm' || $this->action == 'decline'))) {
+    if(!$this->action !== 'index'
+       && $this->action !== 'add'
+       && !($this->modelClass === 'CoInvite'
+            && ($this->action === 'authconfirm'
+                || $this->action === 'confirm'
+                || $this->action === 'reply'
+                || $this->action === 'decline'))) {
       // Only act if a record ID parameter was passed
       if(!empty($this->request->params['pass'][0])) {
         $modelName = $this->modelClass;

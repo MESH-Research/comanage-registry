@@ -46,12 +46,14 @@
 
   // Add breadcrumbs
   print $this->element("coCrumb");
-  $args = array();
-  $args['plugin'] = null;
-  $args['controller'] = 'co_people';
-  $args['action'] = 'index';
-  $args['co'] = $cur_co['Co']['id'];
-  $this->Html->addCrumb(_txt('me.population'), $args);
+  if($permissions['index']) {
+    $args = array();
+    $args['plugin'] = null;
+    $args['controller'] = 'co_people';
+    $args['action'] = 'index';
+    $args['co'] = $cur_co['Co']['id'];
+    $this->Html->addCrumb(_txt('me.population'), $args);
+  }
   if($this->action == "canvas") {
     $this->Html->addCrumb(filter_var(generateCn($co_people[0]['PrimaryName']),FILTER_SANITIZE_SPECIAL_CHARS));
   } elseif($this->action == "invite") {
@@ -162,6 +164,20 @@
           'title'   => _txt('ct.authenticators.pl'),
           'url'     => array(
             'controller' => 'authenticators',
+            'action' => 'status',
+            'copersonid' => $co_people[0]['CoPerson']['id']
+          )
+        );
+      }
+      
+      if(isset($vv_cluster_count) && $vv_cluster_count > 0) {
+        // Link to clusters for this person
+        
+        $sidebarButtons[] = array(
+          'icon'    => 'person',
+          'title'   => _txt('ct.clusters.pl'),
+          'url'     => array(
+            'controller' => 'clusters',
             'action' => 'status',
             'copersonid' => $co_people[0]['CoPerson']['id']
           )

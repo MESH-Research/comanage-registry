@@ -51,9 +51,11 @@ class CoEnrollmentAttributesController extends StandardController {
   public $requires_co = true;
   
   public $edit_contains = array(
+    'CoEnrollmentAttributeDefault'
   );
   
   public $view_contains = array(
+    'CoEnrollmentAttributeDefault'
   );
   
   /**
@@ -211,19 +213,47 @@ class CoEnrollmentAttributesController extends StandardController {
             
             $this->set('vv_ext_attr_types',
                        $this->CoEnrollmentAttribute->CoEnrollmentFlow->Co->CoExtendedAttribute->find('list', $args));
-            
-            // Assemble the list of available COUs
-            
-            $this->set('vv_cous', $this->CoEnrollmentAttribute->CoEnrollmentFlow->Co->Cou->allCous($coid));
-            
+
             // Assemble the list of available affiliations
             
             $this->set('vv_affiliations', $this->CoPersonRole->types($coid, 'affiliation'));
+
+            // (Dis)allow empty COUs
+
+            $this->set('vv_allow_empty_cou', $this->CoEnrollmentAttribute
+                                                  ->CoEnrollmentFlow
+                                                  ->Co
+                                                  ->CoSetting->emptyCouEnabled($this->cur_co['Co']['id']));
+
+            $mode = $this->CoEnrollmentAttribute->CoEnrollmentFlow->Co->CoSetting->getSponsorEligibility($this->cur_co['Co']['id']);
+
+            $this->set('vv_sponsor_mode', $mode);
             
-            // Assemble the list of available Sponsors
-            
-            $this->set('vv_sponsors', $this->CoEnrollmentAttribute->CoEnrollmentFlow->Co->CoPerson->sponsorList($coid));
-            
+            if($mode != SponsorEligibilityEnum::None) {
+              // Generate list of sponsors if it's small enough, otherwise we need to use
+              // the people picker
+              try {
+                $this->set('vv_sponsors', $this->CoEnrollmentAttribute->CoEnrollmentFlow->Co->CoPerson->sponsorList($this->cur_co['Co']['id']));
+              }
+              catch(OverflowException $e) {
+                // Switch to people picker, which will happen due to absence of vv_sponsors
+              }
+              
+              // We do need to manually lookup the current Sponsor, since the people picker
+              // won't render it by default (and if the sponsor is no longer eligible,
+              // the dropdown won't either).
+              if(!empty($this->viewVars['co_enrollment_attributes'][0]['CoEnrollmentAttribute']['attribute'])
+                 && $this->viewVars['co_enrollment_attributes'][0]['CoEnrollmentAttribute']['attribute'] == 'r:sponsor_co_person_id'
+                 && !empty($this->viewVars['co_enrollment_attributes'][0]['CoEnrollmentAttributeDefault'][0]['value'])) {
+                // The default value is a CO Person ID
+                $args = array();
+                $args['conditions']['CoPerson.id'] = $this->viewVars['co_enrollment_attributes'][0]['CoEnrollmentAttributeDefault'][0]['value'];
+                $args['contain'] = array('PrimaryName');
+                
+                $this->set('vv_sponsor', $this->CoEnrollmentAttribute->CoEnrollmentFlow->Co->CoPerson->find('first', $args));
+              }
+            }
+
             // Assemble the list of available groups. Note we currently allow any group to be
             // specified (ie: whether or not it's open). The idea is that an Enrollment Flow
             // is defined by an admin, who can correctly select a group. However, it's plausible
@@ -401,6 +431,17 @@ class CoEnrollmentAttributesController extends StandardController {
     
     // Edit an existing CO Enrollment Attribute?
     $p['edit'] = ($roles['cmadmin'] || $roles['coadmin']);
+
+    // Determine which COUs a person can manage.
+    if($roles['cmadmin'] || $roles['coadmin']) {
+      // Note that here we get id => name while in CoPeopleController we just
+      // get a list of names. This is to generate the pop-up on the edit form.
+      $p['cous'] = $this->CoPersonRole->Cou->allCous($this->cur_co['Co']['id']);
+    } elseif(!empty($roles['admincous'])) {
+      $p['cous'] = $roles['admincous'];
+    } else {
+      $p['cous'] = array();
+    }
 
     // Edit an existing CO Enrollment Attribute's order?
     $p['order'] = ($roles['cmadmin'] || $roles['coadmin']);

@@ -57,6 +57,7 @@ class CoDepartment extends AppModel {
   
   public $hasMany = array(
     "Address" => array('dependent' => true),
+    "AdHocAttribute" => array('dependent' => true),
     "EmailAddress" => array('dependent' => true),
     "Identifier" => array('dependent' => true),
     "TelephoneNumber" => array('dependent' => true),
@@ -82,6 +83,17 @@ class CoDepartment extends AppModel {
       'rule' => array('validateInput'),
       'required' => true,
       'allowEmpty' => false
+    ),
+    'type' => array(
+      'content' => array(
+        'rule' => array('validateExtendedType',
+          array('attribute' => 'CoDepartment.type',
+            'default' => array(DepartmentEnum::VO,
+                               DepartmentEnum::ResearchInstitute,
+                               DepartmentEnum::Department))),
+        'required' => true,
+        'allowEmpty' => false
+      )
     ),
     'description' => array(
       'rule' => array('validateInput'),

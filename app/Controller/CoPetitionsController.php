@@ -282,10 +282,13 @@ class CoPetitionsController extends StandardController {
               // Once we have an authenticated identifier we no longer accept tokens.
               // We don't explicitly throw an error because we'll ultimately want to
               // support petition editing (CO-431).
-              $authId = $this->CoPetition->field('authenticated_identifier', array('CoPetition.id' => $this->parseCoPetitionId()));
-              
-              if(!$authId) {
-                $token = $this->CoPetition->field('petitioner_token', array('CoPetition.id' => $this->parseCoPetitionId()));
+
+              $petitionId = $this->parseCoPetitionId();
+              $authId = $this->CoPetition->field('authenticated_identifier', array('CoPetition.id' => $petitionId));
+              $petitionerCoPersonId = $this->CoPetition->field('petitioner_co_person_id', array('CoPetition.id' => $petitionId));
+
+              if(!$authId && !$petitionerCoPersonId) {
+                $token = $this->CoPetition->field('petitioner_token', array('CoPetition.id' => $petitionId));
                 $passedToken = $this->parseToken();
                 
                 if($token && $token != '' && $passedToken
@@ -477,9 +480,63 @@ class CoPetitionsController extends StandardController {
                                        ->CoEnrollmentFlow
                                        ->CoEnrollmentAttribute
                                        ->mapEnvAttributes($enrollmentAttributes, array());
+        
+          // As a special case, we need to figure out who the default sponsor is,
+          // if any, and lookup their information for rendering (when People Pickers
+          // are in use, at least). We start by looking for an enrollment attribute
+          // for sponsor_co_person_id with a default value.
+          
+          for($i = 0;$i < count($enrollmentAttributes);$i++) {
+            if($enrollmentAttributes[$i]['attribute'] == "r:sponsor_co_person_id") {
+              $defaultCoPersonId = null;
+              
+              if(!empty($enrollmentAttributes[$i]['default'])) {
+                // Now lookup the Sponsor CO Person
+                $defaultCoPersonId = $enrollmentAttributes[$i]['default'];
+              } else {
+                // If there is no default sponsor _and_ the attribute is required
+                // _and_ the current user is eligible to be a sponsor, then the
+                // current user will be defaulted to be the sponsor.
+                
+                if($enrollmentAttributes[$i]['required'] == RequiredEnum::Required) {
+                  $s = $this->CoPetition->Co->CoPerson->filterPicker($this->cur_co['Co']['id'], 
+                                                                     array($this->Session->read('Auth.User.co_person_id')),
+                                                                     PeoplePickerModeEnum::Sponsor);
+                  
+                  if(!empty($s)) {
+                    $defaultCoPersonId = $this->Session->read('Auth.User.co_person_id');
+                    
+                    $enrollmentAttributes[$i]['default'] = $defaultCoPersonId;
+                    
+                    if(!isset($enrollmentAttributes[$i]['modifiable'])) {
+                      $enrollmentAttributes[$i]['modifiable'] = true;
+                    }
+                  }
+                }
+              }
+              
+              if($defaultCoPersonId) {
+                $args = array();
+                $args['conditions']['CoPerson.id'] = $defaultCoPersonId;
+                $args['contain'] = array('PrimaryName');
+                
+                $this->set('vv_default_sponsor', $this->CoPetition->Co->CoPerson->find('first', $args));
+              }
+              
+              // In theory there could be more than one sponsor attribute found, but
+              // we don't currently support multiple sponsors so we just work with the
+              // first one we find.
+              break;
+            }
+          }
         }
         
         $this->set('co_enrollment_attributes', $enrollmentAttributes);
+        // (Dis)allow empty COUs
+        $this->set('vv_allow_empty_cou', $this->CoPetition
+                                              ->CoEnrollmentFlow
+                                              ->Co
+                                              ->CoSetting->emptyCouEnabled($this->cur_co['Co']['id']));
       }
       
       if(in_array($this->action, array('petitionerAttributes', 'view'))) {
@@ -1387,13 +1444,15 @@ class CoPetitionsController extends StandardController {
       // LDAP DN construction), which happens when the CO Person status goes to Active.
       
       $this->CoPetition->assignIdentifiers($id,
-                                           $this->Session->read('Auth.User.co_person_id'),
-                                           false);
+                                           $this->Session->read('Auth.User.co_person_id'));
       
       // This also updates the CO Person/Role to Active
       $this->CoPetition->updateStatus($id,
                                       PetitionStatusEnum::Finalized,
                                       $this->Session->read('Auth.User.co_person_id'));
+      
+      // Maybe establish Cluster Accounts
+      $this->CoPetition->assignClusterAccounts($id, $this->Session->read('Auth.User.co_person_id'));
     }
     
     // The step is done
@@ -1412,6 +1471,10 @@ class CoPetitionsController extends StandardController {
   protected function execute_petitionerAttributes($id) {
     // When this is called, it's just a GET to render the form. POST processing is
     // handled by petitionerAttributes(), which doesn't call dispatch() on POST.
+    $conclusionText = $this->CoPetition->CoEnrollmentFlow->field('conclusion_text', array('CoEnrollmentFlow.id' => $this->cachedEnrollmentFlowID));
+    if(!empty($conclusionText)) {
+      $this->set('vv_conclusion_text', $conclusionText);
+    }
   }
   
   /**

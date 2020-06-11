@@ -137,6 +137,27 @@ class Identifier extends AppModel {
         'required' => false,
         'allowEmpty' => true
       )
+    ),
+    'co_group_id' => array(
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true
+      )
+    ),
+    'source_identifier_id' => array(
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true
+      )
+    ),
+    'co_provisioning_target_id' => array(
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true
+      )
     )
   );
   
@@ -292,6 +313,10 @@ class Identifier extends AppModel {
    */
 
   public function beforeSave($options = array()) {
+    if(isset($options['safeties']) && $options['safeties'] == 'off') {
+      return true;
+    }
+    
     // We don't allow duplicate identifiers for either CoPerson or CoGroup,
     // but we (currently) don't enforce duplicate checking for CoDepartment
     // or OrgIdentity.

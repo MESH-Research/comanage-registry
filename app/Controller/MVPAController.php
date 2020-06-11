@@ -63,13 +63,6 @@ class MVPAController extends StandardController {
     $this->set('pool_org_identities', $pool);
     
     parent::beforeFilter();
-    
-    // Dynamically adjust validation rules to include the current CO ID for dynamic types.
-    
-    $vrule = $model->validate['type']['content']['rule'];
-    $vrule[1]['coid'] = $this->cur_co['Co']['id'];
-    
-    $model->validator()->getField('type')->getRule('content')->rule = $vrule;
   }
   
   /**
@@ -133,7 +126,11 @@ class MVPAController extends StandardController {
       } elseif(!empty($this->viewVars[$modelpl][0]['CoPerson']['PrimaryName']['id'])) {
         $this->set('vv_bc_name', generateCn($this->viewVars[$modelpl][0]['CoPerson']['PrimaryName']));
       } elseif(!empty($this->viewVars[$modelpl][0]['CoPersonRole']['CoPerson']['PrimaryName']['id'])) {
-        $this->set('vv_bc_name', $this->viewVars[$modelpl][0]['CoPersonRole']['title']);
+        if(!empty($this->viewVars[$modelpl][0]['CoPersonRole']['title'])) {
+          $this->set('vv_bc_name', $this->viewVars[$modelpl][0]['CoPersonRole']['title']);
+        } else {
+          $this->set('vv_bc_name', _txt('ct.co_person_roles.1'));
+        }
         // Also set a parent breadcrumb of the Person
         $this->set('vv_pbc_id', $this->viewVars[$modelpl][0]['CoPersonRole']['CoPerson']['id']);
         $this->set('vv_pbc_name', generateCn($this->viewVars[$modelpl][0]['CoPersonRole']['CoPerson']['PrimaryName']));
@@ -161,7 +158,11 @@ class MVPAController extends StandardController {
           $p = $model->CoPersonRole->find('first', $args);
           
           // Set the bc name to the role's title
-          $this->set('vv_bc_name', $p['CoPersonRole']['title']);
+          if(!empty($p['CoPersonRole']['title'])) {
+            $this->set('vv_bc_name', $p['CoPersonRole']['title']);
+          } else {
+            $this->set('vv_bc_name', _txt('ct.co_person_roles.1'));
+          }
           
           // But also set a parent breadcrumb of the Person
           $this->set('vv_pbc_id', $p['CoPerson']['id']);

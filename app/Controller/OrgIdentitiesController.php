@@ -53,6 +53,7 @@ class OrgIdentitiesController extends StandardController {
   
   public $edit_contains = array(
     'Address',
+    'AdHocAttribute',
     'Co',
     'CoOrgIdentityLink' => array('CoPerson' => array('Co', 'PrimaryName')),
     'EmailAddress',
@@ -66,6 +67,7 @@ class OrgIdentitiesController extends StandardController {
   
   public $view_contains = array(
     'Address',
+    'AdHocAttribute',
     'Co',
     'CoOrgIdentityLink' => array('CoPerson' => array('Co', 'PrimaryName')),
     'EmailAddress',
@@ -550,6 +552,11 @@ class OrgIdentitiesController extends StandardController {
       
       // Find an Org Identity to add to a CO?
       $p['find'] = ($roles['cmadmin'] || $roles['coadmin'] || $roles['couadmin']);
+      
+      // View identifiers? This correlates with IdentifiersController
+      $p['identifiers'] = ($roles['cmadmin']
+                           || $roles['coadmin']
+                           || ($managed && $roles['couadmin']));
       
       // View history? This correlates with HistoryRecordsController
       $p['history'] = ($roles['cmadmin']

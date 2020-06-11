@@ -275,6 +275,11 @@ class RoleComponent extends Component {
     $args['joins'][0]['alias'] = 'CoGroupMember';
     $args['joins'][0]['type'] = 'INNER';
     $args['joins'][0]['conditions'][0] = 'CoGroup.id=CoGroupMember.co_group_id';
+
+    // The join bypasses ChangelogBehavior, so manually exclude those records.
+    $args['conditions'][] = 'CoGroupMember.deleted IS NOT TRUE';
+    $args['conditions'][] = 'CoGroupMember.co_group_member_id IS NULL';
+
     if($condValue != null) {
       $args['conditions'][$condKey] = $condValue;
     }
@@ -1232,10 +1237,13 @@ class RoleComponent extends Component {
             return true;
           }
         }
+        
+        // If we get here we've run out of things to check
+        return false;
+      } else {
+        // Just check the COU that we have
+        return $this->cachedGroupCheck($coPersonId, "", "", null, false, GroupEnum::Admins, $couId);
       }
-      
-      // If we get here we've run out of things to check
-      return false;
     } else {
       // We don't need to walk the tree since we only care if a person is a COU Admin
       // for *any* group, not which groups (which would require getting the child COUs).
@@ -1317,11 +1325,16 @@ class RoleComponent extends Component {
       return false;
     }
     
-    // A person is a group manager if (1) they are an owner of the group or (2) they
-    // are a CO admin for the CO of the group. Currently, we do not treat COU admins as
-    // superusers for groups.
+    // Check if the CoGroup is related to a cou or not
+    $CoGroup = ClassRegistry::init('CoGroup');
+    $args = array();
+    $args['conditions']['CoGroup.id'] = $coGroupId;
+    $args['contain'] = false;
+    $group = $CoGroup->find('first', $args);
     
-    if($this->cachedGroupCheck($coPersonId, "", "", $coGroupId, true)) {
+    $isCou = $CoGroup->isCouAdminOrMembersGroup($group);
+    
+    if($this->cachedGroupCheck($coPersonId, "", "", $coGroupId, true, null, $isCou)) {
       return true;
     }
     

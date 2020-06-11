@@ -32,6 +32,11 @@ class ActionEnum
   const AuthenticatorDeleted            = 'DAUT';
   const AuthenticatorEdited             = 'EAUT';
   const AuthenticatorStatusEdited       = 'EATS';
+  const ClusterAccountAdded             = 'ACAM';
+  const ClusterAccountAutoCreated       = 'ACAA';
+  const ClusterAccountAutoEdited        = 'ECAA';
+  const ClusterAccountDeleted           = 'DCAM';
+  const ClusterAccountEdited            = 'ECAM';
   const CoEmailListAdded                = 'ACEL';
   const CoEmailListDeleted              = 'DCEL';
   const CoEmailListEdited               = 'ECEL';
@@ -49,6 +54,7 @@ class ActionEnum
   const CoGroupMemberEditedPipeline     = 'ECGL';
   const CoGroupMemberValidityTriggered  = 'VCGM';
   const CoGroupProvisioned              = 'PCGA';
+  const CoPersonAddedBulk               = 'ACPB';
   const CoPersonAddedManual             = 'ACPM';
   const CoPersonAddedPetition           = 'ACPP';
   const CoPersonAddedPipeline           = 'ACPL';
@@ -99,6 +105,7 @@ class ActionEnum
   const NotificationDelivered           = 'NOTD';
   const NotificationParticipantExpunged = 'NOTE';
   const NotificationResolved            = 'NOTR';
+  const OrgIdAddedBulk                  = 'AOIB';
   const OrgIdAddedManual                = 'AOIM';
   const OrgIdAddedPetition              = 'AOIP';
   const OrgIdAddedSource                = 'AOIS';
@@ -260,6 +267,12 @@ class EnrollmentRole
   const Petitioner = 'P';
 }
 
+class EnrollmentFlowUIMode
+{
+  const Basic = 'B';
+  const Full  = 'F';
+}
+
 class ExtendedAttributeEnum {
   const Integer   = 'INTEGER';
   const Timestamp = 'TIMESTAMP';
@@ -305,6 +318,7 @@ class IdentifierEnum
   const ePPN               = 'eppn';
   const ePTID              = 'eptid';
   const ePUID              = 'epuid';
+  const GID                = 'gid';
   const Mail               = 'mail';
   const National           = 'national';
   const Network            = 'network';
@@ -430,6 +444,11 @@ class OrgIdentityStatusEnum
   const Synced           = 'SY';
 }
 
+class PeoplePickerModeEnum
+{
+  const Sponsor   = 'S';
+}
+
 class PermissionEnum
 {
   const None      = 'N';
@@ -463,6 +482,7 @@ class PetitionActionEnum
 {
   const Approved                = 'PY';
   const AttributesUpdated       = 'AU';
+  const ClusterAccountAutoCreated = 'CA';
   const CommentAdded            = 'CM';
   const Created                 = 'PC';
   const Declined                = 'PX';
@@ -662,6 +682,10 @@ class SyncActionEnum
 {
   const Add    = 'A';
   const Delete = 'D';
+  // Relink is basically add, but will execute regardless of sync_on_add setting
+  const Relink = 'R';
+  // Unlink is basically delete, but will execute regardless of sync_on_delete setting
+  const Unlink = 'X';
   const Update = 'U';
 }
 
@@ -715,6 +739,12 @@ class TrueFalseEnum {
 class UrlEnum {
   const Official      = 'official';
   const Personal      = 'personal';
+}
+
+class DepartmentEnum {
+  const VO                  = 'vo';
+  const ResearchInstitute   = 'researchinstitute';
+  const Department          = 'department';
 }
 
 class VerificationModeEnum

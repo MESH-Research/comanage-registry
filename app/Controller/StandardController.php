@@ -188,7 +188,7 @@ class StandardController extends AppController {
   public function beforeRender() {
     $mName = $this->modelClass;
     
-    if($mName == 'CoPerson' || $mName == 'OrgIdentity') {
+    if($mName == 'CoPerson' || $mName == 'OrgIdentity' || $mName == 'CoGroupMember') {
       // Populate list of statuses for people searches
       
       global $cm_lang, $cm_texts;
@@ -212,6 +212,25 @@ class StandardController extends AppController {
     }
     
     parent::beforeRender();
+  }
+
+    /**
+   * Callback before other controller methods are invoked or views are rendered.
+   *
+   * @since  COmanage Registry v3.3
+   */
+
+  function beforeFilter() {
+    parent::beforeFilter();
+    // Dynamically adjust validation rules to include the current CO ID for dynamic types.
+    // Apply the rule only when the validateExtendedType function is used as a custom rule
+    $model = $this->modelClass;
+    if(!empty($this->$model->validate['type']['content']['rule'])
+       && array_search('validateExtendedType', $this->$model->validate['type']['content']['rule'], true) !== null) {
+      $vrule = $this->$model->validate['type']['content']['rule'];
+      $vrule[1]['coid'] = $this->cur_co['Co']['id'];
+      $this->$model->validator()->getField('type')->getRule('content')->rule = $vrule;
+    }
   }
   
   /**
@@ -743,6 +762,20 @@ class StandardController extends AppController {
         if(!empty($this->request->params['url']['coid'])) {
           $args['conditions'][$model->name . '.co_id'] = $this->request->params['url']['coid'];
         }
+        
+        $this->set($modelpl, $this->Api->convertRestResponse($model->find('all', $args)));
+      } elseif(!empty($model->permittedApiFilters)
+               && !empty(array_intersect_key($model->permittedApiFilters, $this->params['url']))) {
+        // We are filtering on a plugin specific key
+        $keys = array_intersect_key($model->permittedApiFilters, $this->params['url']);
+        
+        $args = array();
+        foreach(array_keys($keys) as $k) {
+          if(!empty($this->params['url'][$k])) {
+            $args['conditions'][$model->name.'.'.$k] = $this->params['url'][$k];
+          }
+        }
+        $args['contain'] = false;
         
         $this->set($modelpl, $this->Api->convertRestResponse($model->find('all', $args)));
       } elseif($this->requires_person

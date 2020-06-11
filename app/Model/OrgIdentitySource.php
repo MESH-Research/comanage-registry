@@ -852,6 +852,7 @@ class OrgIdentitySource extends AppModel {
       $args['joins'][0]['conditions'][0] = 'OrgIdentity.id=OrgIdentitySourceRecord.org_identity_id';
       $args['contain'] = array(
         'Address',
+        'AdHocAttribute',
         'EmailAddress',
         'Identifier',
         'Name',
@@ -1040,6 +1041,7 @@ class OrgIdentitySource extends AppModel {
         // Supported associated models
         $models = array(
           'Address',
+          'AdHocAttribute',
           'EmailAddress',
           'Identifier',
           'Name',

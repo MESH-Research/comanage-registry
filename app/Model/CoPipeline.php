@@ -208,6 +208,8 @@ class CoPipeline extends AppModel {
     
     if(!in_array($syncAction, array(SyncActionEnum::Add,
                                     SyncActionEnum::Delete,
+                                    SyncActionEnum::Relink,
+                                    SyncActionEnum::Unlink,
                                     SyncActionEnum::Update))) {
       throw new InvalidArgumentException(_txt('er.unknown',
                                               array(filter_var($syncAction,
@@ -243,7 +245,8 @@ class CoPipeline extends AppModel {
       throw new InvalidArgumentException(_txt('er.co.notmember'));
     }
     
-    // See if we are configured for the requested action.
+    // See if we are configured for the requested action. Note that Unlink/Relink
+    // are always processed when requested since they are corrective actions.
     
     if(($syncAction == SyncActionEnum::Add && !$pipeline['CoPipeline']['sync_on_add'])
        ||
@@ -264,14 +267,17 @@ class CoPipeline extends AppModel {
       
       if($syncAction != SyncActionEnum::Add) {
         // If we don't have a CO Person record on an update or delete, there's
-        // nothing to do.
+        // nothing to do. For relink, we expect the new target to already exist.
+        // (Relink to a "new" person should be submitted as an Add, since if
+        // "sync on add" is disabled we shouldn't create a new CO Person.)
         return true;
       }
     }
     
-    if($syncAction == SyncActionEnum::Delete
-       && !empty($pipeline['CoPipeline']['sync_status_on_delete'])) {
-      $this->processDelete($pipeline, $orgIdentityId, $actorCoPersonId, $provision);
+    if(($syncAction == SyncActionEnum::Delete
+        && !empty($pipeline['CoPipeline']['sync_status_on_delete']))
+       || $syncAction == SyncActionEnum::Unlink) {
+      $this->processDelete($pipeline, $orgIdentityId, $actorCoPersonId, $provision, $syncAction);
     } else {
       // Pull the full set of attributes needed for syncOrgIdentityToCoPerson.
       // We need to do this after findTargetCoPersonId sice that function might
@@ -283,6 +289,7 @@ class CoPipeline extends AppModel {
         'Name',
         'PrimaryName',
         'Address',
+        'AdHocAttribute',
         'EmailAddress',
         'Identifier',
         'TelephoneNumber',
@@ -373,7 +380,7 @@ class CoPipeline extends AppModel {
       }
     }
     
-    if($syncAction == SyncActionEnum::Add) {
+    if($syncAction == SyncActionEnum::Add || $syncAction == SyncActionEnum::Relink) {
       if(!empty($pipeline['CoPipeline']['sync_replace_cou_id'])) {
         // See if there is already a role in the specified COU for this CO Person,
         // and if so expire it. (This will typically only be useful with a Match Strategy.)
@@ -595,10 +602,11 @@ class CoPipeline extends AppModel {
    * @param  Integer $orgIdentityId Org Identity ID
    * @param  Integer $actorCoPersonId CO Person ID of actor
    * @param  Boolean $provision Whether to trigger provisioning
+   * @param  SyncActionEnum $syncAction Action triggering delete
    * @return Boolean true on success
    */
   
-  protected function processDelete($coPipeline, $orgIdentityId, $actorCoPersonId=null, $provision=true) {
+  protected function processDelete($coPipeline, $orgIdentityId, $actorCoPersonId=null, $provision=true, $syncAction=SyncActionEnum::Delete) {
     // First, find the role associated with this Org Identity and update the status
     
     $args = array();
@@ -669,6 +677,48 @@ class CoPipeline extends AppModel {
       }
     }
     
+    // On a Sync Delete (OIS source drops record) we keep the various attributes
+    // on the CO Person record in order to maintain the integrity of the record.
+    // (ie: Though the OIS source deleted its record, we simply flag the record
+    // as deleted or expired - we don't actually delete it.) For unlinking,
+    // however, we need to purge these attributes since they'd confuse the
+    // original record.
+    
+    if($syncAction == SyncActionEnum::Unlink) {
+      $models = array(
+        'EmailAddress',
+        'Identifier',
+        'Name',
+        'Url'
+      );
+      
+      // For each model, remove values that trace back to their source attributes
+      // in $orgIdentityId.
+      
+      foreach($models as $m) {
+        $mkey = 'source_' . Inflector::underscore($m) . '_id';
+        
+        $args = array();
+        $args['conditions'][$m.'.org_identity_id'] = $orgIdentityId;
+        $args['contain'] = false;
+        
+        $objs = $this->Co->CoPerson->$m->find('all', $args);
+        
+        if(!empty($objs)) {
+          foreach($objs as $o) {
+            // deleteAll on a single object with callbacks=true basically saves
+            // us the trouble of having to separately find and delete.
+            
+            $conditions = array(
+              $m.'.'.$mkey => $o[$m]['id']
+            );
+            
+            $this->Co->CoPerson->$m->deleteAll($conditions, false, true);
+          }
+        }
+      }
+    }
+    
     return true;
   }
   
@@ -683,15 +733,17 @@ class CoPipeline extends AppModel {
    * @param  Integer $actorCoPersonId  CO Person ID of actor
    * @param  Boolean $provision        Whether to trigger provisioning
    * @param  String  $oisRawRecord     If the Org Identity came from an Org Identity Source, the raw record
+   * @param  Boolean $safeties         Whether to operate with safeties off
    * @return Integer                   CO Person ID on success
    */
   
   protected function syncOrgIdentityToCoPerson($coPipeline, 
-                                               $orgIdentity, 
-                                               $targetCoPersonId=null, 
-                                               $actorCoPersonId=null,
-                                               $provision=true,
-                                               $oisRawRecord=null) {
+                                            $orgIdentity, 
+                                            $targetCoPersonId=null, 
+                                            $actorCoPersonId=null,
+                                            $provision=true,
+                                            $oisRawRecord=null,
+                                            $safeties="on") {
     $coPersonId = $targetCoPersonId;
     $coPersonRoleId = null;
     $doProvision = false; // We did something provision-worthy
@@ -716,7 +768,7 @@ class CoPipeline extends AppModel {
       // Clear here and below in case we're run in a loop
       $this->Co->CoPerson->clear();
       
-      if(!$this->Co->CoPerson->save($coPerson, array("provision" => false))) {
+      if(!$this->Co->CoPerson->save($coPerson, array("provision" => false, "safeties" => $safeties))) {
         throw new RuntimeException(_txt('er.db.save-a', array('CoPerson')));
       }
       
@@ -733,7 +785,7 @@ class CoPipeline extends AppModel {
       
       $this->Co->CoPerson->CoOrgIdentityLink->clear();
       
-      if(!$this->Co->CoPerson->CoOrgIdentityLink->save($orgLink, array("provision" => false))) {
+      if(!$this->Co->CoPerson->CoOrgIdentityLink->save($orgLink, array("provision" => false, "safeties" => $safeties))) {
         throw new RuntimeException(_txt('er.db.save-a', array('CoOrgIdentityLink')));
       }
       
@@ -762,7 +814,7 @@ class CoPipeline extends AppModel {
       // We need to inject the CO so extended types can be saved
       $this->Co->CoPerson->Name->validate['type']['content']['rule'][1]['coid'] = $orgIdentity['OrgIdentity']['co_id'];
       
-      if(!$this->Co->CoPerson->Name->save($name, array("provision" => false))) {
+      if(!$this->Co->CoPerson->Name->save($name, array("provision" => false, "safeties" => $safeties))) {
         throw new RuntimeException(_txt('er.db.save-a', array('Name')));
       }
       
@@ -868,7 +920,7 @@ class CoPipeline extends AppModel {
         // We need to inject the CO so extended types can be saved
         $this->Co->CoPerson->CoPersonRole->validate['affiliation']['content']['rule'][1]['coid'] = $orgIdentity['OrgIdentity']['co_id'];
         
-        if(!$this->Co->CoPerson->CoPersonRole->save($newCoPersonRole, array("provision" => false))) {
+        if(!$this->Co->CoPerson->CoPersonRole->save($newCoPersonRole, array("provision" => false, "safeties" => $safeties))) {
           throw new RuntimeException(_txt('er.db.save-a', array('CoPersonRole')));
         }
         
@@ -893,6 +945,7 @@ class CoPipeline extends AppModel {
     // Supported associated models and their parent relation
     $models = array(
       'Address'         => 'co_person_role_id',
+      'AdHocAttribute'  => 'co_person_role_id',
       'EmailAddress'    => 'co_person_id',
       'Identifier'      => 'co_person_id',
       'Name'            => 'co_person_id',
@@ -962,47 +1015,50 @@ class CoPipeline extends AppModel {
         $newRecords[ $orgRecord['id'] ] = $newRecord;
       }
       
-      // Get the set of current CO Person records and prepare them for comparison
+      // Get the set of current CO Person records and prepare them for comparison.
+      // If $safeties are off, we assume there are no current records.
       
-      $args = array();
-      $args['conditions'][$m.'.'.$pkey] = $pval;
-      // We only want the records that were derived from $orgIdentity['OrgIdentity']['id'].
-      // This turns out to be surprisingly hard to figure out, partly because joining back
-      // to the same table is messy, and partly because we may be trying to trace back to
-      // a deleted record. To start, we'll filter out anything without a source_id...
-      // those couldn't have come from an OrgIdentity.
-      $args['conditions'][] = $m.'.source_' . $mkey . ' IS NOT NULL';
-      $args['contain'] = false;
-      
-      $recs = $model->find('all', $args);
-      
-      foreach($recs as $a) {
-        // First we pull the org identity of the source record. By retrieving
-        // based on ID, ChangelogBehavior will return deleted records as well,
-        // which we need here.
-        $linkedOrgIdentityId = $model->field('org_identity_id', array($m.'.id' => $a[$m]['source_'.$mkey]));
+      if($safeties != "off") {
+        $args = array();
+        $args['conditions'][$m.'.'.$pkey] = $pval;
+        // We only want the records that were derived from $orgIdentity['OrgIdentity']['id'].
+        // This turns out to be surprisingly hard to figure out, partly because joining back
+        // to the same table is messy, and partly because we may be trying to trace back to
+        // a deleted record. To start, we'll filter out anything without a source_id...
+        // those couldn't have come from an OrgIdentity.
+        $args['conditions'][] = $m.'.source_' . $mkey . ' IS NOT NULL';
+        $args['contain'] = false;
         
-        if($linkedOrgIdentityId != $orgIdentity['OrgIdentity']['id']) {
-          // This didn't come from the Org Identity we're interest in, so skip it
-          continue;
+        $recs = $model->find('all', $args);
+        
+        foreach($recs as $a) {
+          // First we pull the org identity of the source record. By retrieving
+          // based on ID, ChangelogBehavior will return deleted records as well,
+          // which we need here.
+          $linkedOrgIdentityId = $model->field('org_identity_id', array($m.'.id' => $a[$m]['source_'.$mkey]));
+          
+          if($linkedOrgIdentityId != $orgIdentity['OrgIdentity']['id']) {
+            // This didn't come from the Org Identity we're interest in, so skip it
+            continue;
+          }
+          
+          $curRecord = $a[$m];
+          
+          // Get rid of metadata keys
+          foreach(array('org_identity_id',
+                        'created',
+                        'modified',
+                        $mkey,
+                        'revision',
+                        'deleted',
+                        'login',
+                        'primary_name',
+                        'actor_identifier') as $k) {
+            unset($curRecord[$k]);
+          }
+          
+          $curRecords[ $curRecord['source_' . $mkey] ] = $curRecord;
         }
-        
-        $curRecord = $a[$m];
-        
-        // Get rid of metadata keys
-        foreach(array('org_identity_id',
-                      'created',
-                      'modified',
-                      $mkey,
-                      'revision',
-                      'deleted',
-                      'login',
-                      'primary_name',
-                      'actor_identifier') as $k) {
-          unset($curRecord[$k]);
-        }
-        
-        $curRecords[ $curRecord['source_' . $mkey] ] = $curRecord;
       }
       
       // Now that the lists are ready, walk through them and process any changes
@@ -1087,6 +1143,7 @@ class CoPipeline extends AppModel {
         $trustVerified = empty($coPipeline['CoPipeline']['co_enrollment_flow_id']);
         
         if(!$model->save($nr, array("provision" => false,
+                                    "safeties" => $safeties,
                                     "skipAvailability" => true,
                                     "trustVerified" => $trustVerified))) {
           
@@ -1158,7 +1215,12 @@ class CoPipeline extends AppModel {
     $args['conditions']['CoGroupMember.member'] = true;
     $args['contain'] = false;
     
-    $curGroupMemberships = $this->Co->CoGroup->CoGroupMember->find('all', $args);
+    if($safeties != "off") {
+      $curGroupMemberships = $this->Co->CoGroup->CoGroupMember->find('all', $args);
+    } else {
+      // We assume no current memberships
+      $curGroupMemberships = array();
+    }
     
     // For each mapped group membership, create the membership if it doesn't exist
     
@@ -1181,7 +1243,7 @@ class CoPipeline extends AppModel {
         
         $this->Co->CoPerson->CoGroupMember->clear();
         
-        if(!$this->Co->CoPerson->CoGroupMember->save($newGroupMember, array("provision" => false))) {
+        if(!$this->Co->CoPerson->CoGroupMember->save($newGroupMember, array("provision" => false, "safeties" => $safeties))) {
           throw new RuntimeException(_txt('er.db.save-a', array('CoGroupMember')));
         }
         
@@ -1233,7 +1295,7 @@ class CoPipeline extends AppModel {
             
             $this->Co->CoPerson->CoGroupMember->clear();
             
-            if(!$this->Co->CoPerson->CoGroupMember->save($newGroupMember, array("provision" => false))) {
+            if(!$this->Co->CoPerson->CoGroupMember->save($newGroupMember, array("provision" => false, "safeties" => $safeties))) {
               throw new RuntimeException(_txt('er.db.save-a', array('CoGroupMember')));
             }
             
@@ -1266,46 +1328,48 @@ class CoPipeline extends AppModel {
       }
     }
     
-    // Walk through current list of Group Memberships and remove any associated
-    // with this pipeline and not present in $memberGroups.
-    
-    foreach($curGroupMemberships as $cgm) {
-      if($cgm['CoGroupMember']['source_org_identity_id']
-         && $cgm['CoGroupMember']['source_org_identity_id'] == $orgIdentity['OrgIdentity']['id']) {
-        // This group came from this source org identity, is it still valid?
-        // (Cake's Hash syntax is a bit obscure...)
-        $gid = $cgm['CoGroupMember']['co_group_id'];
-        
-        if(!Hash::check($memberGroups, '{n}.CoGroup[id='.$gid.'].id')) {
-          // Not a valid group membership anymore, delete it. We need to pull the
-          // group to get the name for history.
+    if($safeties != "off") {
+      // Walk through current list of Group Memberships and remove any associated
+      // with this pipeline and not present in $memberGroups.
+      
+      foreach($curGroupMemberships as $cgm) {
+        if($cgm['CoGroupMember']['source_org_identity_id']
+           && $cgm['CoGroupMember']['source_org_identity_id'] == $orgIdentity['OrgIdentity']['id']) {
+          // This group came from this source org identity, is it still valid?
+          // (Cake's Hash syntax is a bit obscure...)
+          $gid = $cgm['CoGroupMember']['co_group_id'];
           
-          $gname = $this->Co->CoGroup->field('name', array('CoGroup.id' => $gid));
-          
-          if(!$this->Co->CoPerson->CoGroupMember->delete($cgm['CoGroupMember']['id'], array("provision" => false))) {
-            throw new RuntimeException(_txt('er.db.save-a', array('CoGroupMember')));
+          if(!Hash::check($memberGroups, '{n}.CoGroup[id='.$gid.'].id')) {
+            // Not a valid group membership anymore, delete it. We need to pull the
+            // group to get the name for history.
+            
+            $gname = $this->Co->CoGroup->field('name', array('CoGroup.id' => $gid));
+            
+            if(!$this->Co->CoPerson->CoGroupMember->delete($cgm['CoGroupMember']['id'], array("provision" => false))) {
+              throw new RuntimeException(_txt('er.db.save-a', array('CoGroupMember')));
+            }
+            
+            // Cut history
+            $this->Co->CoPerson->HistoryRecord->record($coPersonId,
+                                                       null,
+                                                       $orgIdentity['OrgIdentity']['id'],
+                                                       $actorCoPersonId,
+                                                       ActionEnum::CoGroupMemberDeletedPipeline,
+                                                       _txt('rs.grm.deleted', array($gname, $gid)),
+                                                       $gid);
+            
+            $this->Co->CoPerson->HistoryRecord->record($coPersonId,
+                                                       null,
+                                                       $orgIdentity['OrgIdentity']['id'],
+                                                       $actorCoPersonId,
+                                                       ActionEnum::CoGroupMemberDeletedPipeline,
+                                                       _txt('rs.pi.sync-a', array(_txt('ct.co_group_members.1'),
+                                                                                  $coPipeline['CoPipeline']['name'],
+                                                                                  $coPipeline['CoPipeline']['id'])),
+                                                       $gid);
+            
+            $doProvision = true;
           }
-          
-          // Cut history
-          $this->Co->CoPerson->HistoryRecord->record($coPersonId,
-                                                     null,
-                                                     $orgIdentity['OrgIdentity']['id'],
-                                                     $actorCoPersonId,
-                                                     ActionEnum::CoGroupMemberDeletedPipeline,
-                                                     _txt('rs.grm.deleted', array($gname, $gid)),
-                                                     $gid);
-          
-          $this->Co->CoPerson->HistoryRecord->record($coPersonId,
-                                                     null,
-                                                     $orgIdentity['OrgIdentity']['id'],
-                                                     $actorCoPersonId,
-                                                     ActionEnum::CoGroupMemberDeletedPipeline,
-                                                     _txt('rs.pi.sync-a', array(_txt('ct.co_group_members.1'),
-                                                                                $coPipeline['CoPipeline']['name'],
-                                                                                $coPipeline['CoPipeline']['id'])),
-                                                     $gid);
-          
-          $doProvision = true;
         }
       }
     }
