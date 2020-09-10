@@ -90,6 +90,9 @@ class ActionEnum
   const ExpirationPolicyMatched         = 'EXPM';
   const HistoryRecordActorExpunged      = 'HRAE';
   const IdentifierAutoAssigned          = 'AIDA';
+  const IdentityDocumentAdded           = 'AIDD';
+  const IdentityDocumentEdited          = 'EIDD';
+  const IdentityDocumentDeleted         = 'DIDD';
   const InvitationConfirmed             = 'INVC';
   const InvitationDeclined              = 'INVD';
   const InvitationExpired               = 'INVE';
@@ -332,6 +335,27 @@ class IdentifierEnum
   const SamlSubject        = 'subjectid';
   const UID                = 'uid';
 }
+// These generally align with the TAP Core Schema
+class IdentityDocumentEnum {
+  const BirthCertificate  = 'BC';
+  const DriversLicense    = 'DL';
+  const Local             = 'L';
+  const National          = 'N';
+  const NonDriver         = 'ND';
+  const Passport          = 'P';
+  const Regional          = 'R';
+  const Residency         = 'RC';
+  const SelfAssertion     = 'SA';
+  const Tribal            = 'T';
+  const Visa              = 'V';
+}
+
+class IdentityVerificationMethodEnum {
+  const None      = 'X';
+  const Online    = 'O';
+  const Physical  = 'P';
+  const Remote    = 'R';
+}
 
 class JobStatusEnum
 {
@@ -495,6 +519,7 @@ class PetitionActionEnum
   const FlaggedDuplicate        = 'FD';
   const IdentifierAuthenticated = 'ID';
   const IdentifiersAssigned     = 'IA';
+  const IdentityDocumentAdded   = 'DA';
   const IdentityLinked          = 'IL';
   const IdentityNotLinked       = 'IX';
   const IdentityRelinked        = 'IR';
