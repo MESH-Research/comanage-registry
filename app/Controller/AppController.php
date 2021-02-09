@@ -523,6 +523,18 @@ class AppController extends Controller {
                                                   array(_txt('ct.co_person_roles.1'),
                                                         filter_var($p['copersonroleid'],FILTER_SANITIZE_SPECIAL_CHARS))));
         }
+      } elseif(!empty($p['organizationid']) && (isset($model->Organization))) {
+        $Organization = $model->Organization;
+        
+        $coId = $Organization->field('co_id', array('id' => $p['organizationid']));
+        
+        if($coId) {
+          return $coId;
+        } else {
+          throw new InvalidArgumentException(_txt('er.notfound',
+                                                  array(_txt('ct.organizations.1'),
+                                                        filter_var($p['organizationid'],FILTER_SANITIZE_SPECIAL_CHARS))));
+        }
       } elseif(!empty($p['orgidentityid'])) {
         if(isset($model->OrgIdentity)) {
           $coId = $model->OrgIdentity->field('co_id', array('id' => $p['orgidentityid']));
@@ -624,6 +636,7 @@ class AppController extends Controller {
     $coprid = $pids['copersonroleid'];
     $codeptid = $pids['codeptid'];
     $cogroupid = $pids['cogroupid'];
+    $orgid = $pids['organizationid'];
     $orgiid = $pids['orgidentityid'];
     $co = null;
     
@@ -642,7 +655,7 @@ class AppController extends Controller {
     {
       $redirect['controller'] = 'co_people';
 
-      $x = $model->CoPerson->findById($copid);
+      $x = $model->CoPerson->field('created', array('CoPerson.id' => $copid));
       
       if(empty($x))
       {
@@ -660,7 +673,7 @@ class AppController extends Controller {
     {
       $redirect['controller'] = 'co_person_roles';
 
-      $x = $model->CoPersonRole->findById($coprid);
+      $x = $model->CoPersonRole->field('created', array('CoPersonRole.id' => $coprid));
       
       if(empty($x))
       {
@@ -680,7 +693,7 @@ class AppController extends Controller {
     {
       $redirect['controller'] = 'co_departments';
 
-      $x = $model->CoDepartment->findById($codeptid);
+      $x = $model->CoDepartment->field('created', array('CoDepartment.id' => $codeptid));
       
       if(empty($x))
       {
@@ -698,7 +711,7 @@ class AppController extends Controller {
     {
       $redirect['controller'] = 'co_groups';
 
-      $x = $model->CoGroup->findById($cogroupid);
+      $x = $model->CoGroup->field('created', array('CoGroup.id' => $cogroupid));
       
       if(empty($x))
       {
@@ -712,11 +725,29 @@ class AppController extends Controller {
         $rc = 1;
       }
     }
+    elseif($orgid != null)
+    {
+      $redirect['controller'] = 'organizations';
+
+      $x = $model->Organization->field('created', array('Organization.id' => $orgid));
+      
+      if(empty($x))
+      {
+        $redirect['action'] = 'index';
+        $rc = -1;
+      }
+      else
+      {
+        $redirect['action'] = 'edit';
+        $redirect[] = $orgid;
+        $rc = 1;
+      }
+    }
     elseif($orgiid != null)
     {
       $redirect['controller'] = 'org_identities';
 
-      $x = $model->OrgIdentity->findById($orgiid);
+      $x = $model->OrgIdentity->field('created', array('OrgIdentity.id' => $orgiid));
       
       if(empty($x))
       {
@@ -882,6 +913,9 @@ class AppController extends Controller {
   protected function getTheme() {
     // Determine if a theme is in use
     $coTheme = null;
+    $cssStack = null;
+    $eof_allow_stack = null;
+    $co_allow_stack = null;
     
     if(!empty($this->cur_co['Co']['id'])) {
       // First see if we're in an enrollment flow
@@ -898,29 +932,42 @@ class AppController extends Controller {
           $args['contain'][] = 'CoTheme';
           
           $efConfig = $this->Co->CoEnrollmentFlow->find('first', $args);
-          
+          $eof_allow_stack = $efConfig['CoEnrollmentFlow']['theme_stacking'];
+
           if(!empty($efConfig['CoTheme']['id'])) {
             $coTheme = $efConfig['CoTheme'];
+            $cssStack = array();
+            $cssStack['c_ef'] = '/*' . $coTheme["name"] . '*/' . PHP_EOL . $coTheme['css'];
           }
         }
       }
-      
-      if(!$coTheme) {
+
+      if(is_null($coTheme)                                              // No Theme
+         || $eof_allow_stack === SuspendableStatusEnum::Active) {       // CO Theme allows stacking
         // See if there is a CO-wide theme in effect
-        
-        $args = array();
-        $args['conditions']['CoSetting.co_id'] = $this->cur_co['Co']['id'];
-        $args['contain'][] = 'CoTheme';
-        
-        $settings = $this->Co->CoSetting->find('first', $args);
-        
-        if(!empty($settings['CoTheme']['id'])) {
-          $coTheme = $settings['CoTheme'];
+        $co_allow_stack = $this->Co->CoSetting->themeStackingEnabled($this->cur_co['Co']['id']);
+        $co_theme_id = $this->Co->CoSetting->getThemeId($this->cur_co['Co']['id']);
+
+        if(!is_null($co_theme_id)) {
+          $args = array();
+          $args['conditions']['CoTheme.id'] = $co_theme_id;
+          $args['contain'] = false;
+          $coThemeCfg = $this->Co->CoSetting->CoTheme->find('first', $args);
+          if(is_null($coTheme)) {
+            $coTheme = $coThemeCfg['CoTheme'];
+            $cssStack = array();
+            $cssStack['b_co'] = '/*' . $coTheme["name"] . '*/' . PHP_EOL . $coTheme['css'];
+          } else {
+            $cssStack['b_co'] = '/*' . $coThemeCfg['CoTheme']["name"] . '*/' . PHP_EOL . $coThemeCfg['CoTheme']['css'];
+          }
         }
       }
     }
-    
-    if(!$coTheme) {
+
+    if(is_null($coTheme)                                       // No Theme
+       || $co_allow_stack === SuspendableStatusEnum::Active    // CO Theme, EF Theme allows stacking
+       || ($eof_allow_stack === SuspendableStatusEnum::Active  // CMP Theme, No CO Theme, EF Theme allows stacking
+           && empty($cssStack['b_co']))) {
       // See if there is a platform theme
       $args = array();
       $args['joins'][0]['table'] = 'cos';
@@ -930,17 +977,27 @@ class AppController extends Controller {
       $args['conditions']['Co.name'] = 'COmanage';
       $args['conditions']['Co.status'] = TemplateableStatusEnum::Active;
       $args['contain'][] = 'CoTheme';
-      
+
       $this->loadModel('CoSetting');
-      
+
       $settings = $this->CoSetting->find('first', $args);
-      
+
       if(!empty($settings['CoTheme']['id'])) {
-        $coTheme = $settings['CoTheme'];
+        if(is_null($coTheme)) {
+          $coTheme = $settings['CoTheme'];
+          $cssStack = array();
+          $cssStack['a_cmp'] = '/*' . $coTheme["name"] . '*/' . PHP_EOL . $coTheme['css'];
+        } else {
+          $cssStack['a_cmp'] = '/*' . $settings['CoTheme']["name"] . '*/' . PHP_EOL . $settings['CoTheme']['css'];
+        }
       }
     }
       
     if($coTheme) {
+      // Sort the cssStack starting with CMP css to EF css
+      if(!empty($cssStack) && ksort($cssStack)) {
+        $coTheme['css'] = $cssStack;
+      }
       $this->set('vv_theme_hide_title', $coTheme['hide_title']);
       $this->set('vv_theme_hide_footer_logo', $coTheme['hide_footer_logo']);
       
@@ -1128,6 +1185,9 @@ class AppController extends Controller {
     
     // View/Edit own Demographics profile?
     $p['menu']['nsfdemoprofile'] = $roles['user'];
+    
+    // Manage Organizations?
+    $p['menu']['organizations'] = $roles['cmadmin'] || $roles['coadmin'];
     
     // Manage org identity sources? CO Admins can only do this if org identities are NOT pooled
     $this->loadModel('CmpEnrollmentConfiguration');
@@ -1355,7 +1415,7 @@ class AppController extends Controller {
       $coid = -1;
       
       if($this->request->is('restful')) {
-        $coid = $this->Api->requestedCOID($model, $this->request);
+        $coid = $this->Api->requestedCOID($model, $this->request, $data);
         
         if(!$coid) {
           $coid = -1;
@@ -1415,6 +1475,7 @@ class AppController extends Controller {
     $deptid = null;
     $groupid = null;
     $orgiid = null;
+    $orgid = null;
     
     if(!empty($data['co_person_id']))
       $copid = $data['co_person_id'];
@@ -1436,6 +1497,8 @@ class AppController extends Controller {
       $deptid = $data[$req]['co_department_id'];
     elseif(!empty($data[$req]['co_group_id']))
       $groupid = $data[$req]['co_group_id'];
+    elseif(!empty($data[$req]['organization_id']))
+      $orgid = $data[$req]['organization_id'];
     elseif(!empty($this->request->data[$req]['co_person_id']))
       $copid = $this->request->data[$req]['co_person_id'];
     elseif(!empty($this->request->data[$req]['co_person_role_id']))
@@ -1446,6 +1509,8 @@ class AppController extends Controller {
       $deptid = $this->request->data[$req]['codeptid'];
     elseif(!empty($this->request->data[$req]['co_group_id']))
       $groupid = $this->request->data[$req]['co_group_id'];
+    elseif(!empty($this->request->data[$req]['organization_id']))
+      $orgid = $this->request->data[$req]['organization_id'];
     elseif(!empty($this->request->params['named']['copersonid']))
       $copid = $this->request->params['named']['copersonid'];
     elseif(!empty($this->request->params['named']['copersonroleid']))
@@ -1456,6 +1521,8 @@ class AppController extends Controller {
       $deptid = $this->request->params['named']['codeptid'];
     elseif(!empty($this->request->params['named']['cogroup']))
       $groupid = $this->request->params['named']['cogroup'];
+    elseif(!empty($this->request->params['named']['orgid']))
+      $orgid = $this->request->params['named']['orgid'];
     // XXX Why don't we need to check query for other parameters?
     elseif(!empty($this->request->query['cogroupid']))
       $groupid = $this->request->query['cogroupid'];
@@ -1477,6 +1544,9 @@ class AppController extends Controller {
         case 'Org':
           $orgiid = $this->request->data[$modelcc][0]['Person']['Id'];
           break;
+        case 'Organization':
+          $orgid = $this->request->data[$modelcc][0]['Person']['Id'];
+          break;
       }
     }
     elseif(isset($this->request->data[$modelcc][$req]['Person'])) {
@@ -1496,6 +1566,9 @@ class AppController extends Controller {
           break;
         case 'Org':
           $orgiid = $this->request->data[$modelcc][$req]['Person']['Id'];
+          break;
+        case 'Organization':
+          $orgid = $this->request->data[$modelcc][$req]['Person']['Id'];
           break;
       }
     }
@@ -1523,12 +1596,15 @@ class AppController extends Controller {
         $deptid = $rec[$req]['co_department_id'];
       elseif(isset($rec[$req]['co_group_id']))
         $groupid = $rec[$req]['co_group_id'];
+      elseif(isset($rec[$req]['organization_id']))
+        $orgid = $rec[$req]['organization_id'];
     }
     
     return(array("codeptid" => $deptid,
                  "cogroupid" => $groupid,
                  "copersonid" => $copid,
                  "copersonroleid" => $coprid,
+                 "organizationid" => $orgid,
                  "orgidentityid" => $orgiid));
   }
   
@@ -1559,7 +1635,7 @@ class AppController extends Controller {
       throw new LogicException(_txt('er.co.specify'));
     }
     
-    // Specifically whitelist the actions we ignore
+    // Specifically enumerate the actions we ignore
     if(!$this->action !== 'index'
        && $this->action !== 'add'
        && !($this->modelClass === 'CoInvite'

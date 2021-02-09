@@ -41,6 +41,8 @@ class Identifier extends AppModel {
     "CoPerson",
     // An identifier may be created from a Provisioner
     "CoProvisioningTarget",
+    // An Ad Hoc Attribute may be attached to an Organization
+    "Organization",
     // An identifier may be attached to an Org Identity
     "OrgIdentity",
     // An identifier created from a Pipeline has a Source Identifier
@@ -83,11 +85,14 @@ class Identifier extends AppModel {
       'content' => array(
         'rule' => array('validateExtendedType',
                         array('attribute' => 'Identifier.type',
-                              'default' => array(IdentifierEnum::Badge,
+                              'default' => array(IdentifierEnum::AffiliateSOR,
+                                                 IdentifierEnum::Badge,
                                                  IdentifierEnum::Enterprise,
                                                  IdentifierEnum::ePPN,
                                                  IdentifierEnum::ePTID,
                                                  IdentifierEnum::ePUID,
+                                                 IdentifierEnum::GuestSOR,
+                                                 IdentifierEnum::HRSOR,
                                                  IdentifierEnum::Mail,
                                                  IdentifierEnum::National,
                                                  IdentifierEnum::Network,
@@ -100,6 +105,7 @@ class Identifier extends AppModel {
                                                  IdentifierEnum::SamlSubject,
                                                  IdentifierEnum::SORID,
                                                  'wpid',
+                                                 IdentifierEnum::StudentSOR,
                                                  IdentifierEnum::UID))),
         'required' => true,
         'allowEmpty' => false
@@ -407,20 +413,21 @@ class Identifier extends AppModel {
       'CoDepartment',
       'CoGroup',
       'CoPerson',
+      'Organization',
       'OrgIdentity'
     );
 
-    $id = $this->find('first', $args);
+    $identifier = $this->find('first', $args);
     
-    if(!empty($id)) {
+    if(!empty($identifier)) {
       foreach($args['contain'] as $m) {
-        if(!empty($id[$m]['co_id'])) {
-          return $id[$m]['co_id'];
+        if(!empty($identifier[$m]['co_id'])) {
+          return $identifier[$m]['co_id'];
         }
       }
     }
     
-    throw new InvalidArgumentException(_txt('er.notfound', array(_txt('ct.identifiers.1'), $id)));
+    throw new InvalidArgumentException(_txt('er.notfound', array(_txt('ct.identifiers.1'), $identifier)));
   }
   
   /**

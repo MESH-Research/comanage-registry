@@ -849,6 +849,9 @@ class AppModel extends Model {
         if(isset($this->belongsTo['CoDepartment'])) {
           $args['contain'][] = 'CoDepartment';
         }
+        if(isset($this->belongsTo['Organization'])) {
+          $args['contain'][] = 'Organization';
+        }
         $args['contain'][] = 'OrgIdentity';
       }
       
@@ -858,7 +861,7 @@ class AppModel extends Model {
         return $cop['CoPerson']['co_id'];
       }
       
-      // Is this an MVPA where this is an org identity or CO department?
+      // Is this an MVPA where this is an org identity, CO department, or Organization?
       
       if(!empty($cop['OrgIdentity']['co_id'])) {
         return $cop['OrgIdentity']['co_id'];
@@ -866,6 +869,10 @@ class AppModel extends Model {
       
       if(!empty($cop['CoDepartment']['co_id'])) {
         return $cop['CoDepartment']['co_id'];
+      }
+      
+      if(!empty($cop['Organization']['co_id'])) {
+        return $cop['Organization']['co_id'];
       }
       
       // If this is an MVPA, don't fail on no CO ID since that may not be the current configuration
@@ -885,12 +892,15 @@ class AppModel extends Model {
         if(isset($this->belongsTo['CoDepartment'])) {
           $args['contain'][] = 'CoDepartment';
         }
+        if(isset($this->belongsTo['Organization'])) {
+          $args['contain'][] = 'Organization';
+        }
         $args['contain'][] = 'OrgIdentity';
       }
       
       $copr = $this->find('first', $args);
       
-      // Is this an MVPA where this is an org identity or CO department?
+      // Is this an MVPA where this is an org identity, CO department, or Organization?
       
       if(!empty($copr['OrgIdentity']['co_id'])) {
         return $copr['OrgIdentity']['co_id'];
@@ -898,6 +908,10 @@ class AppModel extends Model {
       
       if(!empty($copr['CoDepartment']['co_id'])) {
         return $copr['CoDepartment']['co_id'];
+      }
+      
+      if(!empty($copr['Organization']['co_id'])) {
+        return $copr['Organization']['co_id'];
       }
       
       // Else lookup the CO Person
@@ -1131,7 +1145,7 @@ class AppModel extends Model {
     $args['joins'][0]['type'] = 'INNER';
     $args['joins'][0]['conditions'][0] = $this->name.'.co_id=CoProvisioningTarget.co_id';
     $args['conditions'][$this->name.'.id'] = $id;
-    $args['conditions']['CoProvisioningTarget.status !='] = ProvisionerStatusEnum::Disabled;
+    $args['conditions']['CoProvisioningTarget.status !='] = ProvisionerModeEnum::Disabled;
     $args['contain'] = false;
     
     $targets = $this->Co->CoProvisioningTarget->find('all', $args);
@@ -1172,6 +1186,20 @@ class AppModel extends Model {
             'timestamp' => null,
             'comment'   => $e->getMessage()
           );
+        }
+        
+        // If this provisioner is in a mode that supports queuing, see if there is
+        // a queued job for this subject
+        if($targets[$i]['CoProvisioningTarget']['status'] == ProvisionerModeEnum::QueueMode
+           || $targets[$i]['CoProvisioningTarget']['status'] == ProvisionerModeEnum::QueueOnErrorMode) {
+          $args = array();
+          $args['conditions']['CoJob.job_type'] = 'Provisioner';
+          $args['conditions']['CoJob.job_mode'] = $this->name;
+          $args['conditions']['CoJob.job_type_fk'] = $id;
+          $args['conditions']['CoJob.status'] = JobStatusEnum::Queued;
+          $args['contain'] = false;
+          
+          $targets[$i]['queued'] = $this->Co->CoJob->find('all', $args);
         }
       }
     }
@@ -1264,7 +1292,9 @@ class AppModel extends Model {
       $args['joins'][1]['type'] = 'INNER';
       $args['joins'][1]['conditions'][0] = 'CoPersonRole.co_person_id=CoPerson.id';
       $args['conditions']['CoPerson.co_id'] = $coId;
-    } elseif ($this->alias === 'CoDepartment'){                                 // This attribute is attached to a CO Department
+    } elseif ($this->alias === 'CoDepartment') {                                 // This attribute is attached to a CO Department
+      $args['conditions'][$this->alias . '.co_id'] = $coId;
+    } elseif ($this->alias === 'Organization') {                                 // This attribute is attached to an Organization
       $args['conditions'][$this->alias . '.co_id'] = $coId;
     } else {
       throw new RuntimeException(_txt('er.notimpl'));
@@ -1319,8 +1349,12 @@ class AppModel extends Model {
           // Enumerations defined (and allow other is false), update the validation rule
           $this->validate[ $a[1] ]['content']['rule'] = array(
             'inList',
-            $cfg['dictionary']
+            ($cfg['coded'] ? array_keys($cfg['dictionary']) : $cfg['dictionary'])
           );
+          
+          // Also store the dictionary for use in constructing selects in enrollment flows.
+          // This is a bit of a hack, but this whole thing should be rewritten as part of PE.
+          $this->validate[ $a[1] ]['content']['dictionary'] = $cfg['dictionary'];
         }
       }
     }
@@ -1461,7 +1495,7 @@ class AppModel extends Model {
     if(!preg_match('/\S/', $v)) {
       return _txt('er.input.blank');
     }
-        
+    
     return true;
   }
   
@@ -1520,18 +1554,22 @@ class AppModel extends Model {
     $ret = array();
     
     if(isset($this->validate[$field]['content']['rule'])
-       && $this->validate[$field]['content']['rule'][0] == 'inList'
-       && isset($this->validate[$field]['content']['rule'][1])) {
-      // This is the list of valid values for this field. Map these to their
-      // translated names. Note as of v2.0.0 there may not be "translated"
-      // names (ie: for attribute enumerations), in which case we just want
-      // the original string.
-      
-      foreach($this->validate[$field]['content']['rule'][1] as $key) {
-        if(isset($this->cm_enum_txt[$field])) {
-          $ret[$key] = _txt($this->cm_enum_txt[$field], NULL, $key);
-        } else {
-          $ret[$key] = $key;
+       && $this->validate[$field]['content']['rule'][0] == 'inList') {
+      if(!empty($this->validate[$field]['content']['dictionary'])) {
+        // Just use the provided dectionary (as set in updateValidationRules, above)
+        $ret = $this->validate[$field]['content']['dictionary'];
+      } elseif(isset($this->validate[$field]['content']['rule'][1])) {
+        // This is the list of valid values for this field. Map these to their
+        // translated names. Note as of v2.0.0 there may not be "translated"
+        // names (ie: for attribute enumerations), in which case we just want
+        // the original string.
+        
+        foreach($this->validate[$field]['content']['rule'][1] as $key) {
+          if(isset($this->cm_enum_txt[$field])) {
+            $ret[$key] = _txt($this->cm_enum_txt[$field], NULL, $key);
+          } else {
+            $ret[$key] = $key;
+          }
         }
       }
     }

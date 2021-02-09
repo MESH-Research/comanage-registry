@@ -89,15 +89,17 @@
                 array('class' => 'editbutton')
               ) . "\n";
               
-              print $this->Html->link(
-                _txt('op.manage'),
-                array(
-                  'controller' => 'dictionary_entries',
-                  'action' => 'index',
-                  'dictionary' => $c['Dictionary']['id']
-                ),
-                array('class' => 'configurebutton')
-              ) . "\n";
+              if($c['Dictionary']['mode'] == DictionaryModeEnum::Standard) {
+                print $this->Html->link(
+                  _txt('op.manage'),
+                  array(
+                    'controller' => 'dictionary_entries',
+                    'action' => 'index',
+                    'dictionary' => $c['Dictionary']['id']
+                  ),
+                  array('class' => 'configurebutton')
+                ) . "\n";
+              }
             }
             
             if($permissions['delete']) {

@@ -638,7 +638,7 @@ class RoleComponent extends Component {
         // Pull the COU and its children (if any)
         
         try {
-          $childCous = array_unique($childCous + $Cou->childCousById($couGroup['CoGroup']['cou_id'], true));
+          $childCous = array_unique($childCous + $Cou->childCousById($couGroup['CoGroup']['cou_id'], true, true));
         }
         catch(InvalidArgumentException $e) {
           throw new InvalidArgumentException($e->getMessage());
@@ -939,7 +939,7 @@ class RoleComponent extends Component {
       if(!empty($coEF['CoEnrollmentFlow']['approver_co_group_id'])) {
         // $coPersonId must be a member of this group
         
-        if($this->isCoGroupMember($coPersonId, $coEF['CoEnrollmentFlow']['authz_co_group_id'])) {
+        if($this->isCoGroupMember($coPersonId, $coEF['CoEnrollmentFlow']['approver_co_group_id'])) {
           $ret = true;
         }
       } else {
@@ -1046,7 +1046,15 @@ class RoleComponent extends Component {
    */
   
   public function isCoGroupMember($coPersonId, $coGroupId) {
-    return $this->cachedGroupCheck($coPersonId, "", "", $coGroupId);
+    // Check if the CoGroup is related to a cou or not
+    $CoGroup = ClassRegistry::init('CoGroup');
+    $args = array();
+    $args['conditions']['CoGroup.id'] = $coGroupId;
+    $args['contain'] = false;
+    $group = $CoGroup->find('first', $args);
+
+    $isCou = $CoGroup->isCouAdminOrMembersGroup($group);
+    return $this->cachedGroupCheck($coPersonId, "", "", $coGroupId, false, null, $isCou);
   }
   
   /**

@@ -235,6 +235,17 @@
                 print " (" . _txt('rs.prov.inel.ois') . ")";
               }
             }
+            
+            if(!empty($c['queued'])) {
+              $link = $this->Html->link($c['queued'][0]['CoJob']['id'],
+                                        array(
+                                          'controller' => 'co_jobs',
+                                          'action'     => 'view',
+                                          $c['queued'][0]['CoJob']['id']
+                                        ));
+              
+              print "<hr /><p>" . _txt('rs.prov.queued', array($link)) . "</p>\n";
+            }
           ?>
         </td>
         <td>
@@ -294,15 +305,15 @@
   </table>
 </div>
 
-<div id="progressbar-dialog" title="<?php print _txt('op.prov'); ?>">
+<div id="progressbar-dialog" class="co-dialog" title="<?php print _txt('op.prov'); ?>">
   <p><?php print _txt('op.prov.wait'); ?></p>
   <div id="provision-progressbar"></div>
 </div>
 
-<div id="provision-dialog" title="<?php print _txt('op.prov'); ?>">
+<div id="provision-dialog" class="co-dialog" title="<?php print _txt('op.prov'); ?>">
   <p><?php print _txt('op.prov.confirm'); ?></p>
 </div>
 
-<div id="result-dialog" title="<?php print _txt('op.prov'); ?>">
+<div id="result-dialog" class="co-dialog" title="<?php print _txt('op.prov'); ?>">
   <p><?php print _txt('rs.prov.ok'); ?></p>
 </div>

@@ -41,6 +41,7 @@ class UpgradeVersionShell extends AppShell {
                     'GrouperProvisioner.CoGrouperProvisionerTarget',
                     'HttpServer',
                     'Identifier',
+                    'CoMessageTemplate',
                     'SshKeyAuthenticator.SshKey',
                     'SshKeyAuthenticator.SshKeyAuthenticator');
   
@@ -89,6 +90,7 @@ class UpgradeVersionShell extends AppShell {
     "3.2.4" => array('block' => false),
     "3.2.5" => array('block' => false),
     "3.3.0" => array('block' => false, 'pre' => 'pre330', 'post' => 'post330'),
+    "3.3.1" => array('block' => false),
     "4.0.0" => array('block' => false, 'post' => 'post400')
   );
   
@@ -507,5 +509,28 @@ class UpgradeVersionShell extends AppShell {
     // 4.0.0 converts Attribute Enumerations to use Dictionaries.
     $this->out(_txt('sh.ug.400.attrenums'));
     $this->AttributeEnumeration->_ug400();
+    
+    // 4.0.0 adds Organization Extended Type
+    $this->out(_txt('sh.ug.400.org'));
+    
+    $args = array();
+    $args['contain'] = false;
+    
+    $cos = $this->Co->find('all', $args);
+    
+    // We update inactive COs as well, in case they become active again
+    foreach($cos as $co) {
+      $this->out('- ' . $co['Co']['name']);
+      
+      $this->CoExtendedType->addDefault($co['Co']['id'], 'Organization.type');
+    }
+    
+    // Resize HttpServer password column
+    $this->out(_txt('sh.ug.400.http_server.password'));
+    $this->HttpServer->_ug400();
+
+    // Update CoMessageTemplate format column
+    $this->out(_txt('sh.ug.400.messagetemplate.format'));
+    $this->CoMessageTemplate->_ug400();
   }
 }

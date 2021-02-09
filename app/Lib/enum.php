@@ -43,6 +43,7 @@ class ActionEnum
   const CoEmailListManuallyProvisioned  = 'PCEM';
   const CoEmailListProvisioned          = 'PCEA';
   const CoGroupAdded                    = 'ACGR';
+  const CoGroupAddedBulk                = 'ACGB';
   const CoGroupDeleted                  = 'DCGR';
   const CoGroupEdited                   = 'ECGR';
   const CoGroupManuallyProvisioned      = 'PCGM';
@@ -211,6 +212,18 @@ class DataFilterContextEnum
   const ProvisioningTarget = 'PT';
 }
 
+class DepartmentEnum {
+  const Department          = 'department';
+  const ResearchInstitute   = 'researchinstitute';
+  const VO                  = 'vo';
+}
+
+class DictionaryModeEnum {
+  const Department    = "OU";
+  const Organization  = "O";
+  const Standard      = "S";
+}
+
 class ElectStrategyEnum {
   const FIFO        = 'FI';
   const Manual      = 'M';
@@ -316,12 +329,15 @@ class IdentifierAssignmentExclusionEnum
 
 class IdentifierEnum
 {
+  const AffiliateSOR       = 'sor-affiliate';
   const Badge              = 'badge';
   const Enterprise         = 'enterprise';
   const ePPN               = 'eppn';
   const ePTID              = 'eptid';
   const ePUID              = 'epuid';
   const GID                = 'gid';
+  const GuestSOR           = 'sor-guest';
+  const HRSOR              = 'sor-hr';
   const Mail               = 'mail';
   const National           = 'national';
   const Network            = 'network';
@@ -330,9 +346,10 @@ class IdentifierEnum
   const ORCID              = 'orcid';
   const ProvisioningTarget = 'provisioningtarget';
   const Reference          = 'reference';
-  const SORID              = 'sorid';
   const SamlPairwise       = 'pairwiseid';
   const SamlSubject        = 'subjectid';
+  const StudentSOR         = 'sor-student';
+  const SORID              = 'sorid';
   const UID                = 'uid';
 }
 // These generally align with the TAP Core Schema
@@ -367,14 +384,6 @@ class JobStatusEnum
   const Queued     = 'Q';
 }
 
-class JobTypeEnum
-{
-  // Reserve X* for local plugins/jobs
-  const Expiration      = 'EX';
-  const GroupValidity   = 'GV';
-  const OrgIdentitySync = 'OS';
-}
-
 class LinkLocationEnum
 {
   const topBar  = 'topbar';
@@ -394,6 +403,13 @@ class MessageTemplateEnum
   const EnrollmentFinalization = 'EF';
   const EnrollmentVerification = 'EV';
   const ExpirationNotification = 'XN';
+}
+
+class MessageFormatEnum
+{
+    const Plaintext        = 'text';
+    const HTML             = 'html';
+    const PlaintextAndHTML = 'both';
 }
 
 class NameEnum
@@ -457,6 +473,12 @@ class Oauth2GrantEnum
   const AuthorizationCode = 'AC';
   const ClientCredentials = 'CC';
   // We don't currently support Implicit or Password Credentials
+}
+
+class OrganizationEnum {
+  const Academic            = 'edu';
+  const Commercial          = 'com';
+  const Government          = 'gov';
 }
 
 class OrgIdentityMismatchEnum
@@ -548,12 +570,13 @@ class PetitionStatusEnum
   const PendingConfirmation = 'PC';
 }
 
-// The status of a provisioning plugin
-class ProvisionerStatusEnum
+class ProvisionerModeEnum
 {
   const AutomaticMode       = 'A';
   const Disabled            = 'X';
   const EnrollmentMode      = 'E';
+  const QueueMode           = 'Q';
+  const QueueOnErrorMode    = 'QE';
   const ManualMode          = 'M';
 }
 
@@ -618,6 +641,7 @@ class ServerEnum
 {
   // When adding a new server type, be sure to add it to ServersController::view_contains
   const HttpServer    = 'HT';
+  const KafkaServer   = 'KA';
   const LdapServer    = 'LD';
   const MatchServer   = 'MT';
   const Oauth2Server  = 'O2';
@@ -653,6 +677,7 @@ class StatusEnum
   const Expired             = 'XP';
   const GracePeriod         = 'GP';
   const Invited             = 'I';
+  const Locked              = 'LK';
   const Pending             = 'P';
   const PendingApproval     = 'PA';
   const PendingConfirmation = 'PC';
@@ -669,6 +694,7 @@ class StatusEnum
     'Expired'             => StatusEnum::Expired,
     'GracePeriod'         => StatusEnum::GracePeriod,
     'Invited'             => StatusEnum::Invited,
+    'Locked'              => StatusEnum::Locked,
     'Pending'             => StatusEnum::Pending,
     'PendingApproval'     => StatusEnum::PendingApproval,
     'PendingConfirmation' => StatusEnum::PendingConfirmation,
@@ -686,6 +712,7 @@ class StatusEnum
     StatusEnum::Expired             => 'Expired',
     StatusEnum::GracePeriod         => 'GracePeriod',
     StatusEnum::Invited             => 'Invited',
+    StatusEnum::Locked              => 'Locked',
     StatusEnum::Pending             => 'Pending',
     StatusEnum::PendingApproval     => 'PendingApproval',
     StatusEnum::PendingConfirmation => 'PendingConfirmation',
@@ -771,12 +798,6 @@ class TrueFalseEnum {
 class UrlEnum {
   const Official      = 'official';
   const Personal      = 'personal';
-}
-
-class DepartmentEnum {
-  const VO                  = 'vo';
-  const ResearchInstitute   = 'researchinstitute';
-  const Department          = 'department';
 }
 
 class VerificationModeEnum

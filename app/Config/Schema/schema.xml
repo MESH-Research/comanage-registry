@@ -114,6 +114,7 @@
       <constraint>REFERENCES cm_cos(id)</constraint>
     </field>
     <field name="description" type="C" size="128" />
+    <field name="mode" type="C" size="2" />
     <field name="created" type="T" />
     <field name="modified" type="T" />
     <field name="dictionary_id" type="I">
@@ -198,6 +199,32 @@
     </index>
     <index name="attribute_enumerations_i2">
       <col>attribute_enumeration_id</col>
+    </index>
+  </table>
+  
+  <table name="organizations">
+    <field name="id" type="I">
+      <key />
+      <autoincrement />
+    </field>
+    <field name="co_id" type="I">
+      <notnull />
+      <constraint>REFERENCES cm_cos(id)</constraint>
+    </field>
+    <field name="name" type="C" size="128" />
+    <field name="description" type="C" size="128" />
+    <field name="type" type="C" size="32" />
+    <field name="created" type="T" />
+    <field name="modified" type="T" />
+    <field name="organization_id" type="I">
+      <constraint>REFERENCES cm_organizations(id)</constraint>
+    </field>
+    <field name="revision" type="I" />
+    <field name="deleted" type="L" />
+    <field name="actor_identifier" type="C" size="256" />
+    
+    <index name="organizations_i1">
+      <col>co_id</col>
     </index>
   </table>
   
@@ -435,13 +462,34 @@
     </field>
     <field name="serverurl" type="C" size="256" />
     <field name="username" type="C" size="128" />
-    <field name="password" type="C" size="80" />
+    <field name="password" type="C" size="400" />
     <field name="ssl_verify_peer" type="L" />
     <field name="ssl_verify_host" type="L" />
     <field name="created" type="T" />
     <field name="modified" type="T" />
     
     <index name="http_servers_i1">
+      <col>server_id</col>
+    </index>
+  </table>
+  
+  <table name="kafka_servers">
+    <field name="id" type="I">
+      <key />
+      <autoincrement />
+    </field>
+    <field name="server_id" type="I">
+      <constraint>REFERENCES cm_servers(id)</constraint>
+    </field>
+    <field name="brokers" type="C" size="256" />
+    <field name="security_protocol" type="C" size="24" />
+    <field name="sasl_mechanism" type="C" size="24" />
+    <field name="username" type="C" size="128" />
+    <field name="password" type="C" size="400" />
+    <field name="created" type="T" />
+    <field name="modified" type="T" />
+    
+    <index name="kafka_servers_i1">
       <col>server_id</col>
     </index>
   </table>
@@ -703,6 +751,8 @@
     <field name="bcc" type="C" size="256" />
     <field name="message_subject" type="C" size="256" />
     <field name="message_body" type="X" size="4000" />
+    <field name="message_body_html" type="X" size="4000" />
+    <field name="format" type="C" size="4" />
     <field name="status" type="C" size="2" />
     <field name="created" type="T" />
     <field name="modified" type="T" />
@@ -818,6 +868,7 @@
     <field name="co_theme_id" type="I">
       <constraint>REFERENCES cm_co_themes(id)</constraint>
     </field>
+    <field name="theme_stacking" type="C" size="2" />
     <field name="establish_authenticators" type="L" />
     <field name="establish_cluster_accounts" type="L" />
     <field name="created" type="T" />
@@ -867,6 +918,7 @@
     <field name="sync_on_add" type="L" />
     <field name="sync_on_update" type="L" />
     <field name="sync_on_delete" type="L" />
+    <field name="sync_coperson_status" type="C" size="2" />
     <field name="create_role" type="L" />
     <field name="sync_cou_id" type="I">
       <constraint>REFERENCES cm_cous(id)</constraint>
@@ -953,6 +1005,7 @@
       <constraint>REFERENCES cm_org_identity_sources(id)</constraint>
     </field>
     <field name="status" type="C" size="2" />
+    <field name="retry_interval" type="I" />
     <field name="ordr" type="I" />
     <field name="created" type="T" />
     <field name="modified" type="T" />
@@ -982,6 +1035,9 @@
     </field>
     <field name="co_group_id" type="I">
       <constraint>REFERENCES cm_co_groups(id)</constraint>
+    </field>
+    <field name="organization_id" type="I">
+      <constraint>REFERENCES cm_organizations(id)</constraint>
     </field>
     <field name="source_identifier_id" type="I">
       <constraint>REFERENCES cm_identifiers(id)</constraint>
@@ -1027,6 +1083,9 @@
     <index name="identifiers_i8">
       <col>org_identity_id</col>
     </index>
+    <index name="identifiers_i10">
+      <col>organization_id</col>
+    </index>
   </table>
 
   <table name="email_addresses">
@@ -1046,6 +1105,9 @@
     </field>
     <field name="co_department_id" type="I">
       <constraint>REFERENCES cm_co_departments(id)</constraint>
+    </field>
+    <field name="organization_id" type="I">
+      <constraint>REFERENCES cm_organizations(id)</constraint>
     </field>
     <field name="source_email_address_id" type="I">
       <constraint>REFERENCES cm_email_addresses(id)</constraint>
@@ -1143,6 +1205,9 @@
     <field name="co_department_id" type="I">
       <constraint>REFERENCES cm_co_departments(id)</constraint>
     </field>
+    <field name="organization_id" type="I">
+      <constraint>REFERENCES cm_organizations(id)</constraint>
+    </field>
     <field name="source_address_id" type="I">
       <constraint>REFERENCES cm_addresses(id)</constraint>
     </field>
@@ -1170,6 +1235,9 @@
     <index name="addresses_i5">
       <col>co_department_id</col>
     </index>
+    <index name="addresses_i6">
+      <col>organization_id</col>
+    </index>
   </table>
 
   <table name="telephone_numbers">
@@ -1191,6 +1259,9 @@
     </field>
     <field name="co_department_id" type="I">
       <constraint>REFERENCES cm_co_departments(id)</constraint>
+    </field>
+    <field name="organization_id" type="I">
+      <constraint>REFERENCES cm_organizations(id)</constraint>
     </field>
     <field name="source_telephone_number_id" type="I">
       <constraint>REFERENCES cm_telephone_numbers(id)</constraint>
@@ -1219,6 +1290,9 @@
     <index name="telephone_numbers_i5">
       <col>co_department_id</col>
     </index>
+    <index name="telephone_numbers_i6">
+      <col>organization_id</col>
+    </index>
   </table>
   
   <table name="urls">
@@ -1237,6 +1311,9 @@
     </field>
     <field name="co_department_id" type="I">
       <constraint>REFERENCES cm_co_departments(id)</constraint>
+    </field>
+    <field name="organization_id" type="I">
+      <constraint>REFERENCES cm_organizations(id)</constraint>
     </field>
     <field name="source_url_id" type="I">
       <constraint>REFERENCES cm_urls(id)</constraint>
@@ -1265,6 +1342,9 @@
     <index name="urls_i5">
       <col>source_url_id</col>
     </index>
+    <index name="urls_i6">
+      <col>organization_id</col>
+    </index>
   </table>
   
   <table name="ad_hoc_attributes">
@@ -1283,6 +1363,9 @@
     </field>
     <field name="co_department_id" type="I">
       <constraint>REFERENCES cm_co_departments(id)</constraint>
+    </field>
+    <field name="organization_id" type="I">
+      <constraint>REFERENCES cm_organizations(id)</constraint>
     </field>
     <field name="source_ad_hoc_attribute_id" type="I">
       <constraint>REFERENCES cm_ad_hoc_attributes(id)</constraint>
@@ -1307,6 +1390,9 @@
     </index>
     <index name="ad_hoc_attributes_i4">
       <col>ad_hoc_attribute_id</col>
+    </index>
+    <index name="ad_hoc_attributes_i5">
+      <col>organization_id</col>
     </index>
   </table>
   
@@ -1613,6 +1699,7 @@
     <field name="eds_help_url" type="C" size="256" />
     <field name="eds_preferred_idps" type="X" size="4000" />
     <field name="eds_hidden_idps" type="X" size="4000" />
+    <field name="redirect_on_logout" type="C" size="1024" />
     <field name="status" type="C" size="2" />
     <field name="created" type="T" />
     <field name="modified" type="T" />
@@ -2168,15 +2255,24 @@
       <constraint>REFERENCES cm_cos(id)</constraint>
     </field>
     <field name="job_type" type="C" size="64" />
-    <!-- job_type_fk and job_mode are deprecated and will be removed in v4.0.0 (CO-1310) -->
+    <!-- job_type_fk and job_mode are deprecated and will be removed in v4.0.0 (CO-1310) 
+     We may need to un-deprecate this field, since ProvisionerJob uses it to track
+     if a job is queued for a given subject (in particular for provisioner status)
+    -->
     <field name="job_type_fk" type="I" />
     <field name="job_mode" type="C" size="16" />
-    <field name="job_params" type="X" size="4000" />
+    <field name="job_params" type="XL" />
+    <field name="requeue_interval" type="I" />
+    <field name="retry_interval" type="I" />
+    <field name="requeued_from_co_job_id" type="I">
+      <constraint>REFERENCES cm_co_jobs(id)</constraint>
+    </field>
     <field name="status" type="C" size="2" />
     <field name="register_summary" type="C" size="256" />
     <field name="start_summary" type="C" size="256" />
     <field name="finish_summary" type="C" size="256" />
     <field name="queue_time" type="T" />
+    <field name="start_after_time" type="T" />
     <field name="start_time" type="T" />
     <field name="complete_time" type="T" />
     <field name="percent_complete" type="I" />
@@ -2197,6 +2293,10 @@
       <col>job_type</col>
       <col>job_type_fk</col>
       <col>status</col>
+    </index>
+    
+    <index name="co_jobs_i4">
+      <col>co_job_id</col>
     </index>
   </table>
   
@@ -2811,6 +2911,7 @@
     <field name="required_fields_name" type="C" size="160" />
     <field name="t_and_c_login_mode" type="C" size="2" />
     <field name="sponsor_eligibility" type="C" size="2" />
+    <field name="theme_stacking" type="C" size="2" />
     <field name="sponsor_co_group_id" type="I" />
     <field name="default_co_pipeline_id" type="I">
       <constraint>REFERENCES cm_co_pipelines(id)</constraint>

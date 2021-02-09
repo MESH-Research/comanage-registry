@@ -154,6 +154,13 @@ class CoEnrollmentFlow extends AppModel {
       'required' => false,
       'allowEmpty' => true
     ),
+    'theme_stacking' => array(
+      'rule' => array('inList',
+                       array(SuspendableStatusEnum::Active,
+                             SuspendableStatusEnum::Suspended)),
+      'required' => false,
+      'allowEmpty' => true
+    ),
     'verify_email' => array(
       // deprecated
       'rule' => array('boolean'),
@@ -263,6 +270,11 @@ class CoEnrollmentFlow extends AppModel {
     ),
     'redirect_on_finalize' => array(
       'rule' => array('url', true),
+      'required' => false,
+      'allowEmpty' => true
+    ),
+    'return_url_allowlist' => array(
+      'rule' => 'notBlank',
       'required' => false,
       'allowEmpty' => true
     ),

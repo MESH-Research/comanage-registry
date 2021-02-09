@@ -143,7 +143,14 @@ class CoSetting extends AppModel {
                             ElectStrategyEnum::Manual)),
       'required' => false,
       'allowEmpty' => true
-    )
+    ),
+    'theme_stacking' => array(
+      'rule' => array('inList',
+                      array(SuspendableStatusEnum::Active,
+                            SuspendableStatusEnum::Suspended)),
+      'required' => false,
+      'allowEmpty' => true
+    ),
   );
   
   // Default values for each setting
@@ -162,6 +169,8 @@ class CoSetting extends AppModel {
     'sponsor_eligibility'        => SponsorEligibilityEnum::CoOrCouAdmin,
     't_and_c_login_mode'         => TAndCLoginModeEnum::NotEnforced,
     'enable_empty_cou'           => false,
+    'theme_stacking'             => SuspendableStatusEnum::Suspended,
+    'co_theme_id'                => null,
   );
   
   /**
@@ -307,6 +316,18 @@ class CoSetting extends AppModel {
   public function getSponsorEligibility($coId) {
     return $this->lookupValue($coId, 'sponsor_eligibility');
   }
+
+  /**
+   * Get Theme Stacking mode.
+   *
+   * @since  COmanage Registry v4.0.0
+   * @param  integer $coId CO ID
+   * @return SuspendableStatusEnum Theme Stacking Mode
+   */
+
+  public function themeStackingEnabled($coId) {
+    return $this->lookupValue($coId, 'theme_stacking');
+  }
   
   /**
    * Get sponsor eligibility group. The results of this call are only valid if
@@ -327,6 +348,18 @@ class CoSetting extends AppModel {
     }
     
     return $this->lookupValue($coId, 'sponsor_co_group_id');
+  }
+
+  /**
+   * Get CO Custom Theme Id
+   *
+   * @since  COmanage Registry v4.0.0
+   * @param  integer $coId CO ID
+   * @return integer CO Custom Theme Id
+   */
+
+  public function getThemeId($coId) {
+    return $this->lookupValue($coId, 'co_theme_id');
   }
   
   /**

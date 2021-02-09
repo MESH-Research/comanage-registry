@@ -170,7 +170,7 @@
               <?php
               $attrs = array();
               $attrs['value'] = (isset($co_departments) ? $co_departments[0]['CoDepartment']['type'] : "");
-              $attrs['empty'] = false;
+              $attrs['empty'] = true;
 
               if($e) {
                 print $this->Form->select('type',
@@ -353,6 +353,6 @@
   </div> <!-- personExplorer -->
   <?php print $this->element("changelog"); ?>
 </div> <!-- explorerContainer -->
-<div id="autogenerate-dialog" title="<?php print _txt('op.id.auto'); ?>">
+<div id="autogenerate-dialog" class="co-dialog" title="<?php print _txt('op.id.auto'); ?>">
   <?php print _txt('op.id.auto.confirm'); ?>
 </div>

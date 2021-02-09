@@ -187,7 +187,7 @@
                 </div>
               </li>
             <?php endif; ?>
-            <?php if(!empty($permissions['cous'])): ?>
+            <?php if(!empty($vv_available_cous)): ?>
               <li>
                 <div class="field-name">
                   <?php
@@ -210,7 +210,7 @@
 
                     if($e && !$es) {
                       print $this->Form->select('cou_id',
-                        $permissions['cous'],
+                        $vv_available_cous,
                         $attrs);
 
                       if($this->Form->isFieldError('cou_id')) {
@@ -280,9 +280,13 @@
                 $attrs['empty'] = false;
 
                 if($e && !$es) {
+                  // Actions can not Lock roles because roles cannot be Locked
+                  $statuses = $cm_texts[ $cm_lang ]['en.status'];
+                  unset($statuses[StatusEnum::Locked]);
+                  
                   print $this->Form->select('status',
-                    $cm_texts[ $cm_lang ]['en.status'],
-                    $attrs);
+                                            $statuses,
+                                            $attrs);
 
                   if($this->Form->isFieldError('status')) {
                     print $this->Form->error('status');

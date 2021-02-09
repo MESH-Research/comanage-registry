@@ -29,9 +29,6 @@ class DictionaryEntry extends AppModel {
   // Define class name for cake
   public $name = "DictionaryEntry";
   
-  // Document foreign keys
-  public $cmPluginHasMany = array();
-  
   // Association rules from this model to other models
   public $belongsTo = array("Dictionary");
   
@@ -67,6 +64,28 @@ class DictionaryEntry extends AppModel {
   
   // XXX Should this really be in bootstrap.php?
   protected $dictionaryDir = APP . DS . 'Lib' . DS . 'Dictionaries';
+  
+  /**
+   * Actions to take before a save operation is executed.
+   *
+   * @since  COmanage Registry v4.0.0
+   */
+
+  public function beforeSave($options = array()) {
+    if(isset($this->data['DictionaryEntry']['code'])) {
+      // This is a specific workaround for a more general issue described (for Cake 3)
+      // here: https://github.com/cakephp/cakephp/issues/9678
+      // This should get a more general solution as part of framework migration.
+      
+      if(empty($this->data['DictionaryEntry']['code'])) {
+        // Make sure we use a null and not an empty string, to correspond with
+        // the find() in Dictionary::isValidEntry()p
+        $this->data['DictionaryEntry']['code'] = null;
+      }
+    }
+    
+    return true;
+  }
   
   /**
    * Obtain the CO ID for a record.

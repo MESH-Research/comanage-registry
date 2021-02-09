@@ -178,6 +178,8 @@ $cm_texts['en_US'] = array(
   'ct.identifiers.pl' =>        'Identifiers',
   'ct.identity_documents.1' =>  'Identity Document',
   'ct.identity_documents.pl' => 'Identity Documents',
+  'ct.kafka_servers.1' =>       'Kafka Server',
+  'ct.kafka_servers.pl' =>      'Kafka Servers',
   'ct.ldap_servers.1' =>        'LDAP Server',
   'ct.ldap_servers.pl' =>       'LDAP Servers',
   'ct.match_servers.1' =>       'Match Server',
@@ -188,6 +190,8 @@ $cm_texts['en_US'] = array(
   'ct.navigation_links.pl' =>   'Navigation Links',
   'ct.oauth2_servers.1' =>      'OAuth2 Server',
   'ct.oauth2_servers.pl' =>     'OAuth2 Servers',
+  'ct.organizations.1' =>       'Organization',
+  'ct.organizations.pl' =>      'Organizations',
   'ct.org_identities.1' =>      'Organizational Identity',
   'ct.org_identities.fi' =>     'Organizational Identity Filter',
   'ct.org_identities.se' =>     'Organizational Identity Search',
@@ -256,7 +260,7 @@ Please click the link below to confirm that this is a valid request.
 
 For questions regarding this process, please contact your administrator.',
   'em.invite.ok'             => 'Invitation has been emailed to %1$s',
-  'em.invite.footer'         => 'This email was sent using %1$s.',
+  'em.invite.footer'         => 'This email was sent from %1$s.',
   'em.notification.subject'  => 'New Notification for (@CO_NAME)',
   'em.notification.body'     => '(@COMMENT)
 
@@ -292,6 +296,7 @@ original notification at
     ActionEnum::CoEmailListManuallyProvisioned => 'CO Email List Provisioned (Manual)',
     ActionEnum::CoEmailListProvisioned      => 'CO Email List Provisioned',
     ActionEnum::CoGroupAdded                => 'CO Group Added',
+    ActionEnum::CoGroupAddedBulk            => 'CO Group Added (Bulk)',
     ActionEnum::CoGroupDeleted              => 'CO Group Deleted',
     ActionEnum::CoGroupEdited               => 'CO Group Edited',
     ActionEnum::CoGroupManuallyProvisioned  => 'CO Group Provisioned (Manual)',
@@ -428,6 +433,13 @@ original notification at
     PermittedCharacterEnum::Any               => ''
   ),
   
+  // Extended type, key must be en.model.attribute
+  'en.co_department.type' => array(
+    DepartmentEnum::VO                => 'VO',
+    DepartmentEnum::ResearchInstitute => 'Research Institute',
+    DepartmentEnum::Department        => 'Department',
+  ),
+
   'en.contact' =>     array(ContactEnum::Fax => 'Fax',
                             ContactEnum::Home => 'Home',
                             ContactEnum::Mobile => 'Mobile',
@@ -471,6 +483,19 @@ original notification at
                                          AffiliationEnum::Affiliate     => 'Affiliate',
                                          AffiliationEnum::Employee      => 'Employee',
                                          AffiliationEnum::LibraryWalkIn => 'Library Walk-In'),
+  
+  // Extended type, key must be en.model.attribute
+  'en.organization.type' => array(
+    OrganizationEnum::Academic   => 'Academic',
+    OrganizationEnum::Commercial => 'Commercial',
+    OrganizationEnum::Government => 'Government'
+  ),
+  
+  'en.dictionary.mode' => array(
+    DictionaryModeEnum::Department   => 'Department Registry',
+    DictionaryModeEnum::Organization => 'Organization Registry',
+    DictionaryModeEnum::Standard     => 'Standard'
+  ),
   
   'en.elect.strategy' => array(
     ElectStrategyEnum::FIFO   => 'FIFO',
@@ -574,12 +599,15 @@ original notification at
   ),
   
   // Extended type, key must be en.model.attribute
-  'en.identifier.type' =>  array(IdentifierEnum::Badge => 'Badge',
+  'en.identifier.type' =>  array(IdentifierEnum::AffiliateSOR => 'Affiliate SoRID',
+                                 IdentifierEnum::Badge => 'Badge',
                                  IdentifierEnum::Enterprise => 'Enterprise',
                                  IdentifierEnum::ePPN => 'ePPN',
                                  IdentifierEnum::ePTID => 'ePTID',
                                  IdentifierEnum::ePUID => 'ePUID',
                                  IdentifierEnum::GID => 'GID',
+                                 IdentifierEnum::GuestSOR => 'Guest SoRID',
+                                 IdentifierEnum::HRSOR => 'HR SoRID',
                                  IdentifierEnum::Mail => 'Mail',
                                  IdentifierEnum::National => 'National',
                                  IdentifierEnum::Network => 'Network',
@@ -592,13 +620,8 @@ original notification at
                                  IdentifierEnum::SamlPairwise =>'SAML pairwise-id',
                                  IdentifierEnum::SamlSubject => 'SAML subject-id',
                                  IdentifierEnum::SORID => 'System of Record ID',
+                                 IdentifierEnum::StudentSOR => 'Student SoRID',
                                  IdentifierEnum::UID => 'UID'),
-  
-  'en.job.type' => array(
-    JobTypeEnum::Expiration      => 'Expiration',
-    JobTypeEnum::GroupValidity   => 'Group Validity',
-    JobTypeEnum::OrgIdentitySync => 'Org Identity Sync'
-  ),
   
   // As a moderately arbitrary decision, the languages listed here those with at least
   // 100m speakers per Ethnologue (by way of wikipedia)
@@ -660,6 +683,11 @@ original notification at
                                  MessageTemplateEnum::EnrollmentFinalization => 'Enrollment Flow Finalization',
                                  MessageTemplateEnum::EnrollmentVerification => 'Enrollment Flow Verification',
                                  MessageTemplateEnum::ExpirationNotification => 'Expiration Policy Notification'),
+
+  // Message Template Contexts
+  'en.mt.format' =>       array(MessageFormatEnum::Plaintext        => 'Plain Text',
+                                MessageFormatEnum::PlaintextAndHTML => 'Plain Text and HTML',
+                                MessageFormatEnum::HTML             => 'HTML'),
   
   // Extended type, key must be en.model.attribute
   'en.name.type' =>        array(NameEnum::Alternate => 'Alternate',
@@ -729,6 +757,7 @@ original notification at
   
   'en.server' => array(
     ServerEnum::HttpServer   => 'HTTP',
+    ServerEnum::KafkaServer  => 'Kafka',
     ServerEnum::LdapServer   => 'LDAP',
     ServerEnum::MatchServer  => 'Match',
     ServerEnum::Oauth2Server => 'OAuth2',
@@ -762,6 +791,7 @@ original notification at
                             StatusEnum::Expired             => 'Expired',
                             StatusEnum::GracePeriod         => 'Grace Period',
                             StatusEnum::Invited             => 'Invited',
+                            StatusEnum::Locked              => 'Locked',
                             StatusEnum::Pending             => 'Pending',
                             StatusEnum::PendingApproval     => 'Pending Approval',
                             StatusEnum::PendingConfirmation => 'Pending Confirmation',
@@ -808,10 +838,12 @@ original notification at
   ),
   
   'en.status.prov' => array(
-    ProvisionerStatusEnum::AutomaticMode  => 'Automatic Mode',
-    ProvisionerStatusEnum::EnrollmentMode => 'Enrollment Mode',
-    ProvisionerStatusEnum::ManualMode     => 'Manual Mode',
-    ProvisionerStatusEnum::Disabled       => 'Disabled'
+    ProvisionerModeEnum::AutomaticMode    => 'Automatic Mode',
+    ProvisionerModeEnum::EnrollmentMode   => 'Enrollment Mode',
+    ProvisionerModeEnum::ManualMode       => 'Manual Mode',
+    ProvisionerModeEnum::QueueMode        => 'Queue Mode',
+    ProvisionerModeEnum::QueueOnErrorMode => 'Queue On Error Mode',
+    ProvisionerModeEnum::Disabled         => 'Disabled'
   ),
   
   'en.status.prov.desc' =>  'See <a href="https://spaces.at.internet2.edu/display/COmanage/Provisioning+From+Registry#ProvisioningFromRegistry-AddingaProvisioningTarget">the documentation</a> for mode information',
@@ -893,13 +925,6 @@ original notification at
     UrlEnum::Personal => 'Personal',
   ),
   
-  // Extended type, key must be en.model.attribute
-  'en.co_department.type' => array(
-    DepartmentEnum::VO                => 'VO',
-    DepartmentEnum::ResearchInstitute => 'Research Institute',
-    DepartmentEnum::Department        => 'Department',
-  ),
-
   'en.visibility' => array(
     VisibilityEnum::CoAdmin         => 'CO Admin',
     VisibilityEnum::CoGroupMember   => 'CO Group Member',
@@ -920,6 +945,7 @@ original notification at
   'er.auth.roles' =>  'You do not have any current roles. If your request for enrollment is still being processed, you will not be able to login until it is approved. Please contact an administrator for assistance.',
   // authr = Authenticator (model), vs Authentication (login)
   'er.authr.unlocked' => 'Authenticator is already unlocked',
+  'er.bulk.label.unknown' => 'Unknown cross reference label "%1$s"',
   'er.changelog.model.load' => 'Failed to load model "%1$s"',
   'er.cluster.acct.already' => 'Cluster Account already assigned (%1$s)',
   'er.cluster.acct.grmem' => 'CO Person is not a member of the Default CO Group',
@@ -965,6 +991,7 @@ original notification at
   'er.db.schema' =>   'Possibly failed to update database schema',
   'er.db.save' =>     'Database save failed',
   'er.db.save-a' =>   'Database save failed: %1$s',
+  'er.dict.entry.mode' => 'Unsupported Dictionary Mode for Dictionary Entries',
   'er.ea.alter' =>    'Failed to alter table for attribute',
   'er.ea.exists' =>   'An attribute named "%1$s" already exists within the CO',
   'er.ea.index' =>    'Failed to update index for attribute',
@@ -1035,6 +1062,9 @@ original notification at
   'er.lock' =>        'Error obtaining lock: %1$s',
   'er.lock.exists' => 'Lock #%1$s already held by pid %2$s since %3$s',
   'er.match.response' => 'Match Server responded: %1$s',
+  'er.mt.unknown' => 'Unknown %1$s',
+  'er.mt.invalid' => 'Invalid %1$s',
+  'er.mt.msg' => 'Template emailed to %1$s',
   'er.multiple' =>    'Unexpectedly found multiple results',
   'er.nd.already'  => 'NSF Demographic data already exists for this person',
   'er.nm.official.et' => 'The Name type "official" cannot be deleted or renamed',
@@ -1067,7 +1097,7 @@ original notification at
   'er.perm.status' => 'Permission Denied: Status is %1$s',
   'er.permission' =>  'Permission Denied',
   'er.person.noex' => 'Person does not exist',
-  'er.person.none' => 'No CO Person, CO Person Role, Org Identity, or CO Department specified',
+  'er.person.none' => 'No CO Person, CO Person Role, Org Identity, Organization, or CO Department specified',
   'er.pi.match.multi' => 'Canonical %1$s match type found more than one matching record',
   'er.picker.toomany' => 'Too many results, continue typing to narrow your search',
   'er.plugin.fail' => 'Failed to load plugin "%1$s"',
@@ -1225,6 +1255,7 @@ original notification at
   'fd.cou_empty.enable'  =>  'Enable Empty COUs',
   'fd.default'    =>  'Default',
   'fd.date_of_birth' => 'Date of Birth',
+  'fd.dict.mode'  => 'Dictionary Mode',
   'fd.dp.group.admin' => 'Administrative Group',
   'fd.dp.group.admin.desc' => 'Group containing the Department administrators',
   'fd.dp.group.leader' => 'Leadership Group',
@@ -1338,6 +1369,8 @@ original notification at
   'fd.ef.rd.confirm.desc' => 'URL to redirect to after the email address associated with the Petition is confirmed. Leave blank for account linking enrollment.',
   'fd.ef.rd.finalize' => 'Finalization Redirect URL',
   'fd.ef.rd.finalize.desc' => 'URL to redirect to after processing of the enrollment has completed.',
+  'fd.ef.rd.logout' => 'Logout Redirect URL',
+  'fd.ef.rd.logout.desc' => 'URL to Redirect to after local COmanage Logout',
   'fd.ef.rd.submit' => 'Submission Redirect URL',
   'fd.ef.rd.submit.desc' => 'URL to redirect to after Petition is submitted by someone who is not already in the CO.',
   'fd.ef.saml' =>     'Enable SAML Attribute Extraction',
@@ -1354,8 +1387,8 @@ original notification at
   'fd.ef.vmt.desc' => 'Message template used for email sent as part of verification step',
   'fd.ef.vsub' =>     'Subject For Verification Email',
   'fd.ef.vsub.desc' => 'Subject line for email message sent as part of verification step.',
-  'fd.ef.whitelist' => 'Return URL Whitelist',
-  'fd.ef.whitelist.desc' => 'Permitted regular expressions (one per line) for <i>return</i> parameter, which if specified overrides Finalization Redirect URL',
+  'fd.ef.allowlist' => 'Return URL Whitelist',
+  'fd.ef.allowlist.desc' => 'Permitted regular expressions (one per line) for <i>return</i> parameter, which if specified overrides Finalization Redirect URL',
   // (End enrollment configuration fields)
   // Enrollment Flow Template Names
   'fd.ef.tmpl.arl' => 'Additional Role (Template)',
@@ -1452,6 +1485,13 @@ original notification at
   'fd.job.params' =>  'Job Parameters',
   'fd.job.queue_time' => 'Queued',
   'fd.job.register_summary' => 'Register Summary',
+  'fd.job.requeue_interval' => 'Requeue Interval',
+  'fd.job.requeue_interval.desc' => 'After the job successfully completes, it will automatically be requeued to execute after this interval (in seconds). (To stop requeuing, simply cancel this job.)',
+  'fd.job.requeued_from_co_job_id' => 'Requeued From Job',
+  'fd.job.retry_interval' => 'Retry Interval',
+  'fd.job.retry_interval.desc' => 'If the job fails, it will automatically be retried after this interval (in seconds). (To stop retrying, simply cancel this job.)',
+  'fd.job.start_after_time' => 'Start After',
+  'fd.job.start_after_time.desc' => 'The queued job will not be started until after this time',
   'fd.job.start_summary' => 'Start Summary',
   'fd.job.start_time' => 'Started',
   'fd.job.type' =>    'Job Type',
@@ -1470,11 +1510,15 @@ original notification at
   'fd.model' =>       'Model',
   'fd.modified' =>    'Modified',
   'fd.modified.tz' => 'Modified (%1$s)',
-  'fd.mt.body' =>     'Message Body',
+  'fd.mt.body.txt' =>  'Message Body (Plain Text)',
+  'fd.mt.body.html' => 'Message Body (HTML)',
   'fd.mt.body.desc' => 'Body for message to be sent. Max 4000 characters, see <a href="https://spaces.at.internet2.edu/display/COmanage/Notification+Message+Substitutions">supported substitutions</a>.',
   'fd.mt.context' =>  'Message Context',
+  'fd.mt.format' =>   'Message Format',
+  'fd.mt.mail' =>     'Email:',
   'fd.mt.sub' =>      'Message Subject',
   'fd.mt.sub.desc' => 'Subject line for message to be sent. See <a href="https://spaces.at.internet2.edu/display/COmanage/Notification+Message+Substitutions">supported substitutions</a>.',
+  'fd.mt.test.info' => 'You must first save the template before it can be tested',
   'fd.name' =>        'Name',
   'fd.name-a' =>      '%1$s Name',
   'fd.name.affil'  => 'Name and Affiliation',
@@ -1563,6 +1607,8 @@ original notification at
   'fd.pi.sync.add.ef.desc' => 'Enrollment Flow to trigger on add action, see the <a href="https://spaces.at.internet2.edu/display/COmanage/Registry+Pipelines#RegistryPipelines-TriggeringEnrollmentFlowsFromPipelines">documentation</a> for more details',
   'fd.pi.sync.affil' => 'CO Person Role Affiliation',
   'fd.pi.sync.affil.desc' => 'If set, created CO Person Roles will be given this affiliation (not the affiliation of the Organizational Identity)',
+  'fd.pi.sync.coperson.status' => 'New CO Person Status',
+  'fd.pi.sync.coperson.status.desc' => 'If set, new CoPerson records will be created with this status',
   'fd.pi.sync.cou' => 'Sync to COU',
   'fd.pi.sync.cou.repl' => 'Replace Record in COU',
   'fd.pi.sync.cou.repl.desc' => 'If the CO Person has an existing role in the specified COU, that role will be deleted/expired',
@@ -1579,6 +1625,7 @@ original notification at
   'fd.plugin.warn' => 'Once a new %1$s has been created, the Plugin cannot be changed',
   'fd.prov.group' =>  'Provisioning Group',
   'fd.prov.group.desc' => 'If set, only provision members of the specified group to this target',
+  'fd.prov.retry_interval.desc' => 'If the provisioning action fails, it will automatically be retried after this interval (in seconds), default is 900 seconds. Set to 0 to not try again. (To stop retrying, cancel the job in the Job Queue.)',
   'fd.prov.skipois' => 'Skip If Associated With Org Identity Source',
   'fd.prov.skipois.desc' => 'If set, do not provision CoPerson records that have an attached Org Identity record from the specified Org Identity Source',
   'fd.prov.status' => 'Provisioning Status',
@@ -1605,6 +1652,10 @@ original notification at
   'fd.searchbase' =>  'Search Base',
   'fd.server' =>      'Server',
   'fd.server.hostname' => 'Hostname',
+  'fd.server.kafka.brokers' => 'Kafka Brokers',
+  'fd.server.kafka.brokers.desc' => 'A comma separated list of Kafka Brokers to connect to',
+  'fd.server.kafka.sasl_mechanism' => 'Kafka SASL Mechanism',
+  'fd.server.kafka.security_protocol' => 'Kafka Security Protocol',
   'fd.server.match.is_comanage_match' => 'COmanage Match',
   'fd.server.match.is_comanage_match.desc' => 'If the match server is COmanage Match, checking this box will enable extra functionality',
   'fd.server.match.sor_label' => 'SOR Label',
@@ -1698,6 +1749,7 @@ original notification at
   'fd.th.hide_title' => 'Hide Title',
   'fd.th.hide_footer_logo' => 'Hide Footer Logo',
   'fd.theme' =>       'Theme',
+  'fd.theme.stacking_status' => 'Inheritance/Stacking',
   'fd.timestamp' =>   'Timestamp',
   'fd.timestamp.tz' => 'Timestamp (%1$s)',
   'fd.title' =>       'Title',
@@ -1787,6 +1839,7 @@ original notification at
   'in.orgid.pi.group'  => '%1$s Group Membership created from this Org Identity via Pipeline',
   'in.pagination.format' =>  'Page {:page} of {:pages}, Viewing {:start}-{:end} of {:count}',
   'in.pl.noconfig'     => 'This plugin has no configurable options',
+  'in.tpl.msg.test'    => 'Provide a valid email to forward a preview of the template.',
   'in.widgets.none'    => 'No widgets have been created for this dashboard yet.',
   
   // Menu
@@ -1821,6 +1874,7 @@ original notification at
   'jb.ois.sync.full.start' => 'Beginning sync of new org identities from source (%1$s in source; %2$s already known, %3$s new)',
   'jb.ois.sync.query.finish' => 'Query for matching org identities from source complete',
   'jb.ois.sync.query.start' => 'Beginning query for matching org identities from source (%1$s email addresses to query of %2$s known)',
+  'jb.ois.sync.start' => 'Syncing "%1$s"',
   'jb.ois.sync.update.changed' => '%1$s known record(s) changed, of %2$s reported by source',
   'jb.ois.sync.update.finish' => 'Sync of existing org identities from source complete',
   'jb.ois.sync.update.start' => 'Beginning sync of existing org identities from source (%1$s current total)',
@@ -1840,6 +1894,8 @@ original notification at
   'js.reinvite'       =>  'Are you sure you wish to resend an invitation to {0}?  Any previous invitation will be invalidated.',
   'js.cancel.job'     =>  'Are you sure you wish to cancel this job? Cancelation may not be immediate.',
   'js.confirm.verify' =>  'Are you sure you wish to send a verification request to {0}? Any previous request will be invalidated.',
+  'js.input.provide'  =>  'Please provide your input.',
+  'js.text'           =>  'Input:',
 
   // Operations
   'op.accept' =>      'Accept',
@@ -1944,6 +2000,7 @@ original notification at
   'op.inventory.view' => 'View Inventory',
   'op.manage.grm' =>  'Manage Group Memberships',
   'op.menu' =>        'Menu',
+  'op.msg.tpl.test' => 'Test Template',
   'op.last' =>        'Last',
   'op.link' =>        'Link',
   'op.link.confirm' => 'Are you sure you wish to proceed?',
@@ -1957,6 +2014,8 @@ original notification at
   'op.logout' =>      'Logout',
   'op.manage' =>      'Manage',
   'op.manage-a' =>    'Manage %1$s',
+  'op.mt' => 'Message Template',
+  'op.mt.test.wait' => 'Sending...',
   'op.next' =>        'Next',
   'op.ois.conf.gr' => 'Configure Group Mapping',
   'op.ois.inventory' => 'View %1$s Inventory',
@@ -2058,6 +2117,7 @@ original notification at
   'rs.authr.status' => 'Authenticator "%1$s" status changed from %2$s to %3$s',
   'rs.authr.unlocked' => 'Authenticator "%1$s" unlocked',
   'rs.cluster.acct.ok' => 'Cluster Accounts Assigned (%1$s)',
+  'rs.confirmed-a2' => '%1$s "%2$s" Confirmed',
   'rs.cop.recalc' =>  'CO Person status recalculated to %1$s',
   'rs.copr.mod' =>    'CO Person Role status changed from %1$s to %2$s',
   'rs.copy-a1' =>     '%1$s Copied',
@@ -2131,6 +2191,9 @@ original notification at
   'rs.prov.inel.group' => 'Ineligible: Not the provisioning group',
   'rs.prov.inel.ois' => 'Ineligible: Associated record from Org Identity Source',
   'rs.prov.ok' =>     'Provisioning completed successfully',
+  'rs.prov.queue' =>  'Queued %1$s %2$s for provisioning to %3$s (%4$s)',
+  'rs.prov.queue.err' => 'Provisioning attempt failed, queued %1$s %2$s for retry to %3$s (%4$s)',
+  'rs.prov.queued' => 'Provisioning job %1$s scheduled',
   'rs.pt.approve' =>  'Petition Approved',
   'rs.pt.attr.upd' => 'Petition attributes updated',
   'rs.pt.confirm' =>  'Petition Confirmed',
@@ -2220,6 +2283,9 @@ original notification at
   'sh.job.arg.epilog' =>  'If no task specified, all run. Available tasks: expirations, groupvalidity, syncorgsources, forcesyncorgsources',
   'sh.job.arg.oisid' =>   'Numeric OIS ID to run tasks for (all OISs if not specified)',
   'sh.job.arg.skipnew' => 'If set do not search emails for new memberships after sync',
+  'sh.job.arg.asynchronous' => 'Run asynchronously',
+  'sh.job.arg.cancel' =>  'Cancel the specified job',
+  'sh.job.arg.coid' =>    'Numeric CO ID to run queue for',
   'sh.job.arg.runqueue' => 'Process queued jobs',
   'sh.job.arg.synchronous' => 'Run synchronously',
   'sh.job.arg.unlock' =>  'Remove the specified lock',
@@ -2269,7 +2335,10 @@ original notification at
   'sh.ug.330.ssh.key' =>  'Migrating SSH Key type',
   'sh.ug.330.users' =>    'Dropping users View',
   'sh.ug.340.password' => 'Updating Password Sources',
-  'sh.ug.400.attrenums' => 'Migrating Attribute Enumerations'
+  'sh.ug.400.attrenums' => 'Migrating Attribute Enumerations',
+  'sh.ug.400.http_server.password' => 'Resizing HttpServer column',
+  'sh.ug.400.messagetemplate.format' => 'Updating CoMessageTemplate format',
+  'sh.ug.400.org' =>      'Instantiating default Organization Extended Types'
 );
 
 // Make a copy of the original texts, since CoLocalizations can override them
@@ -2330,7 +2399,7 @@ function _txt($key, $vars=null, $index=null)
 
 function _bootstrap_plugin_txt()
 {
-  global $cm_lang, $cm_texts;
+  global $cm_lang, $cm_texts, $cm_texts_orig;
   
   $plugins = App::objects('plugin');
   
@@ -2347,6 +2416,9 @@ function _bootstrap_plugin_txt()
         $varName = 'cm_' . Inflector::underscore($plugin) . '_texts';
         
         $cm_texts[$cm_lang] = array_merge($cm_texts[$cm_lang], ${$varName}[$cm_lang]);
+        
+        // Copy to cm_texts_orig for localization purposes
+        $cm_texts_orig[$cm_lang] = array_merge($cm_texts_orig[$cm_lang], ${$varName}[$cm_lang]);
         
         break;
       }
