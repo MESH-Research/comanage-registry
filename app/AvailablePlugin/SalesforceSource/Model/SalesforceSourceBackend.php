@@ -409,6 +409,10 @@ class SalesforceSourceBackend extends OrgIdentitySourceBackend {
     catch(InvalidArgumentException $e) {
       throw new InvalidArgumentException(_txt('er.id.unk-a', array($id)));
     }
+
+    if(($r->UP_Commons_Eligible__c===true)||($r->RecordTypeId ==='01215000001Ylc2AAC' && $r->Current_Staff__c===true)){
+      throw new InvalidArgumentException(_txt('er.id.unk-a', array($id)));
+    }
     
     if(!empty($records)) {
       if(!empty($records->AccountId)) {
@@ -529,7 +533,10 @@ class SalesforceSourceBackend extends OrgIdentitySourceBackend {
     // This field is not enabled by default (CO-1506)
     //          'MiddleName',
       'LastName',
-      'Email'
+      'Email',
+      'UP_Commons_Eligible__c',
+      'Contact.RecordTypeId',
+      'Contact.Current_Staff__c'
     );
 
     // We should be able to do this to constrain searches to email addresses,
@@ -547,9 +554,11 @@ class SalesforceSourceBackend extends OrgIdentitySourceBackend {
         // We need to track if the record is a Contact or a User so we
         // can retrieve the details later. We use - instead of / or .
         // because the latter two are parsed as part of URLs.
-        $key = (string)$r->attributes->type . "-" . (string)$r->Id;
-        
-        $ret[ $key ] = $this->resultToOrgIdentity($r);
+	      //print_r($r);
+        if(($r->UP_Commons_Eligible__c===true)||($r->RecordTypeId==='01215000001Ylc2AAC' && $r->Current_Staff__c===true)){
+          $key = (string)$r->attributes->type . "-" . (string)$r->Id;
+          $ret[ $key ] = $this->resultToOrgIdentity($r);
+        }
       }
     }
     
