@@ -732,37 +732,34 @@ class CoLdapProvisionerTarget extends CoProvisionerPluginTarget {
                     $entGroupIds = Hash::extract($provisioningData['CoGroupMember'], '{n}.co_group_id');
 
                     foreach($provisioningData['Password'] as $up) {
-                      // Skip locked passwords
-                      if(!isset($up['AuthenticatorStatus']['locked']) || !$up['AuthenticatorStatus']['locked']) {
-                        // Walk through the mappings and look for any that match
-                        // our current password_authenticator_id. Note that we
-                        // might have more than one service for each password.
+                      // Walk through the mappings and look for any that match
+                      // our current password_authenticator_id. Note that we
+                      // might have more than one service for each password.
+                      
+                      foreach($mappings as $authenticatorId => $m) {
+                        // Do we have a short label?
+                        if(!empty($m['serviceCfg']['short_label']) 
+                           // Is this a PasswordAuthenticator?
+                           && $m['pluginType'] == 'PasswordAuthenticator'
+                           // Does this PasswordAuthenticator match the one associated with this Password?
+                           && $m['cfg']['PasswordAuthenticator']['id'] == $up['password_authenticator_id']
+                           // Is there a Group associated with this service?
+                           && (!$m['serviceCfg']['co_group_id']
+                               // Is the user in the service group, if there is one?
+                               || in_array($m['serviceCfg']['co_group_id'], $entGroupIds))) {
+                          $lrattr = $lattr . ';app-' . $m['serviceCfg']['short_label'];
                         
-                        foreach($mappings as $authenticatorId => $m) {
-                          // Do we have a short label?
-                          if(!empty($m['serviceCfg']['short_label']) 
-                             // Is this a PasswordAuthenticator?
-                             && $m['pluginType'] == 'PasswordAuthenticator'
-                             // Does this PasswordAuthenticator match the one associated with this Password?
-                             && $m['cfg']['PasswordAuthenticator']['id'] == $up['password_authenticator_id']
-                             // Is there a Group associated with this service?
-                             && (!$m['serviceCfg']['co_group_id']
-                                 // Is the user in the service group, if there is one?
-                                 || in_array($m['serviceCfg']['co_group_id'], $entGroupIds))) {
-                            $lrattr = $lattr . ';app-' . $m['serviceCfg']['short_label'];
-                          
-                          switch($up['password_type']) {
-                              // XXX we can't use PasswordAuthenticator's enums in case the plugin isn't installed
-                              case 'CR':
-                                $attributes[$lrattr][] = '(CRYPT)' . $up['password'];
-                                break;
-                              case 'SH':
-                                $attributes[$lrattr][] = '{SSHA}' . $up['password'];
-                                break;
-                              default:
-                                $attributes[$lrattr][] = $up['password'];
-                                break;
-                            }
+                        switch($up['password_type']) {
+                            // XXX we can't use PasswordAuthenticator's enums in case the plugin isn't installed
+                            case 'CR':
+                              $attributes[$lrattr][] = '(CRYPT)' . $up['password'];
+                              break;
+                            case 'SH':
+                              $attributes[$lrattr][] = '{SSHA}' . $up['password'];
+                              break;
+                            default:
+                              $attributes[$lrattr][] = $up['password'];
+                              break;
                           }
                         }
                       }
@@ -812,8 +809,10 @@ class CoLdapProvisionerTarget extends CoProvisionerPluginTarget {
                   // Start with an empty list in case no active keys
                   $attributes[$attr] = array();
                 }
-                foreach($provisioningData['SshKey'] as $sk) {
-                  $attributes[$attr][] = $sk['type'] . " " . $sk['skey'] . " " . $sk['comment'];
+                if(!empty($provisioningData['SshKey'])) {
+                  foreach($provisioningData['SshKey'] as $sk) {
+                    $attributes[$attr][] = $sk['type'] . " " . $sk['skey'] . " " . $sk['comment'];
+                  }
                 }
                 break;
               case 'userPassword':
@@ -821,9 +820,8 @@ class CoLdapProvisionerTarget extends CoProvisionerPluginTarget {
                   // Start with an empty list in case no active passwords
                   $attributes[$attr] = array();
                 }
-                foreach($provisioningData['Password'] as $up) {
-                  // Skip locked passwords
-                  if(!isset($up['AuthenticatorStatus']['locked']) || !$up['AuthenticatorStatus']['locked']) {
+                if(!empty($provisioningData['Password'])) {
+                  foreach($provisioningData['Password'] as $up) {
                     // There's probably a better place for this (an enum somewhere?)
                     switch($up['password_type']) {
                       // XXX we can't use PasswordAuthenticator's enums in case the plugin isn't installed
@@ -844,10 +842,8 @@ class CoLdapProvisionerTarget extends CoProvisionerPluginTarget {
                 if(!$attropts) {
                   $attributes[$attr] = array();
                 }
-                
-                foreach($provisioningData['Certificate'] as $cr) {
-                  // Skip locked certs
-                  if(!isset($cr['AuthenticatorStatus']['locked']) || !$cr['AuthenticatorStatus']['locked']) {
+                if(!empty($provisioningData['Certificate'])) {
+                  foreach($provisioningData['Certificate'] as $cr) {
                     $f = ($attr == 'voPersonCertificateDN' ? 'subject_dn' : 'issuer_dn');
                     
                     if($attropts) {
@@ -863,6 +859,22 @@ class CoLdapProvisionerTarget extends CoProvisionerPluginTarget {
                 if(!$attropts && empty($attributes[$attr]) && !$modify) {
                   // This is the same as the approach using $found, but without an extra variable
                   unset($attributes[$attr]);
+                }
+                break;
+              case 'voPersonToken':
+                if(!$attropts) {
+                  $attributes[$attr] = array();
+                }
+                if(!empty($provisioningData['TotpToken'])) {
+                  foreach($provisioningData['TotpToken'] as $tt) {
+                    if($attropts) {
+                      $lrattr = $lattr . ";type-totp";
+                      
+                      $attributes[$lrattr][] = $tt['serial'];
+                    } else {
+                      $attributes[$attr][] = $tt['serial'];
+                    }
+                  }
                 }
                 break;
               // Attributes from models attached to CO Person Role
@@ -1413,6 +1425,45 @@ class CoLdapProvisionerTarget extends CoProvisionerPluginTarget {
              && in_array(strtolower($cattr), $sattributes)) {
             // Insert a blank record for this attribute to delete it
             $attributes[$fattr] = array();
+          }
+        }
+      }
+    }
+    
+    // (5) How to handle missing required attributes is a bit of a tricky mess.
+    // If we send a record without a required attribute, the LDAP server will
+    // complain about an object class violation. But we don't really have a good
+    // mechanism for reporting the missing attribute. (PE can add some logging.)
+    // And it's not clear that we should send a partial record instead of a full
+    // record. Complicating things is CO-2092, where (eg) voPosixAccountGidNumber
+    // is required for voPosixGroup, but not all groups will have this attribute,
+    // and those that don't shouldn't be provisioned into voPosixGroup.
+    
+    // So for now (as of v3.3.2) we do the following: if a required objectclass
+    // is missing a required attribute, we do nothing, and let the LDAP server
+    // throw at object class violation. If an optional objectclass is missing
+    // a required attribute, we delete the objectclass. For now, we don't
+    // delete any attributes (since they may be part of a different objectclass,
+    // and if we leave any invalid attributes in place the server will complain),
+    // but we'll probably need to revisit this at some point.
+    
+    foreach($supportedAttributes as $oc => $cfg) {
+      if(!$cfg['objectclass']['required']) {
+        // Objectclass is not required...
+        
+        foreach($cfg['attributes'] as $attr => $acfg) {
+          if($acfg['required']) {
+            // But this attribute is...
+            
+            if(empty($attributes[$attr])) {
+              // ... and it's not set, so remove the it from the list of objectclasses
+              
+              $k = array_search($oc, $attributes['objectclass']);
+              
+              if($k !== false) {
+                unset($attributes['objectclass'][$k]);
+              }
+            }
           }
         }
       }
@@ -2300,6 +2351,10 @@ class CoLdapProvisionerTarget extends CoProvisionerPluginTarget {
             'defaulttype' => IdentifierEnum::SORID
           ),
           'voPersonStatus' => array(
+            'required'   => false,
+            'multiple'   => true
+          ),
+          'voPersonToken' => array(
             'required'   => false,
             'multiple'   => true
           )
