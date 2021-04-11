@@ -24,8 +24,93 @@
  * @since         COmanage Registry v0.9.2
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
  */
+
+  // Add breadcrumbs
+  print $this->element("coCrumb");
+
+  // Add page title
+  $params = array();
+  $params['title'] = $title_for_layout;
+  print $this->element("pageTitle", $params);
+
+  // Add dashboard navigation if we have more than one dashboard
+  if(!empty($vv_available_dashboards) && count($vv_available_dashboards) > 1) {
+    print '<div id="dashboard-tabs" class="mdl-tabs">';
+    print '<nav class="mdl-tabs__tab-bar">';
+    foreach($vv_available_dashboards as $dashboardId => $dashboardName) {
+      if ($vv_dashboard['CoDashboard']['id'] == $dashboardId) {
+        print '<span class="mdl-tabs__tab selected">' . $dashboardName . '</span>';
+      } else {
+        print $this->Html->link(filter_var($dashboardName, FILTER_SANITIZE_SPECIAL_CHARS), array(
+          'controller' => 'co_dashboards',
+          'action' => 'dashboard',
+          $dashboardId
+        ),
+          array('class' => 'mdl-tabs__tab'));
+      }
+    }
+    print '</nav>';
+    print '</div>';
+  }
 ?>
 
-<h1 class="firstPrompt">
-  <?php print _txt('op.dashboard.select', array(filter_var($cur_co['Co']['name'],FILTER_SANITIZE_SPECIAL_CHARS)));?>
-</h1>
+<script type="text/javascript">
+  // Load widget content into divs
+  $(document).ready(function() {
+<?php
+  if(!empty($vv_dashboard)) {
+    foreach($vv_dashboard['CoDashboardWidget'] as $w) {
+      if($w['status'] == StatusEnum::Active) {
+        $pmodel = 'Co'.$w['plugin'];
+        
+        $args = array(
+          'plugin' => Inflector::underscore($w['plugin']),
+          'controller' => Inflector::tableize($pmodel),
+          'action' => 'display',
+          $w[$pmodel]['id']
+        );
+
+        print "var coSpinnerTarget" . $w['id'] . " = document.getElementById('widgetSpinner" . $w['id'] . "');\n";
+        print "var coSpinner" . $w['id'] . " = new Spinner(coMiniSpinnerOpts).spin(coSpinnerTarget" . $w['id'] . ");\n";
+        print "$('#widget" . $w['id'] . "').load('" . addslashes($this->Html->url($args)) . "', function() { coSpinner" . $w['id'] . ".stop(); });\n";
+      }
+    }
+  }
+?>
+  });
+</script>
+
+<div class="table-container">
+  <?php if(!empty($vv_dashboard)): ?>
+    <?php if(!empty($vv_dashboard['CoDashboard']['header_text'])): ?>
+      <div id="dashboard-header">
+        <?php print $vv_dashboard['CoDashboard']['header_text']; ?>
+      </div>
+    <?php endif; ?>
+    <?php if(!empty($vv_dashboard['CoDashboardWidget'])): ?>
+      <?php foreach($vv_dashboard['CoDashboardWidget'] as $w): ?>
+        <?php if($w['status'] == StatusEnum::Active): ?>
+          <div class="dashboard-widget-container">
+            <h2 class="widget-title">
+              <?php print filter_var($w['description'], FILTER_SANITIZE_SPECIAL_CHARS); ?>
+              <span id="widgetSpinner<?php print $w['id']; ?>" class="mini-spinner"></span>
+            </h2>
+            <div id="widget<?php print $w['id']; ?>"></div>
+          </div>
+        <?php endif; // Active ?>
+      <?php endforeach; // dashboard widget ?>
+    <?php else: ?>
+      <?php print _txt('in.widgets.none'); ?>
+    <?php endif; ?>
+    <?php if(!empty($vv_dashboard['CoDashboard']['footer_text'])): ?>
+      <div id="dashboard-footer">
+        <?php print $vv_dashboard['CoDashboard']['footer_text']; ?>
+      </div>
+    <?php endif; ?>
+  <?php else: // $vv_dashboard ?>
+  <!-- XXX this doesn't really render correctly -->
+  <h1 class="firstPrompt">
+    <?php print _txt('op.dashboard.select', array(filter_var($cur_co['Co']['name'],FILTER_SANITIZE_SPECIAL_CHARS)));?>
+  </h1>
+  <?php endif; ?>
+</div>

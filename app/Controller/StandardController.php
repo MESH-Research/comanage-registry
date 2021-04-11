@@ -186,15 +186,51 @@ class StandardController extends AppController {
    */
 
   public function beforeRender() {
-    if($this->modelClass == 'CoPerson'
-       || $this->modelClass == 'OrgIdentity') {
+    $mName = $this->modelClass;
+    
+    if($mName == 'CoPerson' || $mName == 'OrgIdentity' || $mName == 'CoGroupMember') {
       // Populate list of statuses for people searches
       
       global $cm_lang, $cm_texts;
       $this->set('vv_statuses', $cm_texts[ $cm_lang ]['en.status']);
     }
     
+    // If we're in a plugin and the plugin specifies a Server type,
+    // populate the available set of those servers
+    
+    if(!empty($this->$mName->cmServerType)) {
+      $this->loadModel('Server');
+      
+      $args = array();
+      $args['conditions']['Server.server_type'] = $this->$mName->cmServerType;
+      $args['conditions']['Server.co_id'] = $this->cur_co['Co']['id'];
+      $args['conditions']['Server.status'] = SuspendableStatusEnum::Active;
+      $args['fields'] = array('id', 'description');
+      $args['contain'] = false;
+      
+      $this->set('vv_servers', $this->Server->find('list', $args));
+    }
+    
     parent::beforeRender();
+  }
+
+    /**
+   * Callback before other controller methods are invoked or views are rendered.
+   *
+   * @since  COmanage Registry v3.3
+   */
+
+  function beforeFilter() {
+    parent::beforeFilter();
+    // Dynamically adjust validation rules to include the current CO ID for dynamic types.
+    // Apply the rule only when the validateExtendedType function is used as a custom rule
+    $model = $this->modelClass;
+    if(!empty($this->$model->validate['type']['content']['rule'])
+       && array_search('validateExtendedType', $this->$model->validate['type']['content']['rule'], true) !== null) {
+      $vrule = $this->$model->validate['type']['content']['rule'];
+      $vrule[1]['coid'] = $this->cur_co['Co']['id'];
+      $this->$model->validator()->getField('type')->getRule('content')->rule = $vrule;
+    }
   }
   
   /**
@@ -728,6 +764,20 @@ class StandardController extends AppController {
         }
         
         $this->set($modelpl, $this->Api->convertRestResponse($model->find('all', $args)));
+      } elseif(!empty($model->permittedApiFilters)
+               && !empty(array_intersect_key($model->permittedApiFilters, $this->params['url']))) {
+        // We are filtering on a plugin specific key
+        $keys = array_intersect_key($model->permittedApiFilters, $this->params['url']);
+        
+        $args = array();
+        foreach(array_keys($keys) as $k) {
+          if(!empty($this->params['url'][$k])) {
+            $args['conditions'][$model->name.'.'.$k] = $this->params['url'][$k];
+          }
+        }
+        $args['contain'] = false;
+        
+        $this->set($modelpl, $this->Api->convertRestResponse($model->find('all', $args)));
       } elseif($this->requires_person
                // XXX This is a bit of a hack, we should really refactor this
                || $req == 'CoOrgIdentityLink'
@@ -735,16 +785,72 @@ class StandardController extends AppController {
                // (But we need to fall through to the other logic if copersonid is not specified, hack hack.)
                || ($req == 'CoPersonRole'
                    && !empty($this->params['url']['copersonid']))) {
-        if(!empty($this->params['url']['copersonid'])) {
-          $t = $model->findAllByCoPersonId($this->params['url']['copersonid']);
+        if(!empty($this->params['url']['codeptid'])) {
+          $args = array();
+          $args['conditions'][$model->name . '.co_department_id'] = $this->params['url']['codeptid'];
+          $args['contain'] = false;
+          
+          $t = $model->find('all', $args);
+          
+          if(empty($t)) {
+            // We need to determine if codeptid is unknown or just
+            // has no objects attached to it
+            
+            $args = array();
+            $args['conditions']['CoDepartment.id'] = $this->params['url']['codeptid'];
+            $args['contain'] = false;
+            
+            if(!$model->CoDepartment->find('count', $args)) {
+              $this->Api->restResultHeader(404, "CO Department Unknown");
+            } else {
+              $this->Api->restResultHeader(204, "CO Department Has No " . $req);
+            }
+            
+            return;
+          }
+          
+          $this->set($modelpl, $this->Api->convertRestResponse($t));
+        } elseif(!empty($this->params['url']['cogroupid'])) {
+          $args = array();
+          $args['conditions'][$model->name . '.co_group_id'] = $this->params['url']['cogroupid'];
+          $args['contain'] = false;
+          
+          $t = $model->find('all', $args);
+          
+          if(empty($t)) {
+            // We need to determine if cogroupid is unknown or just
+            // has no objects attached to it
+            
+            $args = array();
+            $args['conditions']['CoGroup.id'] = $this->params['url']['cogroupid'];
+            $args['contain'] = false;
+            
+            if(!$model->CoGroup->find('count', $args)) {
+              $this->Api->restResultHeader(404, "CO Group Unknown");
+            } else {
+              $this->Api->restResultHeader(204, "CO Group Has No " . $req);
+            }
+            
+            return;
+          }
+          
+          $this->set($modelpl, $this->Api->convertRestResponse($t));
+        } elseif(!empty($this->params['url']['copersonid'])) {
+          $args = array();
+          $args['conditions'][$model->name . '.co_person_id'] = $this->params['url']['copersonid'];
+          $args['contain'] = false;
+          
+          $t = $model->find('all', $args);
           
           if(empty($t)) {
             // We need to determine if copersonid is unknown or just
             // has no objects attached to it
             
-            $o = $model->CoPerson->findById($this->params['url']['copersonid']);
+            $args = array();
+            $args['conditions']['CoPerson.id'] = $this->params['url']['copersonid'];
+            $args['contain'] = false;
             
-            if(empty($o)) {
+            if(!$model->CoPerson->find('count', $args)) {
               $this->Api->restResultHeader(404, "CO Person Unknown");
             } else {
               $this->Api->restResultHeader(204, "CO Person Has No " . $req);
@@ -755,15 +861,21 @@ class StandardController extends AppController {
           
           $this->set($modelpl, $this->Api->convertRestResponse($t));
         } elseif(!empty($this->params['url']['copersonroleid'])) {
-          $t = $model->findAllByCoPersonRoleId($this->params['url']['copersonroleid']);
+          $args = array();
+          $args['conditions'][$model->name . '.co_person_role_id'] = $this->params['url']['copersonroleid'];
+          $args['contain'] = false;
+          
+          $t = $model->find('all', $args);
           
           if(empty($t)) {
             // We need to determine if copersonroleid is unknown or just
             // has no objects attached to it
             
-            $o = $model->CoPersonRole->findById($this->params['url']['copersonroleid']);
+            $args = array();
+            $args['conditions']['CoPersonRole.id'] = $this->params['url']['copersonroleid'];
+            $args['contain'] = false;
             
-            if(empty($o)) {
+            if(!$model->CoPersonRole->find('count', $args)) {
               $this->Api->restResultHeader(404, "CO Person Role Unknown");
             } else {
               $this->Api->restResultHeader(204, "CO Person Role Has No " . $req);
@@ -774,15 +886,21 @@ class StandardController extends AppController {
           
           $this->set($modelpl, $this->Api->convertRestResponse($t));
         } elseif(!empty($this->params['url']['orgidentityid'])) {
-          $t = $model->findAllByOrgIdentityId($this->params['url']['orgidentityid']);
+          $args = array();
+          $args['conditions'][$model->name . '.org_identity_id'] = $this->params['url']['orgidentityid'];
+          $args['contain'] = false;
+          
+          $t = $model->find('all', $args);
           
           if(empty($t)) {
             // We need to determine if orgidentityid is unknown or just
             // has no objects attached to it
             
-            $o = $model->OrgIdentity->findById($this->params['url']['orgidentityid']);
+            $args = array();
+            $args['conditions']['OrgIdentity.id'] = $this->params['url']['orgidentityid'];
+            $args['contain'] = false;
             
-            if(empty($o)) {
+            if(!$model->OrgIdentity->find('count', $args)) {
               $this->Api->restResultHeader(404, "Org Identity Unknown");
             } else {
               $this->Api->restResultHeader(204, "Org Identity Has No " . $req);
@@ -804,14 +922,22 @@ class StandardController extends AppController {
             // XXX need to do an authz check on this
             
             if(isset($model->CoPerson)) {
-              if(!$model->CoPerson->Co->findById($this->params['url']['coid'])) {
+              $args = array();
+              $args['conditions']['Co.id'] = $this->params['url']['coid'];
+              $args['contain'] = false;
+              
+              if(!$model->CoPerson->Co->find('count', $args)) {
                 $this->Api->restResultHeader(404, "CO Unknown");
                 return;
               }
               
               $params['conditions'] = array('CoPerson.co_id' => $this->params['url']['coid']);
             } else {
-              if(!$model->Co->findById($this->params['url']['coid'])) {
+              $args = array();
+              $args['conditions']['Co.id'] = $this->params['url']['coid'];
+              $args['contain'] = false;
+              
+              if(!$model->Co->find('count', $args)) {
                 $this->Api->restResultHeader(404, "CO Unknown");
                 return;
               }
@@ -831,14 +957,22 @@ class StandardController extends AppController {
           // XXX need to do an authz check on this
 
           if(isset($model->CoPerson)) {
-            if(!$model->CoPerson->Co->findById($this->params['url']['coid'])) {
+            $args = array();
+            $args['conditions']['Co.id'] = $this->params['url']['coid'];
+            $args['contain'] = false;
+            
+            if(!$model->CoPerson->Co->find('count', $args)) {
               $this->Api->restResultHeader(404, "CO Unknown");
               return;
             }
             
             $params['conditions'] = array('CoPerson.co_id' => $this->params['url']['coid']);
           } else {
-            if(!$model->Co->findById($this->params['url']['coid'])) {
+            $args = array();
+            $args['conditions']['Co.id'] = $this->params['url']['coid'];
+            $args['contain'] = false;
+            
+            if(!$model->Co->find('count', $args)) {
               $this->Api->restResultHeader(404, "CO Unknown");
               return;
             }
@@ -854,7 +988,11 @@ class StandardController extends AppController {
             // Currently, only CoPersonRole will get here, so we don't also check for
             // (eg) $model->CoPersonRole, and we don't need to do a join like above
             
-            if(!$model->Cou->findById($this->params['url']['couid'])) {
+            $args = array();
+            $args['conditions']['Cou.id'] = $this->params['url']['couid'];
+            $args['contain'] = false;
+            
+            if(!$model->Cou->find('count', $args)) {
               $this->Api->restResultHeader(404, "COU Unknown");
               return;
             }
@@ -866,6 +1004,9 @@ class StandardController extends AppController {
           }
         }
         
+        // We don't ever need associated models
+        $params['contain'] = false;
+        
         $this->set($modelpl, $this->Api->convertRestResponse($model->find('all', $params)));
       }
       
@@ -876,76 +1017,46 @@ class StandardController extends AppController {
       // Set page title
       $this->set('title_for_layout', _txt('ct.' . $modelpl . '.pl'));
       
-      // Use server side pagination
-      if($this->requires_person)
-      {
-        $this->Paginator->settings = $this->paginate;
-        if(!empty($this->params['named']['copersonid']))
-        {
-          $q = $req . ".co_person_id = ";
-          $this->set($modelpl, $this->Paginator->paginate($req, array($q => $this->params['named']['copersonid'])));
-        }
-        elseif(!empty($this->params['named']['copersonroleid']))
-        {
-          $q = $req . ".co_person_role_id = ";
-          $this->set($modelpl, $this->Paginator->paginate($req, array($q => $this->params['named']['copersonroleid'])));
-        }
-        elseif(!empty($this->params['named']['orgidentityid']))
-        {
-          $q = $req . ".org_identity_id = ";
-          $this->set($modelpl, $this->Paginator->paginate($req, array($q => $this->params['named']['orgidentityid'])));
-        }
-        else
-        {
-          // Although requires_person is true, the UI sort of permits
-          // retrieval of all items of a given type
-          
-          $this->set($modelpl, $this->Paginator->paginate($req));
-        }
+      // Configure server side pagination
+      
+      $local = $this->paginationConditions();
+      
+      // XXX We could probaby come up with a better approach than manually enumerating
+      // each field we want to copy...
+      if(!empty($local['conditions'])) {
+        $this->paginate['conditions'] = $local['conditions'];
       }
-      else
-      {
-        // Configure pagination
-        
-        $local = $this->paginationConditions();
-        
-        // XXX We could probaby come up with a better approach than manually enumerating
-        // each field we want to copy...
-        if(!empty($local['conditions'])) {
-          $this->paginate['conditions'] = $local['conditions'];
-        }
-        
-        if(!empty($local['fields'])) {
-          $this->paginate['fields'] = $local['fields'];
-        }
-        
-        if(!empty($local['group'])) {
-          $this->paginate['group'] = $local['group'];
-        }
-        
-        if(!empty($local['joins'])) {
-          $this->paginate['joins'] = $local['joins'];
-        }
-        
-        if(isset($local['contain'])) {
-          $this->paginate['contain'] = $local['contain'];
-        } elseif(isset($this->view_contains)) {
-          $this->paginate['contain'] = $this->view_contains;
-        }
-        
-        // Used either to whitelist which fields can be used for sorting, or
-        // explicitly naming sortable fields for complex relations (ie: using
-        // linkable behavior).
-        $sortlist = array();
-        
-        if(!empty($local['sortlist'])) {
-          $sortlist = $local['sortlist'];
-        }
-        
-        $this->Paginator->settings = $this->paginate;
-        
-        $this->set($modelpl, $this->Paginator->paginate($req, array(), $sortlist));
+      
+      if(!empty($local['fields'])) {
+        $this->paginate['fields'] = $local['fields'];
       }
+      
+      if(!empty($local['group'])) {
+        $this->paginate['group'] = $local['group'];
+      }
+      
+      if(!empty($local['joins'])) {
+        $this->paginate['joins'] = $local['joins'];
+      }
+      
+      if(isset($local['contain'])) {
+        $this->paginate['contain'] = $local['contain'];
+      } elseif(isset($this->view_contains)) {
+        $this->paginate['contain'] = $this->view_contains;
+      }
+      
+      // Used either to enumerate which fields can be used for sorting, or
+      // explicitly naming sortable fields for complex relations (ie: using
+      // linkable behavior).
+      $sortlist = array();
+      
+      if(!empty($local['sortlist'])) {
+        $sortlist = $local['sortlist'];
+      }
+      
+      $this->Paginator->settings = $this->paginate;
+      
+      $this->set($modelpl, $this->Paginator->paginate($req, array(), $sortlist));
     }
   }
   
@@ -1009,11 +1120,27 @@ class StandardController extends AppController {
     
     $ret = array();
     
-    if(!empty($this->cur_co)) {
+    if($this->requires_person) {
+      if(!empty($this->params['named']['copersonid'])) {
+        $ret['conditions'][$req.'.co_person_id'] = $this->params['named']['copersonid'];
+      } elseif(!empty($this->params['named']['copersonroleid'])) {
+        $ret['conditions'][$req.'.co_person_role_id'] = $this->params['named']['copersonroleid'];
+      } elseif(!empty($this->params['named']['orgidentityid'])) {
+        $ret['conditions'][$req.'.org_identity_id'] = $this->params['named']['orgidentityid'];
+      } elseif(!empty($this->params['named']['codeptid'])) {
+        $ret['conditions'][$req.'.co_department_id'] = $this->params['named']['codeptid'];
+      } else {
+        // We previously allowed retrieval of all items of a given type
+        // (eg: Addresses), but it's not really clear why and there wasn't really
+        // a path to get there. So now we throw an error instead.
+        
+        throw new InvalidArgumentException(_txt('er.person.none'));
+      }
+    } elseif(!empty($this->cur_co)) {
       // Only retrieve members of the current CO
       $ret['conditions'][$req.'.co_id'] = $this->cur_co['Co']['id'];
     }
-
+    
     return $ret;
   }
   

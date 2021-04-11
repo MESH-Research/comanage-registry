@@ -6486,6 +6486,8 @@ class ModelReadTest extends BaseModelTest {
 
 	public function testBuildQueryAllI18nConditions() {
 		$this->skipIf(!$this->db instanceof Mysql, 'This test is only compatible with Mysql.');
+		$dbName = $this->db->config['database'];
+
 		$this->loadFixtures('TranslateArticle', 'TranslatedArticle', 'User');
 		$TestModel = new TranslatedArticle();
 		$TestModel->cacheQueries = false;
@@ -6502,7 +6504,7 @@ class ModelReadTest extends BaseModelTest {
 					'table' => (object)array(
 						'tablePrefix' => '',
 						'table' => 'article_i18n',
-						'schemaName' => 'cakephp_test',
+						'schemaName' => $dbName
 					),
 					'conditions' => array(
 						'TranslatedArticle.id' => (object)array(
@@ -6520,7 +6522,7 @@ class ModelReadTest extends BaseModelTest {
 					'table' => (object)array(
 						'tablePrefix' => '',
 						'table' => 'article_i18n',
-						'schemaName' => 'cakephp_test',
+						'schemaName' => $dbName
 					),
 					'conditions' => array(
 						'TranslatedArticle.id' => (object)array(
@@ -6556,6 +6558,7 @@ class ModelReadTest extends BaseModelTest {
 
 	public function testBuildQueryCountI18nConditions() {
 		$this->skipIf(!$this->db instanceof Mysql, 'This test is only compatible with Mysql.');
+		$dbName = $this->db->config['database'];
 		$this->loadFixtures('TranslateArticle', 'TranslatedArticle', 'User');
 		$TestModel = new TranslatedArticle();
 		$TestModel->cacheQueries = false;
@@ -6572,7 +6575,7 @@ class ModelReadTest extends BaseModelTest {
 					'table' => (object)array(
 						'tablePrefix' => '',
 						'table' => 'article_i18n',
-						'schemaName' => 'cakephp_test',
+						'schemaName' => $dbName
 					),
 					'conditions' => array(
 						'`TranslatedArticle`.`id`' => (object)array(
@@ -6589,7 +6592,7 @@ class ModelReadTest extends BaseModelTest {
 					'table' => (object)array(
 						'tablePrefix' => '',
 						'table' => 'article_i18n',
-						'schemaName' => 'cakephp_test',
+						'schemaName' => $dbName
 					),
 					'conditions' => array(
 						'TranslatedArticle.id' => (object)array(
@@ -7423,7 +7426,7 @@ class ModelReadTest extends BaseModelTest {
 	}
 
 /**
- * Test find(count) with Db::expression
+ * Test find(count) with DboSource::expression
  *
  * @return void
  */
@@ -7443,6 +7446,38 @@ class ModelReadTest extends BaseModelTest {
 			'Project.name' => $db->expression('\'Project 3\'')
 		)));
 		$this->assertEquals(1, $result);
+	}
+
+/**
+ * Test 'order' with DboSource::expression
+ */
+	public function testOrderWithDbExpressions() {
+		$this->loadFixtures('User');
+
+		$User = new User();
+
+		$results = $User->find('all', array(
+			'fields' => array('id'),
+			'recursive' => -1,
+			'order' => $this->db->expression('CASE id WHEN 4 THEN 0 ELSE id END'),
+		));
+
+		$expected = array(
+			array(
+				'User' => array('id' => 4),
+			),
+			array(
+				'User' => array('id' => 1),
+			),
+			array(
+				'User' => array('id' => 2),
+			),
+			array(
+				'User' => array('id' => 3),
+			),
+		);
+
+		$this->assertEquals($expected, $results);
 	}
 
 /**

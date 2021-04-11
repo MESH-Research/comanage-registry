@@ -254,7 +254,7 @@ class CoNotification extends AppModel {
    * @param  integer Record to retrieve for
    * @return integer Corresponding CO ID, or NULL if record has no corresponding CO ID
    * @throws InvalidArgumentException
-   * @throws RunTimeException
+   * @throws RuntimeException
    */
   
   public function findCoForRecord($id) {
@@ -281,10 +281,11 @@ class CoNotification extends AppModel {
    *
    * @since  COmanage Registry v0.8.4
    * @param  Integer  $coPersonId CO Person ID to obtain notifications for
-   * @return Array    Set of pending notifications
+   * @param  Integer  $max        Maximum number of notifications to obtain, null for all or 0 for a count
+   * @return Mixed    Array of pending notifications, or Integer of count of notifications
    */
   
-  public function pending($coPersonId) {
+  public function pending($coPersonId, $max=null) {
     // We need the groups the person is a member of. There's probably a clever join
     // to pull from co_notifications in one query, put the obvious joins aren't working.
     
@@ -295,6 +296,19 @@ class CoNotification extends AppModel {
     $args['joins'][0]['conditions'][0] = 'RecipientCoGroup.id=CoGroupMember.co_group_id';
     $args['conditions']['RecipientCoGroup.status'] = SuspendableStatusEnum::Active;
     $args['conditions']['CoGroupMember.co_person_id'] = $coPersonId;
+    // Only pull currently valid group memberships
+    $args['conditions']['AND'][] = array(
+      'OR' => array(
+        'CoGroupMember.valid_from IS NULL',
+        'CoGroupMember.valid_from < ' => date('Y-m-d H:i:s', time())
+      )
+    );
+    $args['conditions']['AND'][] = array(
+      'OR' => array(
+        'CoGroupMember.valid_through IS NULL',
+        'CoGroupMember.valid_through > ' => date('Y-m-d H:i:s', time())
+      )
+    );
     $args['contain'] = false;
     
     $groups = $this->RecipientCoGroup->find('list', $args);
@@ -307,9 +321,16 @@ class CoNotification extends AppModel {
     $args['conditions']['CoNotification.status'] = array(NotificationStatusEnum::PendingAcknowledgment,
                                                          NotificationStatusEnum::PendingResolution);
     $args['order']['CoNotification.created'] = 'desc';
+    if($max > 0) {
+      $args['limit'] = $max;
+    }
     $args['contain'] = false;
     
-    return $this->find('all', $args);
+    if($max === 0) {
+      return $this->find('count', $args);
+    } else {
+      return $this->find('all', $args);
+    }
   }
   
   /**
@@ -564,10 +585,23 @@ class CoNotification extends AppModel {
       $args['contain'] = array(
         'CoGroupMember' => array(
           // We only want group members, not owners
-          'conditions' => array('CoGroupMember.member' => true),
+          'conditions' => array(
+            'CoGroupMember.member' => true,
+            'AND' => array(
+              array('OR' => array(
+                'CoGroupMember.valid_from IS NULL',
+                'CoGroupMember.valid_from < ' => date('Y-m-d H:i:s', time())
+              )),
+              array('OR' => array(
+                'CoGroupMember.valid_through IS NULL',
+                'CoGroupMember.valid_through > ' => date('Y-m-d H:i:s', time())
+              ))
+            )
+          ),
           'CoPerson' => array(
-            // We only want active people
-            'conditions' => array('CoPerson.status' => StatusEnum::Active),
+            // We only want active people BUT this condition seems to get overwritten
+            // in ChangelogBehavior (beforeFind - modifyContain) and is therefore not applied
+            // 'conditions' => array('CoPerson.status' => StatusEnum::Active),
             'EmailAddress'
           )
         )
@@ -577,7 +611,8 @@ class CoNotification extends AppModel {
       
       if(!empty($gr['CoGroupMember'])) {
         foreach($gr['CoGroupMember'] as $gm) {
-          if(!empty($gm['CoPerson'])) {
+          if(!empty($gm['CoPerson']) 
+            && $gm['CoPerson']['status'] == StatusEnum::Active) {
             // Move EmailAddress up a level, as for 'coperson'
             $recipients[] = array(
               'RecipientCoPerson' => $gm['CoPerson'],
@@ -683,6 +718,12 @@ class CoNotification extends AppModel {
       // Make sure we don't lose it
       $notificationId = $this->id;
       
+      $args = array();
+      $args['conditions']['ActorCoPerson.id'] = $actorCoPersonId;
+      $args['contain'][] = 'PrimaryName';
+      
+      $actor = $this->ActorCoPerson->find('first', $args);
+      
       foreach($recipients as $recipient) {
         $toaddr = null;
         
@@ -707,7 +748,7 @@ class CoNotification extends AppModel {
                              $coName,
                              $comment,
                              $sourceurl,
-                             null,
+                             !empty($actor['PrimaryName']) ? generateCn($actor['PrimaryName']) : "(?)",
                              $fromAddress,
                              false,
                              $cc,

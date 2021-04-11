@@ -45,6 +45,8 @@ class CoEnrollmentFlowsController extends StandardController {
   public $uses = array('CoEnrollmentFlow', 'CmpEnrollmentConfiguration');
   
   public $edit_contains = array(
+    'CoEnrollmentAuthenticator',
+    'CoEnrollmentCluster',
     'CoEnrollmentFlowAuthzCoGroup',
     'CoEnrollmentFlowAuthzCou',
     'CoEnrollmentSource'
@@ -68,7 +70,7 @@ class CoEnrollmentFlowsController extends StandardController {
       $this->Flash->set(_txt('rs.ef.defaults'), array('key' => 'success'));
     }
     catch(Exception $e) {
-      $this->Flash->set($e->getMessage(), array('key' => 'error'));
+      $this->Flash->set(_txt($e->getMessage()), array('key' => 'error'));
     }
     
     // redirect back to index page
@@ -102,17 +104,6 @@ class CoEnrollmentFlowsController extends StandardController {
         $this->set('vv_attributes_from_env', true);
       }
       
-      if(!$pool) {
-        // Pull the set of available pipelines. This is only possible for unpooled.
-        $args = array();
-        $args['conditions']['CoPipeline.status'] = SuspendableStatusEnum::Active;
-        $args['conditions']['CoPipeline.co_id'] = $this->cur_co['Co']['id'];
-        $args['fields'] = array('CoPipeline.id', 'CoPipeline.name');
-        $args['contain'] = false;
-        
-        $this->set('vv_co_pipelines', $this->CoEnrollmentFlow->CoPipeline->find('list', $args));
-      }
-      
       // Provide a list of org identity sources
       $args = array();
       $args['conditions']['OrgIdentitySource.co_id'] = $this->cur_co['Co']['id'];
@@ -131,13 +122,13 @@ class CoEnrollmentFlowsController extends StandardController {
         MessageTemplateEnum::EnrollmentVerification
       );
       $args['fields'] = array(
-        'CoEnrollmentFlowApprovalMessageTemplate.id',
-        'CoEnrollmentFlowApprovalMessageTemplate.description',
-        'CoEnrollmentFlowApprovalMessageTemplate.context'
+        'CoEnrollmentFlowAppMessageTemplate.id',
+        'CoEnrollmentFlowAppMessageTemplate.description',
+        'CoEnrollmentFlowAppMessageTemplate.context'
       );
       
       $this->set('vv_message_templates',
-                 $this->CoEnrollmentFlow->CoEnrollmentFlowApprovalMessageTemplate->find('list', $args));
+                 $this->CoEnrollmentFlow->CoEnrollmentFlowAppMessageTemplate->find('list', $args));
       
       // Pull the set of available themes
       $args = array();
@@ -145,6 +136,22 @@ class CoEnrollmentFlowsController extends StandardController {
       $args['order'] = array('CoTheme.name ASC');
       
       $this->set('vv_co_themes', $this->CoEnrollmentFlow->Co->CoTheme->find("list", $args));
+      
+      // Pull the set of available authenticators
+      $args = array();
+      $args['conditions']['Authenticator.co_id'] = $this->cur_co['Co']['id'];
+      $args['conditions']['Authenticator.status'] = SuspendableStatusEnum::Active;
+      $args['contain'] = false;
+      
+      $this->set('vv_authenticators', $this->CoEnrollmentFlow->Co->Authenticator->find('list', $args));
+      
+      // Pull the set of available clusters
+      $args = array();
+      $args['conditions']['Cluster.co_id'] = $this->cur_co['Co']['id'];
+      $args['conditions']['Cluster.status'] = SuspendableStatusEnum::Active;
+      $args['contain'] = false;
+      
+      $this->set('vv_clusters', $this->CoEnrollmentFlow->Co->Cluster->find('list', $args));
     }
     
     parent::beforeRender();
@@ -248,6 +255,7 @@ class CoEnrollmentFlowsController extends StandardController {
     // Any logged in person can get to this page, however which enrollment flows they
     // see will be determined dynamically.
     $p['select'] = $roles['user'];
+    $p['search'] = $roles['user'];
     
     // View an existing CO Enrollment Flow?
     $p['view'] = ($roles['cmadmin'] || $roles['coadmin']);
@@ -305,15 +313,20 @@ class CoEnrollmentFlowsController extends StandardController {
     // Set page title
     $this->set('title_for_layout', _txt('ct.co_enrollment_flows.pl'));
     
+    // Check if we have been redirected by search
+    $enrollmentFlowName = isset($this->request->params['named']['search.eofName']) ? strtolower($this->request->params['named']['search.eofName']) : "";
     // Start with a list of enrollment flows
+    // Use server side pagination
+    $this->paginate['conditions'] = array();
+    $this->paginate['conditions']['CoEnrollmentFlow.co_id'] = $this->cur_co['Co']['id'];
+    $this->paginate['conditions']['CoEnrollmentFlow.status'] = TemplateableStatusEnum::Active;
+    if($enrollmentFlowName != ""){
+      $this->paginate['conditions']['LOWER(CoEnrollmentFlow.name) LIKE'] = "%{$enrollmentFlowName}%";
+    }
+    $this->paginate['contain'] = false;
     
-    $args = array();
-    $args['conditions']['CoEnrollmentFlow.co_id'] = $this->cur_co['Co']['id'];
-    $args['conditions']['CoEnrollmentFlow.status'] = EnrollmentFlowStatusEnum::Active;
-    $args['order']['CoEnrollmentFlow.name'] = 'asc';
-    $args['contain'][] = false;
-    
-    $flows = $this->CoEnrollmentFlow->find('all', $args);
+    $this->Paginator->settings = $this->paginate;
+    $flows =  $this->Paginator->paginate('CoEnrollmentFlow');
     
     // Walk through the list of flows and see which ones this user is authorized to run
     
@@ -333,5 +346,29 @@ class CoEnrollmentFlowsController extends StandardController {
     }
     
     $this->set('co_enrollment_flows', $authedFlows);
+  }
+
+
+    /**
+   * Insert search parameters into URL for index.
+   * - postcondition: Redirect generated
+   *
+   * @since  COmanage Registry v3.3
+   */
+  
+  public function search() {
+    $url['action'] = 'select';
+    
+    // build a URL will all the search elements in it
+    // the resulting URL will be
+    // example.com/registry/co_people/select/co:2?search.givenName:albert/search.familyName:einstein
+    foreach($this->data['search'] as $field=>$value){
+      if(!empty($value)) {
+        $url['search.'.$field] = trim($value);
+      }
+    }
+    $url['co'] = $this->cur_co['Co']['id'];
+    // redirect the user to the url
+    $this->redirect($url, null, true);
   }
 }

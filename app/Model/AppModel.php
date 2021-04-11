@@ -98,22 +98,107 @@ class AppModel extends Model {
    */
   
   public function beforeDelete($cascade = true) {
+    // We need to do a lot of manual work because our data model relations are
+    // way more complex than Cake assumes, including dynamic relations created
+    // by plugins.
+    
+    // Cascading deletes are also complicated by Cake not really ordering for
+    // deep associations, so we might delete a parent model before we've deleted
+    // objects that point into the parent model. For example, a number of models
+    // point into CoGroup, but if we try to delete CoGroup first we'll fail since
+    // the foreign keys still exist. (Cake assumes developers don't bother with
+    // foreign keys in the database, relying on the framework to maintain
+    // associations.) To some degree, this is primarily only an issue when
+    // deleting a CO, since otherwise ChangelogBehavior will generally maintain
+    // referential integrity.
+    
+    // Since we also need to dynamically update plugin relations, while we're here
+    // if (1) Changelog "expunge" is true OR Changelog is not enabled, and
+    //    (2) this model hasMany where dependent=false,
+    // then we'll update the hasMany model foreign keys back to this model to NULL.
+    
+    $hardDelete = false;
+    
+    $changelogConfig = $this->Behaviors->__get('Changelog');
+    
+    if(!isset($changelogConfig->settings[$this->name])
+       || (isset($changelogConfig->settings[$this->name]['expunge'])
+           && $changelogConfig->settings[$this->name]['expunge'])) {
+// CO-1998
+// This has apparently been broken for a really long time, possibly as long as
+// 0.9.4 (when AppModel::delete was introduced). For compatibility, then, we no
+// longer treat expunge as hardDelete, though maybe at some point we want to
+// restore the original behavior.
+//      $hardDelete = true;
+    }
+    
     if($cascade) {
       // Load any plugins and figure out which (if any) have foreign keys to belongTo this model
       
       foreach(App::objects('plugin') as $p) {
         $pluginModel = ClassRegistry::init($p . "." . $p);
         
+        // Check if the plugin has explicitly listed relationships
         if(!empty($pluginModel->cmPluginHasMany)
            && !empty($pluginModel->cmPluginHasMany[ $this->name ])) {
-          foreach($pluginModel->cmPluginHasMany[ $this->name ] as $fkModel) {
+          foreach($pluginModel->cmPluginHasMany[ $this->name ] as $fkModel => $acfg) {
             $assoc = array();
-            $assoc['hasMany'][ $fkModel ] = array(
-              'className' => $fkModel,
-              'dependent' => true
-            );
+            
+            if(is_array($acfg)) {
+              // Use the plugin's association settings
+              $assoc['hasMany'][ $fkModel ] = $acfg;
+              
+              if($this->id
+                 && $hardDelete 
+                 && (!isset($acfg['dependent']) || !$acfg['dependent'])) {
+                // Clear foreign keys pointing to the current record. We use
+                // updateAll since it won't run callbacks.
+                $updateModel = ClassRegistry::init($p . "." . $acfg['className']);
+                
+                $field = $acfg['className'].".".$acfg['foreignKey'];
+                
+                $updateModel->updateAll(
+                  array($field => null),
+                  array($field => $this->id)
+                );
+              }
+            } else {
+              // The model is actually $acfg because of the way PHP handles
+              // singletons in an array (ie: 0 => CoAnnouncementChannel)
+              
+              // Default association settings
+              $assoc['hasMany'][ $acfg ] = array(
+                'className' => $acfg,
+                'dependent' => true
+              );
+            }
             
             $this->bindModel($assoc, false);
+          }
+        }
+        
+        // Check if this model has an automatic relationship with plugins
+        // XXX Possibly for v4.0.0, we should do this bind in initialize()
+        // for all operations
+        
+        if(!empty($this->hasManyPlugins)) {
+          foreach($this->hasManyPlugins as $ptype => $pcfg) {
+            if($pluginModel->isPlugin($ptype)) {
+              // For some plugin types, the core model isn't something like
+              // "FooPlugin" but instead "CoFooPlugin". We ultimately need to
+              // delete that core model instead.
+              
+              $corem = sprintf($pcfg['coreModelFormat'], $p);
+              
+              // Plugin is a type of interest
+              $assoc = array();
+              $assoc['hasMany'][ $corem ] = array(
+                'className' => $p . "." . $corem,
+                'dependent' => true
+              );
+              
+              $this->bindModel($assoc, false);
+            }
           }
         }
       }
@@ -178,6 +263,12 @@ class AppModel extends Model {
           // Chop off _co_person_id
           $afield = substr($attr, 0, strlen($attr)-13);
           $amodel = "CoPerson";
+        } elseif(preg_match('/.*_co_group_id$/', $attr)) {
+          // This is a foreign key to a CO Group (eg: admins_co_group)
+
+          // Chop off _co_group_id
+          $afield = substr($attr, 0, strlen($attr)-12);
+          $amodel = "CoGroup";
         } else {
           // Chop off _id
           $afield = substr($attr, 0, strlen($attr)-3);
@@ -474,6 +565,7 @@ class AppModel extends Model {
    * @param  String  $identifierType Type of candidate identifier or email address
    * @param  Integer $coId           CO ID
    * @param  Boolean $emailUnique    If true, email addresses must be unique within the CO
+   * @param  String  $objectModel    Model this Identifier is linked to (eg: CoPerson, CoGroup)
    * @return Boolean True if identifier or email address is not in use
    * @throws InvalidArgumentException If $identifier is not of the correct format
    * @throws OverflowException If $identifier is already in use
@@ -481,7 +573,7 @@ class AppModel extends Model {
    * @todo   Since this only currently supports EmailAddress and Identifer, this could go in an intermediate model instead
    */
   
-  public function checkAvailability($identifier, $identifierType, $coId, $emailUnique=false) {
+  public function checkAvailability($identifier, $identifierType, $coId, $emailUnique=false, $objectModel='CoPerson') {
     $mname = $this->name;
     // Currently we support Identifier and EmailAddress
     $mattr = ($this->name == 'Identifier' ? 'identifier' : 'mail');
@@ -495,16 +587,16 @@ class AppModel extends Model {
     
     if($mname != 'EmailAddress' || $emailUnique) {
       $args = array();
-      $args['conditions']['CoPerson.co_id'] = $coId;
+      $args['conditions'][$objectModel.'.co_id'] = $coId;
       $args['conditions'][$mname.'.'.$mattr] = $identifier;
       if($mname == 'Identifier') {
         // For email address, uniqueness is regardless of type
         $args['conditions'][$mname.'.type'] = $identifierType;
       }
-      $args['joins'][0]['table'] = 'co_people';
-      $args['joins'][0]['alias'] = 'CoPerson';
+      $args['joins'][0]['table'] = Inflector::tableize($objectModel);
+      $args['joins'][0]['alias'] = $objectModel;
       $args['joins'][0]['type'] = 'INNER';
-      $args['joins'][0]['conditions'][0] = 'CoPerson.id='.$mname.'.co_person_id';
+      $args['joins'][0]['conditions'][0] = $objectModel.'.id='.$mname.'.'.Inflector::underscore($objectModel).'_id';
       $args['contain'] = false;
       
       $r = $this->findForUpdate($args['conditions'],
@@ -728,7 +820,7 @@ class AppModel extends Model {
    * @param  integer Record to retrieve for
    * @return integer Corresponding CO ID, or NULL if record has no corresponding CO ID
    * @throws InvalidArgumentException
-   * @throws RunTimeException
+   * @throws RuntimeException
    */
   
   public function findCoForRecord($id) {
@@ -754,6 +846,9 @@ class AppModel extends Model {
       $args['contain'][] = 'CoPerson';
       if(isset($this->validate['org_identity_id'])) {
         // This is an MVPA
+        if(isset($this->belongsTo['CoDepartment'])) {
+          $args['contain'][] = 'CoDepartment';
+        }
         $args['contain'][] = 'OrgIdentity';
       }
       
@@ -763,10 +858,14 @@ class AppModel extends Model {
         return $cop['CoPerson']['co_id'];
       }
       
-      // Is this an MVPA where this is an org identity?
+      // Is this an MVPA where this is an org identity or CO department?
       
       if(!empty($cop['OrgIdentity']['co_id'])) {
         return $cop['OrgIdentity']['co_id'];
+      }
+      
+      if(!empty($cop['CoDepartment']['co_id'])) {
+        return $cop['CoDepartment']['co_id'];
       }
       
       // If this is an MVPA, don't fail on no CO ID since that may not be the current configuration
@@ -783,10 +882,25 @@ class AppModel extends Model {
       $args['contain'][] = 'CoPersonRole';
       if(isset($this->validate['org_identity_id'])) {
         // This is an MVPA
+        if(isset($this->belongsTo['CoDepartment'])) {
+          $args['contain'][] = 'CoDepartment';
+        }
         $args['contain'][] = 'OrgIdentity';
       }
       
       $copr = $this->find('first', $args);
+      
+      // Is this an MVPA where this is an org identity or CO department?
+      
+      if(!empty($copr['OrgIdentity']['co_id'])) {
+        return $copr['OrgIdentity']['co_id'];
+      }
+      
+      if(!empty($copr['CoDepartment']['co_id'])) {
+        return $copr['CoDepartment']['co_id'];
+      }
+      
+      // Else lookup the CO Person
       
       if(!empty($copr['CoPersonRole']['co_person_id'])) {
         $args = array();
@@ -798,12 +912,6 @@ class AppModel extends Model {
         if(!empty($cop['CoPerson']['co_id'])) {
           return $cop['CoPerson']['co_id'];
         }
-      }
-      
-      // Is this an MVPA where this is an org identity?
-      
-      if(!empty($copr['OrgIdentity']['co_id'])) {
-        return $copr['OrgIdentity']['co_id'];
       }
       
       // If this is an MVPA, don't fail on no CO ID since that may not be the current configuration
@@ -837,6 +945,18 @@ class AppModel extends Model {
       if(!empty($copt['CoProvisioningTarget']['co_id'])) {
         return $copt['CoProvisioningTarget']['co_id'];
       }
+    } elseif(isset($this->validate['data_filter_id'])) {
+      // Data Filter plugins will refer to a Data Filter
+      
+      $args = array();
+      $args['conditions'][$this->alias.'.id'] = $id;
+      $args['contain'][] = 'DataFilter';
+    
+      $df = $this->find('first', $args);
+      
+      if(!empty($df['DataFilter']['co_id'])) {
+        return $df['DataFilter']['co_id'];
+      }
     } elseif(isset($this->validate['org_identity_source_id'])) {
       // Org Identity Source plugins will refer to an org identity source
       
@@ -848,6 +968,18 @@ class AppModel extends Model {
       
       if(!empty($copt['OrgIdentitySource']['co_id'])) {
         return $copt['OrgIdentitySource']['co_id'];
+      }
+    } elseif(isset($this->validate['server_id'])) {
+      // Typed Servers will refer to a parent server
+      
+      $args = array();
+      $args['conditions'][$this->alias.'.id'] = $id;
+      $args['contain'][] = 'Server';
+    
+      $srvr = $this->find('first', $args);
+      
+      if(!empty($srvr['Server']['co_id'])) {
+        return $srvr['Server']['co_id'];
       }
     } elseif(preg_match('/Co[0-9]+PersonExtendedAttribute/', $this->alias)) {
       // Extended attributes need to be handled specially, as usual, since there
@@ -969,6 +1101,72 @@ class AppModel extends Model {
   }
   
   /**
+   * Determine the current status of the provisioning targets for this CO Person.
+   *
+   * @since  COmanage Registry v3.1.0
+   * @param  Integer Model ID
+   * @return Array Current status of provisioning targets
+   * @throws RuntimeException
+   */
+  
+  public function provisioningStatus($id) {
+    // First, obtain the list of active provisioning targets for this record's CO.
+    
+    $args = array();
+    $args['joins'][0]['table'] = Inflector::tableize($this->name);
+    $args['joins'][0]['alias'] = $this->name;
+    $args['joins'][0]['type'] = 'INNER';
+    $args['joins'][0]['conditions'][0] = $this->name.'.co_id=CoProvisioningTarget.co_id';
+    $args['conditions'][$this->name.'.id'] = $id;
+    $args['conditions']['CoProvisioningTarget.status !='] = ProvisionerStatusEnum::Disabled;
+    $args['contain'] = false;
+    
+    $targets = $this->Co->CoProvisioningTarget->find('all', $args);
+    
+    if(!empty($targets)) {
+      // Next, for each target ask the relevant plugin for the status for this person.
+      
+      // We may end up querying the same Plugin more than once, so maintain a cache.
+      $plugins = array();
+      
+      for($i = 0;$i < count($targets);$i++) {
+        $pluginModelName = $targets[$i]['CoProvisioningTarget']['plugin']
+                         . ".Co" . $targets[$i]['CoProvisioningTarget']['plugin'] . "Target";
+        
+        if(!isset($plugins[ $pluginModelName ])) {
+          try {
+            $plugins[ $pluginModelName ] = ClassRegistry::init($pluginModelName, true);
+          }
+          catch(Exception $e) {
+            $targets[$i]['status'] = array(
+              'status'    => ProvisioningStatusEnum::Unknown,
+              'timestamp' => null,
+              'comment'   => _txt('er.plugin.fail', array($targets[$i]['CoProvisioningTarget']['plugin']))
+            );
+            
+            continue;
+          }
+        }
+        
+        try {
+          $targets[$i]['status'] = $plugins[ $pluginModelName ]->status($targets[$i]['CoProvisioningTarget']['id'],
+                                                                        $this,
+                                                                        $id);
+        }
+        catch(Exception $e) {
+          $targets[$i]['status'] = array(
+            'status'    => ProvisioningStatusEnum::Unknown,
+            'timestamp' => null,
+            'comment'   => $e->getMessage()
+          );
+        }
+      }
+    }
+    
+    return $targets;
+  }
+  
+  /**
    * Recursively reload a behavior for a model and it's dependent=true related models.
    *
    * @since  COmanage Registry v0.9.4
@@ -991,6 +1189,21 @@ class AppModel extends Model {
       }
     }
   }
+  
+  /**
+   * Perform a keyword search.
+   *
+   * @since  COmanage Registry v3.1.0
+   * @param  Integer $coId CO ID to constrain search to
+   * @param  String  $q    String to search for
+   * @return Array Array of search results, as from find('all)
+   * @todo   OrgIdentitySourceBackend.php defines a different search() for OIS backends. Reconcile this.
+  
+  public function search($coId, $q) {
+    // This should be overridden by models that support it.
+    
+    throw new RuntimeException(_txt('er.notimpl'));
+  }*/
   
   /**
    * Set the current timezone for use within the model.
@@ -1017,18 +1230,18 @@ class AppModel extends Model {
    */
   
   public function typeInUse($attribute, $attributeType, $coId) {
+    // TODO: Implement a more generic approach in the construction of the queries
     $args = array();
-    $args['conditions']['CoPerson.co_id'] = $coId;
     $args['conditions'][$attribute] = $attributeType;
     $args['contain'] = false;
     
-    // Is this model attached to CO Person or CO Person Role?
-    if(!empty($this->validate['co_person_id'])) {
+    if(array_key_exists('co_person_id', $this->getColumnTypes())) {             // This model attached to CO Person
       $args['joins'][0]['table'] = 'co_people';
       $args['joins'][0]['alias'] = 'CoPerson';
       $args['joins'][0]['type'] = 'INNER';
       $args['joins'][0]['conditions'][0] = 'CoPerson.id=' . $this->alias . '.co_person_id';
-    } elseif(!empty($this->validate['co_person_role_id'])) {
+      $args['conditions']['CoPerson.co_id'] = $coId;
+    } elseif(array_key_exists('co_person_role_id', $this->getColumnTypes())) {  // This model attached to CO Person Role
       $args['joins'][0]['table'] = 'co_person_roles';
       $args['joins'][0]['alias'] = 'CoPersonRole';
       $args['joins'][0]['type'] = 'INNER';
@@ -1037,6 +1250,9 @@ class AppModel extends Model {
       $args['joins'][1]['alias'] = 'CoPerson';
       $args['joins'][1]['type'] = 'INNER';
       $args['joins'][1]['conditions'][0] = 'CoPersonRole.co_person_id=CoPerson.id';
+      $args['conditions']['CoPerson.co_id'] = $coId;
+    } elseif ($this->alias === 'CoDepartment'){                                 // This attribute is attached to a CO Department
+      $args['conditions'][$this->alias . '.co_id'] = $coId;
     } else {
       throw new RuntimeException(_txt('er.notimpl'));
     }
@@ -1204,6 +1420,11 @@ class AppModel extends Model {
       }
     }
     
+    // We require at least one non-whitespace character (CO-1551)
+    if(!preg_match('/\S/', $v)) {
+      return _txt('er.input.blank');
+    }
+        
     return true;
   }
   
@@ -1279,5 +1500,24 @@ class AppModel extends Model {
     }
     
     return $ret;
+  }
+
+  /**
+   * Validate that at least one of the named fields contains a value.
+   *
+   * @since  COmanage Registry vTODO
+   * @param  string field Name of field within model, as known to $validates
+   * @param  array fields List of field names to match
+   * @return array Array suitable for generating a select via FormHelper
+   */
+  public function validateOneOfMany($field, $fields) {
+    $status = false;
+    foreach($fields as $name) {
+      if(!empty($this->data[$this->alias][$name])) {
+        $status = true;
+        break;
+      }
+    }
+    return $status;
   }
 }

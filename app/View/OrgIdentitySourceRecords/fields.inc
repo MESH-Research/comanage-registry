@@ -113,6 +113,33 @@
           </pre>
         </td>
       </tr>
+      <tr class="line1">
+        <td>
+          <?php print _txt('ct.co_petitions.1'); ?>
+        </td>
+        <td>
+          <?php
+            if(!empty($org_identity_source_records[0]['CoPetition']['id'])) {
+              print $this->Html->link(
+                $org_identity_source_records[0]['CoPetition']['id'],
+                array(
+                  'controller' => 'co_petitions',
+                  'action'     => 'view',
+                  $org_identity_source_records[0]['CoPetition']['id']
+                )
+              );
+            }
+          ?>
+        </td>
+      </tr>
+      <tr class="line2">
+        <td>
+          <?php print _txt('en.identifier.type', null, IdentifierEnum::Reference); ?>
+        </td>
+        <td>
+          <?php print filter_var($org_identity_source_records[0]['OrgIdentitySourceRecord']['reference_identifier'],FILTER_SANITIZE_SPECIAL_CHARS); ?>
+        </td>
+      </tr>
     </tbody>
   </table>
 </div>

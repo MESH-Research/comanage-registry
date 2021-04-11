@@ -140,8 +140,12 @@ class CoInvite extends AppModel {
         // Mark the email address associated with this invite as verified.
         
         if($confirm) {
-          // We're actually verifying an org identity email address even though we're
-          // getting to the EmailAddress object via CoPerson
+          // For historical reasons, we don't attach the email_address_id to the invite
+          // when we're in a petition context. (That's how we distinguish petition
+          // vs not, above.) This all needs to get rewritten (currently scheduled
+          // for v4.0.0), but in the mean time we have to check both Org Identity
+          // and CO Person attached Email Addresses, since we might have confirmed
+          // either one.
           
           $orgId = null;
           
@@ -151,7 +155,7 @@ class CoInvite extends AppModel {
             // Try to find the org identity associated with this invite
             
             $args = array();
-            $args['conditions']['CoOrgIdentityLink.co_person_id'] = $invite['CoPerson']['co_person_id'];
+            $args['conditions']['CoOrgIdentityLink.co_person_id'] = $invite['CoPerson']['id'];
             $args['conditions']['EmailAddress.mail'] = $invite['CoInvite']['mail'];
             $args['joins'][0]['table'] = 'cm_email_addresses';
             $args['joins'][0]['alias'] = 'EmailAddress';
@@ -167,14 +171,15 @@ class CoInvite extends AppModel {
             }
           }
           
-          if($orgId) {
-            try {
-              $this->CoPerson->EmailAddress->verify($orgId, null, $invite['CoInvite']['mail'], $invite['CoPetition']['enrollee_co_person_id']);
-            }
-            catch(Exception $e) {
-              $dbc->rollback();
-              throw new RuntimeException($e->getMessage());
-            }
+          try {
+            $this->CoPerson->EmailAddress->verify($orgId,
+                                                  $invite['CoPetition']['enrollee_co_person_id'],
+                                                  $invite['CoInvite']['mail'],
+                                                  $invite['CoPetition']['enrollee_co_person_id']);
+          }
+          catch(Exception $e) {
+            $dbc->rollback();
+            throw new RuntimeException($e->getMessage());
           }
         }
         
@@ -320,6 +325,7 @@ class CoInvite extends AppModel {
       $substitutions = array_merge($subs, array(
         'CO_NAME'   => $coName,
         'INVITE_URL' => Router::url(array(
+                                    'plugin'     => null,
                                     'controller' => 'co_invites',
                                     'action'     => 'reply',
                                     $invite['CoInvite']['invitation']

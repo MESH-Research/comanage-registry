@@ -204,6 +204,18 @@
         <?php endforeach; // name ?>
         <tr class="line<?php print $l++ % 2; ?>">
           <td>
+            <?php print _txt('fd.date_of_birth'); ?>
+          </td>
+          <td>
+            <?php
+              if(!empty($vv_org_source_record['OrgIdentity']['date_of_birth'])) {
+                print filter_var($vv_org_source_record['OrgIdentity']['date_of_birth'],FILTER_SANITIZE_SPECIAL_CHARS);
+              }
+            ?>
+          </td>
+        </tr>
+        <tr class="line<?php print $l++ % 2; ?>">
+          <td>
             <?php print _txt('fd.affiliation'); ?>
           </td>
           <td>
@@ -314,6 +326,16 @@
           </td>
         </tr>
         <?php endforeach; // telephone ?>
+        <?php if(!empty($vv_org_source_record['Url'])) foreach($vv_org_source_record['Url'] as $url): ?>
+        <tr class="line<?php print $l++ % 2; ?>">
+          <td>
+            <?php print _txt('fd.url.url') . " (" . $url['type'] . ")"; ?>
+          </td>
+          <td>
+            <?php print $url['url']; ?>
+          </td>
+        </tr>
+        <?php endforeach; // url ?>
         <?php if(!empty($vv_mapped_groups)): ?>
         <tr class="line<?php print $l++ % 2; ?>">
           <td>
@@ -323,13 +345,35 @@
             <ul>
               <?php
                 foreach($vv_mapped_groups as $g) {
-                print "<li>" . filter_var($g['CoGroup']['name'],FILTER_SANITIZE_SPECIAL_CHARS) . "</li>\n";
+                  print "<li>" . filter_var($g['CoGroup']['name'],FILTER_SANITIZE_SPECIAL_CHARS);
+                  if(!empty($g['CoGroupMember']['valid_from']) || !empty($g['CoGroupMember']['valid_through'])) {
+                    print " (" 
+                          . (!empty($g['CoGroupMember']['valid_from']) ? $g['CoGroupMember']['valid_from'] : "")
+                          . " - "
+                          . (!empty($g['CoGroupMember']['valid_through']) ? $g['CoGroupMember']['valid_through'] : "")
+                          . ")";
+                  }
+                  print "</li>\n";
                 }
               ?>
             </ul>
           </td>
         </tr>
         <?php endif; // mapped groups ?>
+        <?php if(!empty($vv_org_source_record['AdHocAttribute'])): ?>
+        <tr class="line<?php print $l++ % 2; ?>">
+          <td>
+            <?php print _txt('ct.ad_hoc_attributes.pl'); ?>
+          </td>
+          <td>
+            <ul>
+              <?php foreach($vv_org_source_record['AdHocAttribute'] as $aha): ?>
+              <li><?php print filter_var($aha['tag'],FILTER_SANITIZE_SPECIAL_CHARS) . ": " . filter_var($aha['value'],FILTER_SANITIZE_SPECIAL_CHARS); ?></li>
+              <?php endforeach; ?>
+            </ul>
+          </td>
+        </tr>
+        <?php endif; // AdHocAttribute ?>
         <tr class="line<?php print $l++ % 2; ?>">
           <td>
             <?php print _txt('fd.ois.record'); ?><br />
@@ -345,6 +389,20 @@
             </pre>
           </td>
         </tr>
+        <?php if($vv_org_identity_source['hash_source_record']): ?>
+        <tr class="line<?php print $l++ % 2; ?>">
+          <td>
+            <?php print _txt('fd.ois.record.hashed'); ?>
+          </td>
+          <td>
+            <?php
+              if(!empty($vv_source_record_hash)) {
+                print $vv_source_record_hash;
+              }
+            ?>
+          </td>
+        </tr>
+        <?php endif; // hash_source_record ?>
       </tbody>
     </table>
   </div>

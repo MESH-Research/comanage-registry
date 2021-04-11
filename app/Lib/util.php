@@ -32,6 +32,9 @@ $group_sep = ":";
 // Default invitation validity, in minutes (used in various places, should probably be moved elsewhere)
 define("DEF_INV_VALIDITY", 1440);
 
+// Default window for reprovisioning on group validity change
+define("DEF_GROUP_SYNC_WINDOW", 1440);
+
 /**
  * Find an attribute within an array, specifically intended for working with
  * Enrollment Flow Attributes.
@@ -102,6 +105,32 @@ function formatAddress($addr) {
   if(!empty($addr['country'])) {
     if($a != "") { $a .= ", "; }
     $a .= $addr['country'];
+  }
+  
+  return $a;
+}
+
+/**
+ * Format an Ad Hoc attribute for rendering.
+ *
+ * @since  COmanage Registry v3.3.0
+ * @param  array  $aha Ad Hoc Attribute
+ * @return string      Formatted string
+ */
+
+function formatAdHoc($aha) {
+  $a = "";
+  
+  if(!empty($aha['tag'])) {
+    $a = $aha['tag'];
+  }
+  
+  $a .= ": ";
+  
+  if(!empty($aha['value'])) {
+    $a .= $aha['value'];
+  } else {
+    $a .= "<i>" . _txt('fd.null') . "</i>";
   }
   
   return $a;
@@ -205,6 +234,37 @@ function generateCn($name, $showHonorific = false) {
 }
 
 /**
+ * Generate a random token, suitable for use as (eg) an API Key.
+ *
+ * @since  COmanage Registry v3.3.0
+ * @param  int    Requested token length, not counting dashes inserted for readability every four characters
+ * @return string Token
+ */
+
+function generateRandomToken($len=16) {
+  // Note we use Security::randomBytes() rather than php random_bytes, which was not added until 7.0
+  // XXX as part of Registry v5, switch to random_bytes()
+  // skip l to avoid confusion with 1
+  $token = substr(preg_replace("/[^a-km-z0-9]+/", "", base64_encode(Security::randomBytes(60))),
+                  0,
+                  $len);
+  
+  // Insert some dashes to improve readability
+  $dtoken = "";
+  
+  for($i = 0;$i < strlen($token);$i++) {
+    $dtoken .= $token[$i];
+    
+    if((($i + 1) % 4 == 0)
+       && ($i + 1 < strlen($token))) {
+      $dtoken .= '-';
+    }
+  }
+  
+  return $dtoken;
+}
+
+/**
  * Obtain the preferred language requested by the browser, if supported.
  *
  * @since  COmanage Registry v0.8.2
@@ -254,6 +314,21 @@ function getPreferredLanguage() {
 }
 
 /**
+ * Maybe append a string, if not null.
+ * 
+ * @param  string $left      Left hand side of string
+ * @param  string $connector Connecting string
+ * @param  string $right     Right hand side of string
+ * @return string            Concatenated string
+ */
+
+function maybeAppend($left, $connector, $right) {
+  return (!empty($left) ? $left : "")
+         . (!empty($left) && !empty($right) ? $connector : "")
+         . (!empty($right) ? $right : "");
+}
+
+/**
  * Process a message template, replacing parameters with respective values.
  * Note this function is for configured templates (ie: those loaded from the
  * database) and not for Cake templates (ie: those loaded from View/Emails).
@@ -300,45 +375,46 @@ function processTemplate($template, $substitutions, $identifiers=array()) {
 }
 
 /**
- * Render menu links for plugin-defined menu items.
+ * Retrieve menu links for plugin-defined menu items.
  * - postcondition: HTML emitted
  *
- * @param HtmlHelper Helper to use to render links
- * @param Array Array of plugins as created by AppController
- * @param String Which menu items to render
- * @param Integer Co Id
+ * @since  COmanage Registry v3.2.0
+ * @param  Array   $plugins Array of plugins as created by AppController
+ * @param  String  $context Which menu items to render
+ * @param  Integer $coId    CO ID
+ * @return Array            Array of menu labels and their URL information
  */
 
-function render_plugin_menus() {
-  // When called from dropMenu element there may be 4 arguments and
-  // when called from secondaryMenu element there may be 3 arguments.
-  $htmlHelper = func_get_arg(0);
-  $plugins = func_get_arg(1);
-  $menu = func_get_arg(2);
-  $coid = null;
-  
-  if(func_num_args() == 4
-     && ($menu == 'coconfig' || $menu == 'copeople')){
-    $coid = func_get_arg(3);
-  }
-  
+function retrieve_plugin_menus($plugins, $menu, $coId=null) {
+  $ret = array();
+ 
   if(!empty($plugins)) {
     foreach(array_keys($plugins) as $plugin) {
       if(isset($plugins[$plugin][$menu])) {
         foreach(array_keys($plugins[$plugin][$menu]) as $label) {
           $args = $plugins[$plugin][$menu][$label];
+          
           if(is_array($args)) {
             $args['plugin'] = Inflector::underscore($plugin);
-            if(!empty($coid)){
-              $args['co'] = $coid;
+            
+            if(!empty($coId)){
+              $args['co'] = $coId;
             }
           }
-          // else probably just a string url
-          print "<li>" . $htmlHelper->link($label, $args) . "</li>\n";
+          
+          // Migrate 'icon' to its own key
+          if(!empty($args['icon'])) {
+            $ret[$label]['icon'] = $args['icon'];
+            unset($args['icon']);
+          }
+          
+          $ret[$label]['url'] = $args;
         }
       }
     }
   }
+  
+  return $ret;
 }
 
 /**

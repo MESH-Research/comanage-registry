@@ -383,6 +383,10 @@ class SqlserverTest extends CakeTestCase {
 		$result = $this->db->fields($this->model, null, 'DISTINCT Car.country_code');
 		$expected = array('DISTINCT [Car].[country_code] AS [Car__country_code]');
 		$this->assertEquals($expected, $result);
+
+		$result = $this->db->fields($this->model, null, 'COUNT(DISTINCT Car.country_code)');
+		$expected = array('COUNT(DISTINCT [Car].[country_code]) AS [Car__country_code]');
+		$this->assertEquals($expected, $result);
 	}
 
 /**
@@ -394,6 +398,13 @@ class SqlserverTest extends CakeTestCase {
 		$this->db->read($this->model, array(
 			'fields' => array('DISTINCT SqlserverTestModel.city', 'SqlserverTestModel.country'),
 			'limit' => 5
+		));
+		$result = $this->db->getLastQuery();
+		$this->assertRegExp('/^SELECT DISTINCT TOP 5/', $result);
+
+		$this->db->read($this->model, array(
+			'fields' => array('DISTINCT SqlserverTestModel.city', 'SqlserverTestModel.country'),
+			'limit' => '5'
 		));
 		$result = $this->db->getLastQuery();
 		$this->assertRegExp('/^SELECT DISTINCT TOP 5/', $result);

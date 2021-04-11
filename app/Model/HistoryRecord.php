@@ -34,6 +34,7 @@ class HistoryRecord extends AppModel {
   
   // Association rules from this model to other models
   public $belongsTo = array(
+    "CoEmailList",
     "CoGroup",
     "CoPerson" => array(
       'className' => 'CoPerson',
@@ -74,6 +75,11 @@ class HistoryRecord extends AppModel {
       'allowEmpty' => true
     ),
     'co_group_id' => array(
+      'rule' => 'numeric',
+      'required' => false,
+      'allowEmpty' => true
+    ),
+    'co_email_list_id' => array(
       'rule' => 'numeric',
       'required' => false,
       'allowEmpty' => true
@@ -140,7 +146,7 @@ class HistoryRecord extends AppModel {
    * @param  integer Record to retrieve for
    * @return integer Corresponding CO ID, or NULL if record has no corresponding CO ID
    * @throws InvalidArgumentException
-   * @throws RunTimeException
+   * @throws RuntimeException
    */
   
   public function findCoForRecord($id) {
@@ -170,15 +176,26 @@ class HistoryRecord extends AppModel {
    * @param  ActionEnum Action
    * @param  String Comment (if not provided, default comment for $action is used)
    * @param  Integer CO Group ID
+   * @param  Integer CO Email List ID
    * @throws RuntimeException
    */
   
-  public function record($coPersonID, $coPersonRoleID, $orgIdentityId, $actorCoPersonID, $action, $comment=null, $coGroupID=null) {
+  public function record($coPersonID,
+                         $coPersonRoleID,
+                         $orgIdentityId,
+                         $actorCoPersonID,
+                         $action,
+                         $comment=null,
+                         $coGroupID=null,
+                         $coEmailListId = null,
+                         $coServiceId = null) {
     $historyData = array();
     $historyData['HistoryRecord']['co_person_id'] = $coPersonID;
     $historyData['HistoryRecord']['co_person_role_id'] = $coPersonRoleID;
     $historyData['HistoryRecord']['org_identity_id'] = $orgIdentityId;
     $historyData['HistoryRecord']['co_group_id'] = $coGroupID;
+    $historyData['HistoryRecord']['co_email_list_id'] = $coEmailListId;
+    $historyData['HistoryRecord']['co_service_id'] = $coServiceId;
     $historyData['HistoryRecord']['actor_co_person_id'] = $actorCoPersonID;
     $historyData['HistoryRecord']['action'] = $action;
     

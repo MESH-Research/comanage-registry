@@ -28,11 +28,15 @@
 
 <script type="text/javascript">
   function js_local_onload() {
-    toggle_attr_def_div();
-    toggle_attr_type_div();
-    toggle_copy_to_coperson_div();
+    initialize_attr_select();
   }
-  
+
+  const available_attributes_nested = <?php print json_encode($vv_available_attributes_nested);?>;
+  const vv_attributes_properties = <?php print json_encode($vv_attributes_properties);?>;
+  var stored_attribute = null;
+  // Ensure that fields are updated once
+  let fields_updated = false;
+
   function enum_for_attr(attrname) {
     // Determine if an attribute has defined enumerations. We use PHP code to
     // generate javascript based on the view variable $vv_enums.
@@ -42,7 +46,7 @@
     switch(attrname) {
     <?php foreach(array_keys($vv_enums) as $k): ?>
       case "<?php print $k; ?>":
-        ret = new Array(<?php print '"' . join('","', array_values(filter_var($vv_enums[$k],FILTER_SANITIZE_SPECIAL_CHARS))) . '"'; ?>);
+        ret = new Array(<?php print '"' . join('","', array_map(function($v) { return filter_var($v, FILTER_SANITIZE_SPECIAL_CHARS); }, array_values($vv_enums[$k]))) . '"'; ?>);
         break;
     <?php endforeach; ?>
     }
@@ -80,12 +84,25 @@
   
   function set_attr_def_value(elementid) {
     // Offset date requires a + prefix
-    document.getElementById('CoEnrollmentAttributeDefault0Value').value =
-      (elementid == "def_date_val_offset" ? "+" : "") +
-      document.getElementById(elementid).value
+    const input_value =
+      (elementid == "def_date_val_offset" ? "+" : "") + document.getElementById(elementid).value;
+
+    // Update Form Input Field
+    document.getElementById('CoEnrollmentAttributeDefault0Value').value = input_value;
+    // Save state
+    const $default = $('div[id^="attr_def_val_"').find(':visible');
+    if($default.length > 0) {
+        if($('#type_fields_div').is(':visible')) {
+            const $selected_option = $('#type_fields_div > select').find(':selected');
+            $selected_option.attr('data-default', input_value);
+        } else {
+            const $selected_option = $('#attr_fields_div > select').find(':selected');
+            $selected_option.attr('data-default', input_value);
+        }
+    }
   }
   
-  function toggle_attr_def_div() {
+  function toggle_attr_def_div(curval) {
     // For now, only CO Person Role attributes (type 'r'), Organizational Identity
     // attributes (type 'o'), or Extended Attributes (type 'x') can have default values.
     
@@ -104,8 +121,9 @@
       $("#attr_def_val_enum_div").hide();
       $("#attr_def_val_group_div").hide();
       $("#attr_def_val_sponsor_div").hide();
-      
-      var curval = document.getElementById('CoEnrollmentAttributeDefault0Value').value;
+
+      // Update the Form input value
+      document.getElementById('CoEnrollmentAttributeDefault0Value').value = curval;
       
       var curattrarr = curattr.split(":");
       var curattrcode = curattrarr[0];
@@ -167,7 +185,9 @@
         document.getElementById('def_group_val').value = curval;
         $("#attr_def_val_group_div").show("fade");
       } else {
-        $("#attr_def_val_div").show();
+        // Set current value before showing
+        document.getElementById('def_val_div').value = curval;
+        $("#attr_def_val_div").show("fade");
       }
     } else {
       $("#attr_def_div").hide("fade", { "direction" : "up" });
@@ -250,15 +270,123 @@
       document.getElementById('CoEnrollmentAttributeCopyToCoperson').checked=false;
     }
   }
+
+  function initialize_attr_select() {
+      trigger_update_fields($('#CoEnrollmentAttributeMdlField'));
+  }
+
+  function trigger_update_fields(element) {
+      let databind = $("option:selected", element).data('bind');
+      let value = $("option:selected", element).attr('value');
+      fields_updated = false;
+
+      if( databind !== null
+          && databind !== ''
+          && $.isPlainObject(databind)) {
+          let binded_select = $(element).closest('div').next().find('select');
+          update_attr_fields(binded_select.attr('id'), databind, value);
+          $(element).closest('div').next().show();
+      } else {
+          if (element.id !== 'CoEnrollmentAttributeTypeField') {
+              $(element).closest('div').next().hide();
+          }
+          // Update the hidden field
+          document.getElementById('CoEnrollmentAttributeAttribute').value = value;
+      }
+
+      // Force run only once. Run while in the deepest level of recursion
+      if(!fields_updated) {
+          if(document.getElementById('CoEnrollmentAttributeRequiredFields') != null) {
+              document.getElementById('CoEnrollmentAttributeRequiredFields').value = '';
+              let default_val = ($("option:selected", element).data('default') == null) ? '' : $("option:selected", element).data('default');
+              toggle_attr_def_div(default_val);
+              toggle_copy_to_coperson_div();
+              toggle_attr_type_div();
+              fields_updated = true;
+          }
+      }
+  }
+
+  function update_attr_fields(select_obj_id, options_object, parent_class) {
+      let select = $('#' + select_obj_id);
+      if(stored_attribute === null) {
+          stored_attribute = document.getElementById('CoEnrollmentAttributeAttribute').value;
+      }
+      let curattr_hmn = $.map(vv_attributes_properties[stored_attribute], function(item) {
+          return item;
+      });
+      // Reset the select list
+      select.empty();
+      $.each(options_object, function (key, data) {
+          append_option(select, key, data, parent_class, curattr_hmn);
+      });
+      select.change();
+  }
+
+  function append_option(parent, value, text, attrMdl, attributesProperty) {
+      let option = $('<option/>');
+      let cur_value = '';
+      option.attr("value", value);
+      option.attr("data-class", attrMdl);
+      if ($.isPlainObject(text)) {
+          option.attr("data-bind", JSON.stringify(text));
+          option.text(value);
+          cur_value = value;
+      } else {
+          option.text(text);
+          cur_value = text;
+      }
+      if ($.inArray(cur_value, attributesProperty) !== -1) {
+          option.attr('selected', 'selected');
+          <?php if(!empty($co_enrollment_attributes[0]['CoEnrollmentAttributeDefault'][0]['value'])): ?>
+          option.attr('data-default', '<?php print filter_var($co_enrollment_attributes[0]['CoEnrollmentAttributeDefault'][0]['value'],FILTER_SANITIZE_SPECIAL_CHARS); ?>');
+          <?php endif; ?>
+      }
+      parent.append(option);
+  }
+
+  $(function() {
+    <?php if($vv_sponsor_mode != SponsorEligibilityEnum::None && !isset($vv_sponsors)): ?>
+    // Sponsor Auto-complete
+    $("#sponsors").autocomplete({
+      source: "<?php print $this->Html->url(array('controller' => 'co_people', 'action' => 'find', 'co' => $cur_co['Co']['id'], 'mode' => PeoplePickerModeEnum::Sponsor)); ?>",
+      minLength: 3,
+      select: function(event, ui) {
+        $("#sponsors").val(ui.item.label);
+        document.getElementById('CoEnrollmentAttributeDefault0Value').value = ui.item.value;
+        return false;
+      }
+    });
+
+    // Used in inline-edit mode for Sponsor (i.e. when sponsor list > 50)
+    $("#cm-ief-button-remove-sponsor_co_person_id").click(function() {
+      reset_sponsor();
+      $(this).closest(".cm-ief-val").hide();
+      $(this).closest(".cm-inline-editable-field").find(".cm-ief-widget").removeClass('hidden');
+      $("#sponsors").focus();
+    });
+    <?php endif; //vv_sponsor_mode ?>
+  });
+
+  <?php if($vv_sponsor_mode !== SponsorEligibilityEnum::None && !isset($vv_sponsors)): ?>
+  function reset_sponsor() {
+    $("#sponsors").val("");
+    document.getElementById('CoEnrollmentAttributeDefault0Value').value = null;
+  }
+  <?php endif; //vv_sponsor_mode ?>
 </script>
 <?php
   // Determine if fields are editable
   $e = false;
-  
-  if(($this->action == "add" && $permissions['add']) || ($this->action == "edit" && $permissions['edit']))
+  $display = '';
+
+  if(($this->action == "add" && $permissions['add']) || ($this->action == "edit" && $permissions['edit'])) {
     $e = true;
-    
-  // We shouldn't get here if we don't have at least read permission, but check just in case
+    $display = 'none';
+  }
+
+
+// We shouldn't get here if we don't have at least read permission, but check just in case
   
   if(!$e && !$permissions['view'])
     return(false);
@@ -302,7 +430,16 @@
     print $this->Form->hidden('CoEnrollmentAttributeDefault.0.id') . "\n";
     print $this->Form->hidden('CoEnrollmentAttributeDefault.0.co_enrollment_attribute_id') . "\n";
   }
-  
+
+  $co_enrollment_attribute_attribute = !empty($co_enrollment_attributes[0]['CoEnrollmentAttribute']['attribute'])
+                                       ? filter_var($co_enrollment_attributes[0]['CoEnrollmentAttribute']['attribute'],FILTER_SANITIZE_SPECIAL_CHARS)
+                                       : '';
+  $co_enrollment_attribute_value = !empty($co_enrollment_attributes[0]['CoEnrollmentAttribute']['value'])
+                                       ? filter_var($co_enrollment_attributes[0]['CoEnrollmentAttribute']['value'],FILTER_SANITIZE_SPECIAL_CHARS)
+                                       : '';
+  print $this->Form->hidden('attribute', array('value' => $co_enrollment_attribute_attribute)) . "\n";
+  print $this->Form->hidden('CoEnrollmentAttributeDefault.0.value', array('value' => filter_var($co_enrollment_attribute_value,FILTER_SANITIZE_SPECIAL_CHARS))) . "\n";
+
   $l = 1;
 ?>
 <div class="table-container">
@@ -335,27 +472,42 @@
           <b><?php print _txt('fd.attribute'); ?></b>
         </td>
         <td>
-          <?php
-          $attrs['value'] = (isset($co_enrollment_attributes)
-            ? $co_enrollment_attributes[0]['CoEnrollmentAttribute']['attribute']
-            : null);
-          $attrs['empty'] = false;
-          $attrs['onchange'] = "document.getElementById('CoEnrollmentAttributeRequiredFields').value='';
-                                      toggle_attr_def_div();toggle_copy_to_coperson_div();toggle_attr_type_div();";
-
-          if($e) {
-            print $this->Form->select('attribute',
-              $vv_available_attributes,
-              $attrs);
-
-            if($this->Form->isFieldError('attribute')) {
-              print $this->Form->error('status');
-            }
-          } else {
-            print filter_var($co_enrollment_attributes[0]['CoEnrollmentAttribute']['attribute'],FILTER_SANITIZE_SPECIAL_CHARS);
-          }
-          ?>
+          <?php if($e): ?>
+            <div id="mdl_fields_div">
+              <?php print _txt('fd.class.attr'); ?>:<br />
+                <select id="CoEnrollmentAttributeMdlField" onchange="trigger_update_fields(this);">
+                <?php
+                  $mdl_options = array_keys($vv_available_attributes_nested);
+                  $currentAttr = $co_enrollment_attributes[0]['CoEnrollmentAttribute']['attribute'];
+                  $attrProps = $vv_attributes_properties[$currentAttr];
+                  foreach($mdl_options as $mdl) {
+                    $selected = ($mdl === $attrProps['attrMdl']) ? 'selected' : '';
+                    print '<option value="' . $mdl . '" '
+                         . $selected
+                         . ' data-bind="' . htmlspecialchars(json_encode($vv_available_attributes_nested[$mdl]), ENT_QUOTES, 'UTF-8') .
+                         '">' . $mdl . '</option>';
+                  }
+                ?>
+                </select>
+            </div>
+            <div id="attr_fields_div">
+              <?php print _txt('fd.name.attr'); ?>:<br />
+              <select id="CoEnrollmentAttributeNameField" onchange="trigger_update_fields(this);"></select>
+            </div>
+            <div id="type_fields_div" style="display: none">
+              <?php print _txt('fd.type.attr'); ?>:<br />
+              <select id="CoEnrollmentAttributeTypeField" onchange="trigger_update_fields(this);"></select>
+            </div>
+          <?php else: ?>
+            <div id="attr_print_div">
+              <?php
+                $attrProps = $vv_attributes_properties[ $co_enrollment_attribute_attribute ];
+                print $attrProps['attrName'] . '(' . implode(', ', array_slice(array_filter($attrProps), '1')) . ')';
+              ?>
+            </div>
+          <?php endif; ?>
           <div id="type_div" style="display: none">
+            <?php print _txt('fd.name.language'); ?>:<br />
             <?php
             global $cm_lang, $cm_texts;
 
@@ -473,6 +625,17 @@
       <?php endif; ?>
       <tr class="line<?php print ($l % 2); $l++; ?>">
         <td>
+          <b><?php print _txt('fd.ea.default_env'); ?></b><br />
+          <span class="descr"><?php print _txt('fd.ea.default_env.desc'); ?></span>
+        </td>
+        <td>
+          <?php print ($e
+            ? $this->Form->input('default_env', array('size' => 40))
+            : filter_var($co_enrollment_attributes[0]['CoEnrollmentAttribute']['default_env'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+        </td>
+      </tr>
+      <tr class="line<?php print ($l % 2); $l++; ?>">
+        <td>
           <b><?php print _txt('fd.ea.order'); ?></b><br />
           <span class="descr"><?php print _txt('fd.ea.order.desc'); ?></span>
         </td>
@@ -483,16 +646,24 @@
         </td>
       </tr>
     </tbody>
-    <tbody id="attr_def_div" style="display: none">
+    <tbody id="attr_def_div" style="display: <?php print $display;?>">
       <tr class="line<?php print ($l % 2); $l++; ?>">
         <td width="50%">
           <b><?php print _txt('fd.ed.default'); ?></b><br />
         </td>
         <td>
           <div id="attr_def_val_div">
-            <?php print ($e
-              ? $this->Form->input('CoEnrollmentAttributeDefault.0.value', array('size' => 40))
-              : filter_var($co_enrollment_attributes[0]['CoEnrollmentAttributeDefault'][0]['value'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+            <?php if($e): ?>
+                <input name="def_val_div"
+                       id="def_val_div"
+                       size="40"
+                       maxlength="80"
+                       type="text"
+                       onchange="set_attr_def_value('def_val_div')"
+                />
+            <?php else: ?>
+              <?php print filter_var($co_enrollment_attributes[0]['CoEnrollmentAttributeDefault'][0]['value'],FILTER_SANITIZE_SPECIAL_CHARS); ?>
+            <?php endif; ?>
           </div>
           <div id="attr_def_val_affil_div">
             <?php if($e): ?>
@@ -513,16 +684,18 @@
               <select name="def_cou_val"
                       id="def_cou_val"
                       onchange="set_attr_def_value('def_cou_val')">
-                <option value=""></option>
-                <?php foreach(array_keys($vv_cous) as $k): ?>
+                <?php if($vv_allow_empty_cou): ?>
+                  <option value=""></option>
+                <?php endif;?>
+                <?php foreach($permissions['cous'] as $k => $value): ?>
                   <option value="<?php print filter_var($k,FILTER_SANITIZE_SPECIAL_CHARS); ?>">
-                    <?php print filter_var($vv_cous[$k],FILTER_SANITIZE_SPECIAL_CHARS); ?>
+                    <?php print filter_var($value,FILTER_SANITIZE_SPECIAL_CHARS); ?>
                   </option>
                 <?php endforeach; ?>
               </select>
             <?php endif; ?>
           </div>
-          <div id="attr_def_val_date_div">
+          <div id="attr_def_val_date_div" class="modelbox-data">
             <?php if($e): ?>
               <input name="def_date_type"
                      id="def_date_fixed"
@@ -595,18 +768,63 @@
             <?php endif; ?>
           </div>
           <div id="attr_def_val_sponsor_div">
-            <?php if($e): ?>
-              <select name="def_sponsor_val"
-                      id="def_sponsor_val"
-                      onchange="set_attr_def_value('def_sponsor_val')">
-                <option value=""></option>
-                <?php foreach(array_keys($vv_sponsors) as $k): ?>
-                  <option value="<?php print filter_var($k,FILTER_SANITIZE_SPECIAL_CHARS); ?>">
-                    <?php print filter_var($vv_sponsors[$k],FILTER_SANITIZE_SPECIAL_CHARS); ?>
-                  </option>
-                <?php endforeach; ?>
-              </select>
-            <?php endif; ?>
+            <?php if($e && $vv_sponsor_mode != SponsorEligibilityEnum::None): ?>
+              <?php if(isset($vv_sponsors)): ?>
+                <!-- Use a simple dropdown -->
+                <select name="def_sponsor_val"
+                        id="def_sponsor_val"
+                        onchange="set_attr_def_value('def_sponsor_val')">
+                  <option value=""></option>
+                  <?php foreach(array_keys($vv_sponsors) as $k): ?>
+                    <option value="<?php print filter_var($k,FILTER_SANITIZE_SPECIAL_CHARS); ?>">
+                      <?php print filter_var($vv_sponsors[$k],FILTER_SANITIZE_SPECIAL_CHARS); ?>
+                    </option>
+                  <?php endforeach; ?>
+                </select>
+              <?php else: // vv_sponsors ?>
+                <!-- Use a people picker -->
+                <div class="cm-inline-editable-field">
+                  <?php
+                    $inlineEditableFields['sponsor-val']['set'] = false;
+
+                    if(!empty($vv_sponsor)) {
+                      $inlineEditableFields['sponsor-val']['set'] = true;
+                      print '<div class="cm-ief-val">';
+
+                      print $this->Html->link(
+                        generateCn($vv_sponsor['PrimaryName']),
+                        array(
+                          'controller' => 'co_people',
+                          'action' => 'canvas',
+                          $vv_sponsor['CoPerson']['id']
+                        )
+                      );
+
+                      print $this->element('inlineEditControls', array(
+                        'fieldName' => 'sponsor_co_person_id',
+                        'actions' => array('remove')
+                      ));
+                      print '</div>';
+                    }
+
+                    $iefClasses = "cm-ief-widget";
+                    if ($inlineEditableFields['sponsor-val']['set']) {
+                      $iefClasses .= " hidden";
+                    }
+                  ?>
+                  <div class="<?php print $iefClasses; ?>">
+                      <div class="ui-widget">
+                        <input id="sponsors" type="text" />
+                        <input type="hidden" name="def_sponsor_val" id="def_sponsor_val" />
+                      </div>
+                      <div class="field-desc">
+                        <span class="ui-icon ui-icon-info co-info"></span>
+                        <em><?php print _txt('fd.sponsor.desc'); ?></em>
+                      </div>
+                    <?php endif; // vv_sponsors ?>
+                </div>
+              <?php endif; ?>
+            </div>
           </div>
         </td>
       </tr>
@@ -643,7 +861,7 @@
         <td>
           <?php
           if($e) {
-            print $this->Form->submit($submit_label, array('onClick' => 'on_submit()'));
+            print $this->Form->submit($submit_label);
           }
           ?>
         </td>

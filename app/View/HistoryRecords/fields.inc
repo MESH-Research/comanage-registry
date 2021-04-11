@@ -140,7 +140,8 @@
               'controller' => 'co_people',
               'action' => 'canvas',
               $history_records[0]['CoPerson']['id']
-            )
+            ),
+            array('target' => '_top')
           );
         }
       ?>
@@ -152,15 +153,15 @@
     </div>
     <div class="field-info">
       <?php
-        if(!empty($history_records[0]['CoPersonRole']['id'])) {
+        if(!empty($history_records[0]['HistoryRecord']['co_person_role_id'])) {
           print $this->Html->link(
-            filter_var($history_records[0]['CoPersonRole']['title'],FILTER_SANITIZE_SPECIAL_CHARS)
-            . " (" . $history_records[0]['CoPersonRole']['id'] . ")",
+            $history_records[0]['HistoryRecord']['co_person_role_id'],
             array(
               'controller' => 'co_person_roles',
               'action' => 'view',
-              $history_records[0]['CoPersonRole']['id']
-            )
+              $history_records[0]['HistoryRecord']['co_person_role_id']
+            ),
+            array('target' => '_top')
           );
         }
       ?>
@@ -179,7 +180,8 @@
               'controller' => 'org_identities',
               'action' => 'view',
               $history_records[0]['OrgIdentity']['id']
-            )
+            ),
+            array('target' => '_top')
           );
         }
       ?>
@@ -198,7 +200,28 @@
               'controller' => 'co_groups',
               'action' => 'view',
               $history_records[0]['CoGroup']['id']
-            )
+            ),
+            array('target' => '_top')
+          );
+        }
+      ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <?php print _txt('ct.co_email_lists.1'); ?>
+    </div>
+    <div class="field-info">
+      <?php
+        if(!empty($history_records[0]['CoEmailList']['id'])) {
+          print $this->Html->link(
+            $history_records[0]['CoEmailList']['name'],
+            array(
+              'controller' => 'co_email_lists',
+              'action' => 'edit',
+              $history_records[0]['CoEmailList']['id']
+            ),
+            array('target' => '_top')
           );
         }
       ?>
@@ -217,7 +240,8 @@
               'controller' => 'co_people',
               'action' => 'view',
               $history_records[0]['ActorCoPerson']['id']
-            )
+            ),
+            array('target' => '_top')
           );
         }
       ?>

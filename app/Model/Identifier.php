@@ -34,8 +34,13 @@ class Identifier extends AppModel {
   
   // Association rules from this model to other models
   public $belongsTo = array(
+    // An identifier may be attached to a CO Department
+    "CoDepartment",
+    "CoGroup",
     // An identifier may be attached to a CO Person
     "CoPerson",
+    // An identifier may be created from a Provisioner
+    "CoProvisioningTarget",
     // An identifier may be attached to an Org Identity
     "OrgIdentity",
     // An identifier created from a Pipeline has a Source Identifier
@@ -82,12 +87,17 @@ class Identifier extends AppModel {
                                                  IdentifierEnum::Enterprise,
                                                  IdentifierEnum::ePPN,
                                                  IdentifierEnum::ePTID,
+                                                 IdentifierEnum::ePUID,
                                                  IdentifierEnum::Mail,
                                                  IdentifierEnum::National,
                                                  IdentifierEnum::Network,
+                                                 IdentifierEnum::OIDCsub,
                                                  IdentifierEnum::OpenID,
                                                  IdentifierEnum::ORCID,
+                                                 IdentifierEnum::ProvisioningTarget,
                                                  IdentifierEnum::Reference,
+                                                 IdentifierEnum::SamlPairwise,
+                                                 IdentifierEnum::SamlSubject,
                                                  IdentifierEnum::SORID,
                                                  IdentifierEnum::UID))),
         'required' => true,
@@ -117,6 +127,34 @@ class Identifier extends AppModel {
       )
     ),
     'org_identity_id' => array(
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true
+      )
+    ),
+    'co_department_id' => array(
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true
+      )
+    ),
+    'co_group_id' => array(
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true
+      )
+    ),
+    'source_identifier_id' => array(
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true
+      )
+    ),
+    'co_provisioning_target_id' => array(
       'content' => array(
         'rule' => 'numeric',
         'required' => false,
@@ -168,22 +206,40 @@ class Identifier extends AppModel {
    * Autoassign identifiers for a CO Person.
    *
    * @since  COmanage Registry v0.6
-   * @param  Integer CO ID
-   * @param  Integer CO Person ID
+   * @param  String  Object Type ("CoDepartment", "CoGroup", "CoPerson")
+   * @param  Integer Object ID
    * @param  Integer Actor CO Person ID
-   * @return Boolean Whether or not to run provisioners on save
+   * @param  Boolean Whether or not to run provisioners on save
    * @return Array Success for each attribute, where the key is the attribute assigned and the value is 1 for success, 2 for already assigned, or an error string
+   * @throws Exception
+   * @throws InvalidArgumentException
+   * @throws OverflowException
    */  
   
-  function assign($coId, $coPersonId, $actorCoPersonId, $provision=true) {
+  function assign($objType, $objId, $actorCoPersonId, $provision=true) {
     $ret = array();
     
-    // First, see if there are any identifiers to autoassign for this CO. This will return the
+    // First, pull the CO ID from the object record
+    $coId = $this->$objType->field('co_id', array($objType.'.id' => $objId));
+    
+    if(!$coId) {
+      throw new InvalidArgumentException(_txt('er.co.fail'));
+    }
+    
+    // Next, see if there are any identifiers to autoassign for this CO. This will return the
     // same thing if the answer is "no" or if the answer is "invalid CO ID".
+    $contexts = array(
+      'CoDepartment' => IdentifierAssignmentContextEnum::CoDepartment,
+      'CoGroup'      => IdentifierAssignmentContextEnum::CoGroup,
+      'CoPerson'     => IdentifierAssignmentContextEnum::CoPerson
+    );
     
     $args = array();
-    $args['conditions']['Co.id'] = $coId;
-    $args['contain'][] = 'Co';
+    $args['conditions']['CoIdentifierAssignment.co_id'] = $coId;
+    $args['conditions']['CoIdentifierAssignment.context'] = $contexts[$objType];
+    $args['conditions']['CoIdentifierAssignment.status'] = SuspendableStatusEnum::Active;
+    $args['order'][] = 'CoIdentifierAssignment.ordr';
+    $args['contain'] = false;
     
     $identifierAssignments = $this->CoPerson->Co->CoIdentifierAssignment->find('all', $args);
     
@@ -195,12 +251,13 @@ class Identifier extends AppModel {
         // Assign will throw an error if an identifier of this type already exists.
         
         try {
-          $this->CoPerson->Co->CoIdentifierAssignment->assign($ia, $coPersonId, $actorCoPersonId, $provision);
+          // We don't provision here, but instead once below after all identifiers are assigned
+          $this->CoPerson->Co->CoIdentifierAssignment->assign($ia, $objType, $objId, $actorCoPersonId, false);
           $ret[ $ia['CoIdentifierAssignment']['identifier_type'] ] = 1;
           $cnt++;
         }
         catch(OverflowException $e) {
-          // An identifier already exists of this type for this CO Person
+          // An identifier already exists of this type for this CO Person/CO Group
           $ret[ $ia['CoIdentifierAssignment']['identifier_type'] ] = 2;
         }
         catch(Exception $e) {
@@ -208,11 +265,17 @@ class Identifier extends AppModel {
         }
       }
       
-      if($cnt > 0 && $provision) {
+      if($cnt > 0 && $provision && $objType != 'CoDepartment') {
         // At least one identifier was assigned, so fire provisioning
+        // Currently, CoDepartments do not support provisioning
         
-        $this->CoPerson->Behaviors->load('Provisioner');
-        $this->CoPerson->manualProvision(null, $coPersonId, null, ProvisioningActionEnum::CoPersonUpdated);
+        $this->$objType->Behaviors->load('Provisioner');
+        
+        if($objType == 'CoGroup') {
+          $this->CoGroup->manualProvision(null, null, $objId, ProvisioningActionEnum::CoGroupUpdated);
+        } else {
+          $this->CoPerson->manualProvision(null, $objId, null, ProvisioningActionEnum::CoPersonUpdated);
+        }
       }
     }
     
@@ -227,16 +290,19 @@ class Identifier extends AppModel {
    * actions taken based on availability are atomic.
    *
    * @since  COmanage Registry v0.6
-   * @param  Integer CO Person ID
+   * @param  String  Object Type ("CoDepartment", "CoGroup", "CoPerson")
+   * @param  Integer Object ID
    * @param  String Type of candidate identifier
    * @return Boolean True if an identifier of the specified type is already assigned, false otherwise
    */
   
-  public function assigned($coPersonID, $identifierType) {
+  public function assigned($objType, $objId, $identifierType) {
+    $fk = Inflector::underscore($objType) . "_id";
+    
     $args = array();
-    $args['conditions']['Identifier.co_person_id'] = $coPersonID;
+    $args['conditions']['Identifier.'.$fk] = $objId;
     $args['conditions']['Identifier.type'] = $identifierType;
-    $args['conditions']['Identifier.status'] = StatusEnum::Active;
+    $args['conditions']['Identifier.status'] = SuspendableStatusEnum::Active;
     
     $r = $this->findForUpdate($args['conditions'], array('identifier'));
     
@@ -252,7 +318,16 @@ class Identifier extends AppModel {
    */
 
   public function beforeSave($options = array()) {
-    if(!empty($this->data['Identifier']['co_person_id'])) {
+    if(isset($options['safeties']) && $options['safeties'] == 'off') {
+      return true;
+    }
+    
+    // We don't allow duplicate identifiers for either CoPerson or CoGroup,
+    // but we (currently) don't enforce duplicate checking for CoDepartment
+    // or OrgIdentity.
+    
+    if(!empty($this->data['Identifier']['co_person_id'])
+       || !empty($this->data['Identifier']['co_group_id'])) {
       // If this is an edit operation, check if the identifier itself is being changed.
       // If not, we don't need to recheck availability.
       
@@ -283,7 +358,9 @@ class Identifier extends AppModel {
       // correct number of nested begin/commit calls when afterSave() fires.
       
       if(!isset($options['skipAvailability']) || !$options['skipAvailability']) {
-        $coId = $this->CoPerson->field('co_id', array('CoPerson.id' => $this->data['Identifier']['co_person_id']));
+        $objectModel = (!empty($this->data['Identifier']['co_group_id']) ? 'CoGroup' : 'CoPerson');
+        
+        $coId = $this->$objectModel->field('co_id', array($objectModel.'.id' => $this->data['Identifier'][Inflector::underscore($objectModel).'_id']));
         
         // Run the internal availability check. This will remain consistent until
         // afterSave, though we can't assert the same for any external services
@@ -292,7 +369,9 @@ class Identifier extends AppModel {
         try {
           $this->checkAvailability($this->data['Identifier']['identifier'],
                                    $this->data['Identifier']['type'],
-                                   $coId);
+                                   $coId,
+                                   false,
+                                   $objectModel);
         }
         catch(Exception $e) {
           // Roll back the transaction and re-throw the exception
@@ -306,5 +385,65 @@ class Identifier extends AppModel {
     // else we currently don't do anything with org identity identifiers
     
     return true;
+  }
+  
+  /**
+   * Obtain the CO ID for a record.
+   *
+   * @since  COmanage Registry v3.3.0
+   * @param  integer Record to retrieve for
+   * @return integer Corresponding CO ID, or NULL if record has no corresponding CO ID
+   * @throws InvalidArgumentException
+   * @throws RuntimeException
+   */
+
+  public function findCoForRecord($id) {
+    // The CO for the Identifier is available in whatever related model is populated
+
+    $args = array();
+    $args['conditions'][$this->alias.'.id'] = $id;
+    $args['contain'] = array(
+      'CoDepartment',
+      'CoGroup',
+      'CoPerson',
+      'OrgIdentity'
+    );
+
+    $identifier = $this->find('first', $args);
+    
+    if(!empty($identifier)) {
+      foreach($args['contain'] as $m) {
+        if(!empty($identifier[$m]['co_id'])) {
+          return $identifier[$m]['co_id'];
+        }
+      }
+    }
+    
+    throw new InvalidArgumentException(_txt('er.notfound', array(_txt('ct.identifiers.1'), $identifier)));
+  }
+  
+  /**
+   * Perform a keyword search.
+   *
+   * @since  COmanage Registry v3.1.0
+   * @param  Integer $coId CO ID to constrain search to
+   * @param  String  $q    String to search for
+   * @return Array Array of search results, as from find('all)
+   */
+  
+  public function search($coId, $q) {
+    $args = array();
+    $args['conditions']['Identifier.identifier'] = $q;
+    $args['conditions']['OR'] = array(
+      'CoPerson.co_id' => $coId,
+      'CoGroup.co_id' => $coId
+    );
+    $args['order'] = array('Identifier.identifier');
+    $args['contain'] = array(
+      'CoGroup',
+      'CoPerson' => 'PrimaryName'
+    );
+    
+    return $this->find('all', $args);
   }
 }

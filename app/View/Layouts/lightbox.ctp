@@ -56,7 +56,7 @@
 
     <!-- Load JavaScript -->
     <?php
-    print $this->Html->script('jquery/jquery-3.2.1.min.js') . "\n    ";
+    print $this->Html->script('jquery/jquery-3.5.1.min.js') . "\n    ";
     print $this->Html->script('jquery/jquery-ui-1.12.1.custom/jquery-ui.min.js') . "\n    ";
     print $this->Html->script('jquery/spin.min.js');
     ?>
@@ -68,7 +68,7 @@
       var tz = jstz.determine();
       // This won't be available for the first delivered page, but after that the
       // server side should see it and process it
-      document.cookie = "cm_registry_tz_auto=" + tz.name() + "; path=/";
+      document.cookie = "cm_registry_tz_auto=" + tz.name() + "; path=/; SameSite=Strict";
     </script>
 
 
@@ -95,8 +95,14 @@
       ?>
   </head>
 
-  <body class="<?php print $this->params->controller . ' ' . $this->params->action ?>"
-        onload="js_onload_call_hooks()">
+  <?php
+    // cleanse the controller and action strings and insert them into the body classes
+    $controller_stripped = preg_replace('/[^a-zA-Z0-9\-_]/', '', $this->params->controller);
+    $action_stripped = preg_replace('/[^a-zA-Z0-9\-_]/', '', $this->params->action);
+    $bodyClasses = $controller_stripped . ' ' .$action_stripped;
+  ?>
+
+  <body class="<?php print $bodyClasses ?>" onload="js_onload_call_hooks()">
 
     <div id="lightboxContent">
       <?php

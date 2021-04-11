@@ -29,7 +29,7 @@
 <script type="text/javascript">
   $(document).ready(function () {
     // Display warning for changes to co people who are not active (CO683)
-    $("input[type='checkbox']").change(function() {
+    $("#co_people input[type='checkbox']").change(function() {
       if(this.parentElement.previousElementSibling.className != 'Active')
         generateFlash("<?php print _txt('in.groupmember.select') ?>",
                       "information");
@@ -41,12 +41,14 @@
   // Add breadcrumbs
   print $this->element("coCrumb");
 
-  $args = array();
-  $args['plugin'] = null;
-  $args['controller'] = 'co_groups';
-  $args['action'] = 'index';
-  $args['co'] = $cur_co['Co']['id'];
-  $this->Html->addCrumb(_txt('ct.co_groups.pl'), $args);
+  if($permissions['index']) {
+    $args = array();
+    $args['plugin'] = null;
+    $args['controller'] = 'co_groups';
+    $args['action'] = 'index';
+    $args['co'] = $cur_co['Co']['id'];
+    $this->Html->addCrumb(_txt('ct.co_groups.pl'), $args);
+  }
   
   $args = array(
     'controller' => 'co_groups',
@@ -63,6 +65,20 @@
 
   print $this->element("pageTitleAndButtons", $params);
 
+?>
+
+<?php // Load the top search bar
+  if(isset($permissions['search']) && $permissions['search'] ) { // Should be true if we're in this view, but we'll check just in case
+    if(!empty($this->plugin)) {
+      $fileLocation = APP . "Plugin/" . $this->plugin . "/View/CoGroupMembers/search.inc";
+      if(file_exists($fileLocation))
+        include($fileLocation);
+    } else {
+      $fileLocation = APP . "View/CoGroupMembers/search.inc";
+      if(file_exists($fileLocation))
+        include($fileLocation);
+    }
+  }
 ?>
 
 <div class="table-container">
@@ -87,15 +103,14 @@
 
     <tbody>
       <?php $i = 0; ?>
-      <?php foreach ($co_people as $p): ?>
+      <?php foreach($co_people as $p): ?>
       <tr class="line<?php print ($i % 2)+1; ?>">
         <td>
           <?php
             print $this->Html->link(generateCn($p['PrimaryName']),
                                     array('controller' => 'co_people',
                                           'action' => 'canvas',
-                                          $p['CoPerson']['id'],
-                                          'co' => $cur_co['Co']['id']));
+                                          $p['CoPerson']['id']));
           ?>
         </td>
         <td class = "<?php print _txt('en.status', null, $p['CoPerson']['status']); ?>">
@@ -105,16 +120,16 @@
         </td>
         <td>
           <?php
-            $isMember = isset($co_group_roles['members'][$p['CoPerson']['id']])
-                        && $co_group_roles['members'][$p['CoPerson']['id']];
-            $isOwner = isset($co_group_roles['owners'][$p['CoPerson']['id']])
-                       && $co_group_roles['owners'][$p['CoPerson']['id']];
+            $isMember = isset($co_group_roles['members'][ $p['CoPerson']['id'] ])
+                        && $co_group_roles['members'][ $p['CoPerson']['id'] ];
+            $isOwner = isset($co_group_roles['owners'][ $p['CoPerson']['id'] ])
+                       && $co_group_roles['owners'][ $p['CoPerson']['id'] ];
             $gmid = null;
 
             if($isMember) {
-              $gmid = $co_group_roles['members'][$p['CoPerson']['id']];
+              $gmid = $co_group_roles['members'][ $p['CoPerson']['id'] ];
             } elseif($isOwner) {
-              $gmid = $co_group_roles['owners'][$p['CoPerson']['id']];
+              $gmid = $co_group_roles['owners'][ $p['CoPerson']['id'] ];
             }
 
             if($gmid) {
@@ -156,3 +171,6 @@
     </tfoot>
   </table>
 </div>
+
+<?php
+  print $this->element("pagination");

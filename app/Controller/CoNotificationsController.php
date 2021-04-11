@@ -156,12 +156,11 @@ class CoNotificationsController extends StandardController {
   public function cancel($id) {
     try {
       $this->CoNotification->cancel($id, $this->Session->read('Auth.User.co_person_id'));
+      $this->Flash->set(_txt('rs.nt.cxld'), array('key' => 'success'));    
     }
     catch(Exception $e) {
       $this->Flash->set($e->getMessage(), array('key' => 'error'));
     }
-    
-    $this->Flash->set(_txt('rs.nt.cxld'), array('key' => 'success'));
     
     // Not really clear where to redirect to
     $this->redirect("/");
@@ -319,6 +318,19 @@ class CoNotificationsController extends StandardController {
       $args['joins'][0]['conditions'][0] = 'RecipientCoGroup.id=CoGroupMember.co_group_id';
       $args['conditions']['CoGroupMember.co_person_id'] = $this->request->params['named']['recipientcopersonid'];
       $args['conditions']['CoGroupMember.member'] = true;
+      // Only pull currently valid group memberships
+      $args['conditions']['AND'][] = array(
+        'OR' => array(
+          'CoGroupMember.valid_from IS NULL',
+          'CoGroupMember.valid_from < ' => date('Y-m-d H:i:s', time())
+        )
+      );
+      $args['conditions']['AND'][] = array(
+        'OR' => array(
+          'CoGroupMember.valid_through IS NULL',
+          'CoGroupMember.valid_through > ' => date('Y-m-d H:i:s', time())
+        )
+      );
       $args['conditions']['RecipientCoGroup.status'] = StatusEnum::Active;
       $args['fields'] = array('RecipientCoGroup.id', 'RecipientCoGroup.id');
       $args['contain'] = false;

@@ -179,7 +179,6 @@ class Sqlite extends DboSource {
 		);
 
 		foreach ($result as $column) {
-			$column = (array)$column;
 			$default = ($column['dflt_value'] === 'NULL') ? null : trim($column['dflt_value'], "'");
 
 			$fields[$column['name']] = array(
@@ -212,7 +211,7 @@ class Sqlite extends DboSource {
  * @param array $fields The fields to update.
  * @param array $values The values to set columns to.
  * @param mixed $conditions array of conditions to use.
- * @return array
+ * @return bool
  */
 	public function update(Model $model, $fields = array(), $values = null, $conditions = null) {
 		if (empty($values) && !empty($fields)) {
@@ -299,7 +298,7 @@ class Sqlite extends DboSource {
 /**
  * Generate ResultSet
  *
- * @param mixed $results The results to modify.
+ * @param PDOStatement $results The results to modify.
  * @return void
  */
 	public function resultSet($results) {

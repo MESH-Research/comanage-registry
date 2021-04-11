@@ -28,14 +28,33 @@
 class ActionEnum
 {
   // Codes beginning with 'X' (eg: 'XABC') are reserved for local use
+  // Codes beginning with a lowercase 'p' (eg: 'pABC') are reserved for plugin use
+  const AuthenticatorDeleted            = 'DAUT';
+  const AuthenticatorEdited             = 'EAUT';
+  const AuthenticatorStatusEdited       = 'EATS';
+  const ClusterAccountAdded             = 'ACAM';
+  const ClusterAccountAutoCreated       = 'ACAA';
+  const ClusterAccountAutoEdited        = 'ECAA';
+  const ClusterAccountDeleted           = 'DCAM';
+  const ClusterAccountEdited            = 'ECAM';
+  const CoEmailListAdded                = 'ACEL';
+  const CoEmailListDeleted              = 'DCEL';
+  const CoEmailListEdited               = 'ECEL';
+  const CoEmailListManuallyProvisioned  = 'PCEM';
+  const CoEmailListProvisioned          = 'PCEA';
   const CoGroupAdded                    = 'ACGR';
   const CoGroupDeleted                  = 'DCGR';
   const CoGroupEdited                   = 'ECGR';
+  const CoGroupManuallyProvisioned      = 'PCGM';
   const CoGroupMemberAdded              = 'ACGM';
   const CoGroupMemberAddedPipeline      = 'ACGL';
   const CoGroupMemberDeleted            = 'DCGM';
   const CoGroupMemberDeletedPipeline    = 'DCGL';
   const CoGroupMemberEdited             = 'ECGM';
+  const CoGroupMemberEditedPipeline     = 'ECGL';
+  const CoGroupMemberValidityTriggered  = 'VCGM';
+  const CoGroupProvisioned              = 'PCGA';
+  const CoPersonAddedBulk               = 'ACPB';
   const CoPersonAddedManual             = 'ACPM';
   const CoPersonAddedPetition           = 'ACPP';
   const CoPersonAddedPipeline           = 'ACPL';
@@ -75,6 +94,8 @@ class ActionEnum
   const InvitationDeclined              = 'INVD';
   const InvitationExpired               = 'INVE';
   const InvitationSent                  = 'INVS';
+  const InvitationViewed                = 'INVV';
+  const MatchAttributesUpdated          = 'UMAT';
   const NameAdded                       = 'ANAM';
   const NameDeleted                     = 'DNAM';
   const NameEdited                      = 'ENAM';
@@ -84,6 +105,7 @@ class ActionEnum
   const NotificationDelivered           = 'NOTD';
   const NotificationParticipantExpunged = 'NOTE';
   const NotificationResolved            = 'NOTR';
+  const OrgIdAddedBulk                  = 'AOIB';
   const OrgIdAddedManual                = 'AOIM';
   const OrgIdAddedPetition              = 'AOIP';
   const OrgIdAddedSource                = 'AOIS';
@@ -96,10 +118,7 @@ class ActionEnum
   const OrgIdRemovedSource              = 'ROIS';
   const ProvisionerAction               = 'PRVA';
   const ProvisionerFailed               = 'PRVX';
-  const SshKeyAdded                     = 'SSHA';
-  const SshKeyDeleted                   = 'SSHD';
-  const SshKeyEdited                    = 'SSHE';
-  const SshKeyUploaded                  = 'SSHU';
+  const ReferenceIdentifierObtained     = 'OIDR';
 }
 
 class AdministratorEnum
@@ -150,6 +169,14 @@ class AuthenticationEventEnum
   const RegistryLogin          = 'IN';
 }
 
+class AuthenticatorStatusEnum
+{
+  const Active                 = 'A';
+  const Expired                = 'XP';
+  const Locked                 = 'L';
+  const NotSet                 = 'NS';
+}
+
 class ComparisonEnum
 {
   const Contains               = 'CTS'; // Substr
@@ -174,6 +201,13 @@ class ContactEnum
   const Postal      = 'postal';
 }
 
+class DataFilterContextEnum
+{
+// Not yet implemented
+//  const OrgIdentitySource  = 'OIS';
+  const ProvisioningTarget = 'PT';
+}
+
 class ElectStrategyEnum {
   const FIFO        = 'FI';
   const Manual      = 'M';
@@ -182,6 +216,7 @@ class ElectStrategyEnum {
 class EmailAddressEnum {
   const Delivery      = 'delivery';
   const Forwarding    = 'forwarding';
+  const MailingList   = 'list';
   const Official      = 'official';
   const Personal      = 'personal';
   const Preferred     = 'preferred';
@@ -207,13 +242,6 @@ class EnrollmentDupeModeEnum
   const NewRoleCouCheck = 'C';
 }
 
-class EnrollmentFlowStatusEnum
-{
-  const Active              = 'A';
-  const Suspended           = 'S';
-  const Template            = 'T';
-}
-
 class EnrollmentMatchPolicyEnum {
   const Advisory  = "A";
   const Automatic = "M";
@@ -225,6 +253,7 @@ class EnrollmentMatchPolicyEnum {
 class EnrollmentOrgIdentityModeEnum {
   const OISAuthenticate   = "OA";
   const OISClaim          = "OC";
+  const OISIdentify       = "OI";
   const OISSearch         = "OS";
   const OISSearchRequired = "SR";
   const OISSelect         = "SL";
@@ -238,23 +267,16 @@ class EnrollmentRole
   const Petitioner = 'P';
 }
 
+class EnrollmentFlowUIMode
+{
+  const Basic = 'B';
+  const Full  = 'F';
+}
+
 class ExtendedAttributeEnum {
   const Integer   = 'INTEGER';
   const Timestamp = 'TIMESTAMP';
   const Varchar32 = 'VARCHAR(32)';
-}
-
-class IdentifierAssignmentEnum
-{
-  const Random     = 'R';
-  const Sequential = 'S';
-}
-
-class IdentifierAssignmentExclusionEnum
-{
-  const Confusing     = 'C';
-  const Offensive     = 'O';
-  const Superstitious = 'S';
 }
 
 // Note CO or COU is determined by co_groups:cou_id
@@ -269,24 +291,51 @@ class GroupEnum
   const NestedMembers = "MN";
 }
 
+class IdentifierAssignmentEnum
+{
+  const Random     = 'R';
+  const Sequential = 'S';
+}
+
+class IdentifierAssignmentContextEnum
+{
+  const CoDepartment = 'CD';
+  const CoGroup      = 'CG';
+  const CoPerson     = 'CP';
+}
+
+class IdentifierAssignmentExclusionEnum
+{
+  const Confusing     = 'C';
+  const Offensive     = 'O';
+  const Superstitious = 'S';
+}
+
 class IdentifierEnum
 {
-  const Badge      = 'badge';
-  const Enterprise = 'enterprise';
-  const ePPN       = 'eppn';
-  const ePTID      = 'eptid';
-  const Mail       = 'mail';
-  const National   = 'national';
-  const Network    = 'network';
-  const OpenID     = 'openid';
-  const ORCID      = 'orcid';
-  const Reference  = 'reference';
-  const SORID      = 'sorid';
-  const UID        = 'uid';
+  const Badge              = 'badge';
+  const Enterprise         = 'enterprise';
+  const ePPN               = 'eppn';
+  const ePTID              = 'eptid';
+  const ePUID              = 'epuid';
+  const GID                = 'gid';
+  const Mail               = 'mail';
+  const National           = 'national';
+  const Network            = 'network';
+  const OIDCsub            = 'oidcsub';
+  const OpenID             = 'openid';
+  const ORCID              = 'orcid';
+  const ProvisioningTarget = 'provisioningtarget';
+  const Reference          = 'reference';
+  const SORID              = 'sorid';
+  const SamlPairwise       = 'pairwiseid';
+  const SamlSubject        = 'subjectid';
+  const UID                = 'uid';
 }
 
 class JobStatusEnum
 {
+  const Canceled   = 'CX';
   const Complete   = 'OK';
   const Failed     = 'X';
   const InProgress = 'GO';
@@ -296,7 +345,9 @@ class JobStatusEnum
 
 class JobTypeEnum
 {
+  // Reserve X* for local plugins/jobs
   const Expiration      = 'EX';
+  const GroupValidity   = 'GV';
   const OrgIdentitySync = 'OS';
 }
 
@@ -377,6 +428,13 @@ class NSFRaceEnum
   const White            = 'W';
 }
 
+class Oauth2GrantEnum
+{
+  const AuthorizationCode = 'AC';
+  const ClientCredentials = 'CC';
+  // We don't currently support Implicit or Password Credentials
+}
+
 class OrgIdentityMismatchEnum
 {
   const CreateNew        = 'N';
@@ -387,6 +445,11 @@ class OrgIdentityStatusEnum
 {
   const Removed          = 'RM';
   const Synced           = 'SY';
+}
+
+class PeoplePickerModeEnum
+{
+  const Sponsor   = 'S';
 }
 
 class PermissionEnum
@@ -422,6 +485,7 @@ class PetitionActionEnum
 {
   const Approved                = 'PY';
   const AttributesUpdated       = 'AU';
+  const ClusterAccountAutoCreated = 'CA';
   const CommentAdded            = 'CM';
   const Created                 = 'PC';
   const Declined                = 'PX';
@@ -432,11 +496,15 @@ class PetitionActionEnum
   const IdentifierAuthenticated = 'ID';
   const IdentifiersAssigned     = 'IA';
   const IdentityLinked          = 'IL';
+  const IdentityNotLinked       = 'IX';
   const IdentityRelinked        = 'IR';
   const InviteConfirmed         = 'IC';
   const InviteSent              = 'IS';
+  const InviteViewed            = 'IV';
   const NotificationSent        = 'NS';
+  const OrgIdentitySourced      = 'OC';
   const StatusUpdated           = 'SU';
+  const StepFailed              = 'SX';
   const TCExplicitAgreement     = 'TE';
   const TCImpliedAgreement      = 'TI';
 }
@@ -460,25 +528,35 @@ class ProvisionerStatusEnum
 {
   const AutomaticMode       = 'A';
   const Disabled            = 'X';
+  const EnrollmentMode      = 'E';
   const ManualMode          = 'M';
 }
 
 // The action for which a plugin may want to act on
 class ProvisioningActionEnum
 {
-  const CoGroupAdded                  = 'GA';
-  const CoGroupDeleted                = 'GD';
-  const CoGroupReprovisionRequested   = 'GR';
-  const CoGroupUpdated                = 'GU';
-  const CoPersonAdded                 = 'PA';
-  const CoPersonDeleted               = 'PD';
-  const CoPersonEnteredGracePeriod    = 'PG';
-  const CoPersonExpired               = 'PX';
-  const CoPersonPetitionProvisioned   = 'PP';  // Triggered after a petition is finalized
-  const CoPersonPipelineProvisioned   = 'PL';  // Triggered after a pipeline is executed
-  const CoPersonReprovisionRequested  = 'PR';
-  const CoPersonUnexpired             = 'PY';
-  const CoPersonUpdated               = 'PU';
+  const AuthenticatorUpdated            = 'AU';
+  const CoEmailListAdded                = 'LA';
+  const CoEmailListDeleted              = 'LD';
+  const CoEmailListReprovisionRequested = 'LR';
+  const CoEmailListUpdated              = 'LU';
+  const CoGroupAdded                    = 'GA';
+  const CoGroupDeleted                  = 'GD';
+  const CoGroupReprovisionRequested     = 'GR';
+  const CoGroupUpdated                  = 'GU';
+  const CoPersonAdded                   = 'PA';
+  const CoPersonDeleted                 = 'PD';
+  const CoPersonEnteredGracePeriod      = 'PG';
+  const CoPersonExpired                 = 'PX';
+  const CoPersonPetitionProvisioned     = 'PP';  // Triggered after a petition is finalized
+  const CoPersonPipelineProvisioned     = 'PL';  // Triggered after a pipeline is executed
+  const CoPersonReprovisionRequested    = 'PR';
+  const CoPersonUnexpired               = 'PY';
+  const CoPersonUpdated                 = 'PU';
+  const CoServiceAdded                  = 'SA';
+  const CoServiceDeleted                = 'SD';
+  const CoServiceReprovisionRequested   = 'SR';
+  const CoServiceUpdated                = 'SU';
 }
 
 // The status of a provisioned target
@@ -511,6 +589,17 @@ class RequiredNameFieldsEnum
   const GivenFamily = "given,family";
 }
 
+class ServerEnum
+{
+  // When adding a new server type, be sure to add it to ServersController::view_contains
+  const HttpServer    = 'HT';
+  const LdapServer    = 'LD';
+  const MatchServer   = 'MT';
+  const Oauth2Server  = 'O2';
+  // Generic SQL Server, not "MS SQL Server"
+  const SqlServer     = 'SQ';
+}
+
 class SponsorEligibilityEnum {
   const CoAdmin       = 'CA';
   const CoGroupMember = 'CG';
@@ -519,13 +608,13 @@ class SponsorEligibilityEnum {
   const None          = 'N';
 }
 
-class SshKeyTypeEnum
+class SqlServerEnum
 {
-  // Protocol v2
-  const DSA         = 'DSA';
-  const RSA         = 'RSA';
-  // Protocol v1
-  const RSA1        = 'RSA1';
+  // Initially we only support Cake-supported types, though that should
+  // probably expand at some point
+  const Mysql     = 'MY';
+  const Postgres  = 'PG';
+  const SqlServer = 'MS';
 }
 
 class StatusEnum
@@ -600,6 +689,10 @@ class SyncActionEnum
 {
   const Add    = 'A';
   const Delete = 'D';
+  // Relink is basically add, but will execute regardless of sync_on_add setting
+  const Relink = 'R';
+  // Unlink is basically delete, but will execute regardless of sync_on_delete setting
+  const Unlink = 'X';
   const Update = 'U';
 }
 
@@ -626,6 +719,41 @@ class TAndCLoginModeEnum
   const DisableAllServices = 'D';
 }
 
+class TemplateableStatusEnum
+{
+  const Active              = 'A';
+  const Suspended           = 'S';
+  const Template            = 'T';
+  
+  public static $from_api = array(
+    'Active'    => TemplateableStatusEnum::Active,
+    'Suspended' => TemplateableStatusEnum::Suspended,
+    'Template'  => TemplateableStatusEnum::Template
+  );
+
+  public static $to_api = array(
+    TemplateableStatusEnum::Active    => 'Active',
+    TemplateableStatusEnum::Suspended => 'Suspended',
+    TemplateableStatusEnum::Template  => 'Template'
+  );
+}
+
+class TrueFalseEnum {
+  const True = 't';
+  const False = 'f';
+}
+
+class UrlEnum {
+  const Official      = 'official';
+  const Personal      = 'personal';
+}
+
+class DepartmentEnum {
+  const VO                  = 'vo';
+  const ResearchInstitute   = 'researchinstitute';
+  const Department          = 'department';
+}
+
 class VerificationModeEnum
 {
   const Automatic = 'A';
@@ -639,6 +767,20 @@ class VisibilityEnum
   const CoGroupMember   = 'CG';
   const CoMember        = 'CP';
   const Unauthenticated = 'P';
+  
+  public static $from_api = array(
+    'CoAdmin'         => VisibilityEnum::CoAdmin,
+    'CoGroupMember'   => VisibilityEnum::CoGroupMember,
+    'CoMember'        => VisibilityEnum::CoMember,
+    'Unauthenticated' => VisibilityEnum::Unauthenticated
+  );
+  
+  public static $to_api = array(
+    VisibilityEnum::CoAdmin         => 'CoAdmin',
+    VisibilityEnum::CoGroupMember   => 'CoGroupMember',
+    VisibilityEnum::CoMember        => 'CoMember',
+    VisibilityEnum::Unauthenticated => 'Unauthenticated'
+  );
 }
 
 // Old style enums below, deprecated
@@ -651,7 +793,6 @@ global $contact_t, $contact_ti;
 global $extattr_t, $extattr_ti;
 global $identifier_t, $identifier_ti;
 global $name_t, $name_ti;
-global $ssh_ti;  // Used for ldap and github provisioner
 global $status_t, $status_ti;
 
 $affil_t = array(
@@ -725,12 +866,6 @@ $name_ti = array(
   'FKA' => 'fka',
   'Official' => 'official',
   'Preferred' => 'preferred'
-);
-
-$ssh_ti = array(
-  'DSA'  => 'ssh-dss',
-  'RSA'  => 'ssh-rsa',
-  'RSA1' => 'ssh-rsa1'
 );
 
 $status_t = array(

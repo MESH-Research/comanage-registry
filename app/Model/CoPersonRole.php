@@ -61,6 +61,7 @@ class CoPersonRole extends AppModel {
   public $hasMany = array(
     // A person can have one or more address
     "Address" => array('dependent' => true),
+    "AdHocAttribute" => array('dependent' => true),
     "CoExpirationCount" => array('dependent' => true),
     "CoPetition" => array(
       'dependent' => true,
@@ -138,6 +139,11 @@ class CoPersonRole extends AppModel {
         'required' => false,
         'allowEmpty' => true
       )
+    ),
+    'ordr' => array(
+      'rule' => 'numeric',
+      'required' => false,
+      'allowEmpty' => true
     ),
     'status' => array(
       'content' => array(
@@ -235,6 +241,10 @@ class CoPersonRole extends AppModel {
    */
   
   public function afterSave($created, $options = array()) {
+    if(isset($options['safeties']) && $options['safeties'] == 'off') {
+      return true;
+    }
+    
     // Manage CO person membership in the COU members group.
     
     // Pass through provision setting in case we're being run via an enrollment flow
@@ -289,6 +299,10 @@ class CoPersonRole extends AppModel {
    */
   
   public function beforeSave($options = array()) {
+    if(isset($options['safeties']) && $options['safeties'] == 'off') {
+      return true;
+    }
+    
     // Cache the current record
     $this->cachedData = null;
     
@@ -342,9 +356,7 @@ class CoPersonRole extends AppModel {
       
       if(!empty($this->data[$this->alias]['valid_through'])) {
         if(strtotime($this->data[$this->alias]['valid_through']) < time()
-           && ($this->data[$this->alias]['status'] == StatusEnum::Active
-               ||
-               $this->data[$this->alias]['status'] == StatusEnum::GracePeriod)) {
+           && ($this->data[$this->alias]['status'] == StatusEnum::Active)) {
           // Flag role as expired
           $this->data[$this->alias]['status'] = StatusEnum::Expired;
         } elseif(strtotime($this->data[$this->alias]['valid_through']) > time()
@@ -477,5 +489,61 @@ class CoPersonRole extends AppModel {
     
     $this->CoPerson->CoGroupMember->syncMembership(GroupEnum::ActiveMembers, $couId, $coPersonId, $activeEligible, $provision);
     $this->CoPerson->CoGroupMember->syncMembership(GroupEnum::AllMembers, $couId, $coPersonId, $allEligible, $provision);
+
+    // Remove group memberships if the COU ID or CO Person ID has changed.
+    if (isset($this->cachedData)) {
+
+      // If the COU has changed, remove memberships for the old COU.
+      if (isset($this->cachedData[$this->alias]['cou_id'])) {
+        $oldCouId = $this->cachedData[$this->alias]['cou_id'];
+        if ($oldCouId !== $couId) {
+          $this->CoPerson->CoGroupMember->syncMembership(GroupEnum::ActiveMembers, $oldCouId, $coPersonId, false, $provision);
+          $this->CoPerson->CoGroupMember->syncMembership(GroupEnum::AllMembers, $oldCouId, $coPersonId, false, $provision);
+        }
+      }
+
+      // If the person has changed, remove memberships for the old person.
+      if (isset($this->cachedData[$this->alias]['co_person_id'])) {
+        $oldCoPersonId = $this->cachedData[$this->alias]['co_person_id'];
+        if ($oldCoPersonId !== $coPersonId) {
+          $this->CoPerson->CoGroupMember->syncMembership(GroupEnum::ActiveMembers, $couId, $oldCoPersonId, false, $provision);
+          $this->CoPerson->CoGroupMember->syncMembership(GroupEnum::AllMembers, $couId, $oldCoPersonId, false, $provision);
+        }
+      }
+    }
+
+  }
+  
+  /**
+   * Perform a keyword search.
+   *
+   * @since  COmanage Registry v3.1.0
+   * @param  Integer $coId CO ID to constrain search to
+   * @param  String  $q    String to search for
+   * @return Array Array of search results, as from find('all)
+   */
+  
+  public function search($coId, $q) {
+    // Tokenize $q on spaces
+    $tokens = explode(" ", $q);
+    
+    $args = array();
+    
+    foreach($tokens as $t) {
+      $args['conditions']['AND'][] = array(
+        // For some reason CoPersonRole.title throws a database error
+        'OR' => array(
+          'LOWER(title) LIKE' => '%' . strtolower($t) . '%',
+          'LOWER(o) LIKE' => '%' . strtolower($t) . '%',
+          'LOWER(ou) LIKE' => '%' . strtolower($t) . '%',
+        )
+      );
+    }
+    
+    $args['conditions']['CoPerson.co_id'] = $coId;
+    $args['order'] = array('CoPersonRole.title');
+    $args['contain']['CoPerson'] = 'PrimaryName';
+    
+    return $this->find('all', $args);
   }
 }

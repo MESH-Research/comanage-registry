@@ -35,8 +35,15 @@ class ChangelogBehavior extends ModelBehavior {
   
   public function afterSave(Model $model, $created, $options = array()) {
     $mname = $model->name;
+    $malias = $model->alias;
     $parentfk = Inflector::underscore($mname) . "_id";
     $dataSource = $model->getDataSource();
+    
+    if(isset($this->settings[$malias]['expunge'])
+       && $this->settings[$malias]['expunge']) {
+      // We're in the middle of an expunge, so don't do anything
+      return true;
+    }
     
     if(!$created
        && !empty($options['fieldList'])
@@ -285,6 +292,12 @@ class ChangelogBehavior extends ModelBehavior {
     $malias = $model->alias;
     $parentfk = Inflector::underscore($mname) . "_id";
     
+    if(isset($this->settings[$malias]['expunge'])
+       && $this->settings[$malias]['expunge']) {
+      // We're in the middle of an expunge, so don't do anything
+      return true;
+    }
+    
     if(!empty($model->data[$malias]['id'])) {
       // Before we do anything, make sure we're operating on the latest version of
       // the record. We don't allow editing of already archived attributes.
@@ -366,7 +379,7 @@ class ChangelogBehavior extends ModelBehavior {
         $origWhitelist = $model->whitelist;
         
         // Reset model state for new save
-        $model->whitelist = null;
+        $model->whitelist = array();
         $model->create();
       
         // Disable callbacks so we don't loop indefinitely. Also disable validation because
@@ -457,8 +470,15 @@ class ChangelogBehavior extends ModelBehavior {
       
       // Set common attributes for add and edit
       $model->data[$malias]['deleted'] = false;
-      // Forcing a read of the CakeSession is sub-optimal, but consistent with what we do elsewhere
-      $model->data[$malias]['actor_identifier'] = CakeSession::read('Auth.User.username');
+      
+      if(session_status() == PHP_SESSION_ACTIVE) {
+        // Forcing a read of the CakeSession is sub-optimal, but consistent with what we do elsewhere
+        $model->data[$malias]['actor_identifier'] = CakeSession::read('Auth.User.username');
+      } else {
+        // We're probably at the command line
+        $user = posix_getpwuid(posix_getuid());
+        $model->data[$malias]['actor_identifier'] = _txt('fd.actor.shell', array($user['name']));
+      }
     }
     
     return true;
@@ -564,9 +584,10 @@ class ChangelogBehavior extends ModelBehavior {
         // eg: $query['contain'] = array('Model1' => array('Model2'));
         // eg: $query['contain'] = array('Model1' => 'Model2');
         // eg: $query['contain'] = array('conditions' => array('Model1.foo =' => 'value'));
-        // eg: $query['contain'] = array('Model1' => array('conditions' => array('Model1.foo' => 'value),
+        // eg: $query['contain'] = array('Model1' => array('conditions' => array('Model1.foo' => 'value'),
         //                                                 'Model2' => array('conditions' => array('Model2.foo' => 'value'))
         // eg: $query['contain'] = array('Model1' => array('Model2' => 'Model3'));
+        // eg: $query['contain'] = array('Model1' => array('order' => 'Model1.field DESC'));
         
         if(is_array($v)) {
           // First handle Model1
@@ -608,6 +629,10 @@ class ChangelogBehavior extends ModelBehavior {
               // Third example, nothing to do but copy (merge) the conditions
               
               $ret[$k]['conditions'] = array_merge($ret[$k]['conditions'], $v2);
+            } elseif((string)$k2 == 'order') {
+              // Sixth example
+              
+              $ret[$k]['order'] = $v2;
             } elseif(is_array($v2)) {
               $ret[$k][$k2] = $this->modifyContain($model->$k->$k2, $v2);
               

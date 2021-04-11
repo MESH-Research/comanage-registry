@@ -36,6 +36,31 @@ class CoGroup extends AppModel {
   public $hasMany = array(
     // A CoGroup has zero or more members
     "CoGroupMember" => array('dependent' => true),
+    "CoGroupNesting" => array(
+      'dependent' => true,
+      'foreignKey' => 'target_co_group_id'
+    ),
+    "SourceCoGroupNesting" => array(
+      'dependent' => true,
+      'className' => 'CoGroupNesting',
+      'foreignKey' => 'co_group_id'
+    ),
+    "CoDashboardVisibilityCoGroup" => array(
+      'className' => 'CoDashboard',
+      'foreignKey' => 'visibility_co_group_id'
+    ),
+    "CoDepartmentAdministrativeCoGroup" => array(
+      'className' => 'CoDepartment',
+      'foreignKey' => 'administrative_co_group_id'
+    ),
+    "CoDepartmentLeadershipCoGroup" => array(
+      'className' => 'CoDepartment',
+      'foreignKey' => 'leadership_co_group_id'
+    ),
+    "CoDepartmentSupportCoGroup" => array(
+      'className' => 'CoDepartment',
+      'foreignKey' => 'support_co_group_id'
+    ),
     "CoEnrollmentFlowApproverCoGroup" => array(
       'className' => 'CoEnrollmentFlow',
       'foreignKey' => 'approver_co_group_id'
@@ -70,7 +95,20 @@ class CoGroup extends AppModel {
       'className' => 'CoSetting',
       'foreignKey' => 'sponsor_co_group_id'
     ),
-    "HistoryRecord"
+    "EmailListAdmin" => array(
+      'className' => 'CoEmailList',
+      'foreignKey' => 'admins_co_group_id'
+    ),
+    "EmailListMember" => array(
+      'className' => 'CoEmailList',
+      'foreignKey' => 'members_co_group_id'
+    ),
+    "EmailListModerator" => array(
+      'className' => 'CoEmailList',
+      'foreignKey' => 'moderators_co_group_id'
+    ),
+    "HistoryRecord",
+    "Identifier" => array('dependent' => true)
   );
 
   public $belongsTo = array(
@@ -365,6 +403,8 @@ class CoGroup extends AppModel {
         }
       }
     }
+
+    return true;
   }
   
   /**
@@ -387,12 +427,32 @@ class CoGroup extends AppModel {
     $args['contain'] = false;
     
     $coAdminGroup = $this->Co->CoGroup->find('first', $args);
-    
+
     if(!empty($coAdminGroup['CoGroup']['id'])) {
       return $coAdminGroup['CoGroup']['id'];
     }
     
-    throw new InvalidArgumentException(_txt('er.gr.nf', array($args['conditions']['CoGroup.name'])));
+    throw new InvalidArgumentException(_txt('er.gr.nf', array('admins')));
+  }
+  
+  /**
+   * Actions to take after a save operation is executed.
+   *
+   * @since  COmanage Registry v3.3.0
+   * @param  boolean $created True if a new record was created (rather than update)
+   * @param  array   $options As passed into Model::save()
+   */
+
+  public function afterSave($created, $options = array()) {
+    // Maybe assign identifiers, but only for new Groups
+    if($created 
+       && !empty($this->data['CoGroup']['id'])
+       && isset($this->data['CoGroup']['auto'])   // CO-1829
+       && !$this->data['CoGroup']['auto']) {
+      $this->Identifier->assign('CoGroup', $this->data['CoGroup']['id'], null);
+    }
+
+    return true;
   }
   
   /**
@@ -454,6 +514,19 @@ class CoGroup extends AppModel {
     } else {
       $args['conditions']['CoGroupMember.member'] = true;
     }
+    // Only pull currently valid group memberships
+    $args['conditions']['AND'][] = array(
+      'OR' => array(
+        'CoGroupMember.valid_from IS NULL',
+        'CoGroupMember.valid_from < ' => date('Y-m-d H:i:s', time())
+      )
+    );
+    $args['conditions']['AND'][] = array(
+      'OR' => array(
+        'CoGroupMember.valid_through IS NULL',
+        'CoGroupMember.valid_through > ' => date('Y-m-d H:i:s', time())
+      )
+    );
     $args['contain'] = false;
     
     if($limit) {
@@ -480,14 +553,25 @@ class CoGroup extends AppModel {
    */
   
   public function findSortedMembers($id) {
-    $conditions = array();
-    $conditions['CoGroupMember.co_group_id'] = $id;
-    $contain = array();
-    $contain['CoPerson'][] = 'PrimaryName';
-    
     $args = array();
-    $args['conditions'] = $conditions;
-    $args['contain'] = $contain;
+    $args['conditions'] = array();
+    $args['conditions']['CoGroupMember.co_group_id'] = $id;
+    // Only pull currently valid group memberships
+    $args['conditions']['AND'][] = array(
+      'OR' => array(
+        'CoGroupMember.valid_from IS NULL',
+        'CoGroupMember.valid_from < ' => date('Y-m-d H:i:s', time())
+      )
+    );
+    $args['conditions']['AND'][] = array(
+      'OR' => array(
+        'CoGroupMember.valid_through IS NULL',
+        'CoGroupMember.valid_through > ' => date('Y-m-d H:i:s', time())
+      )
+    );
+    $args['contain'] = array(
+      'CoPerson' => array('PrimaryName')
+    );
     
     // Because we're using containable behavior, we can't easily sort by PrimaryName
     // as part of the find. So instead we'll pull the records and sort using Hash.
@@ -573,56 +657,6 @@ class CoGroup extends AppModel {
             && !empty($group['CoGroup']['cou_id']));
   }
   
-  /**
-   * Determine the current status of the provisioning targets for this CO Group.
-   *
-   * @since  COmanage Registry v0.8.2
-   * @param  Integer CO Group ID
-   * @return Array Current status of provisioning targets
-   * @throws RuntimeException
-   */
-  
-  public function provisioningStatus($coGroupId) {
-    // First, obtain the list of active provisioning targets for this group's CO.
-    
-    $args = array();
-    $args['joins'][0]['table'] = 'co_groups';
-    $args['joins'][0]['alias'] = 'CoGroup';
-    $args['joins'][0]['type'] = 'INNER';
-    $args['joins'][0]['conditions'][0] = 'CoGroup.co_id=CoProvisioningTarget.co_id';
-    $args['conditions']['CoGroup.id'] = $coGroupId;
-    $args['conditions']['CoProvisioningTarget.status !='] = ProvisionerStatusEnum::Disabled;
-    $args['contain'] = false;
-    
-    $targets = $this->Co->CoProvisioningTarget->find('all', $args);
-    
-    if(!empty($targets)) {
-      // Next, for each target ask the relevant plugin for the status for this group.
-      
-      // We may end up querying the same Plugin more than once, so maintain a cache.
-      $plugins = array();
-      
-      for($i = 0;$i < count($targets);$i++) {
-        $pluginModelName = $targets[$i]['CoProvisioningTarget']['plugin']
-                         . ".Co" . $targets[$i]['CoProvisioningTarget']['plugin'] . "Target";
-        
-        if(!isset($plugins[ $pluginModelName ])) {
-          $plugins[ $pluginModelName ] = ClassRegistry::init($pluginModelName, true);
-          
-          if(!$plugins[ $pluginModelName ]) {
-            throw new RuntimeException(_txt('er.plugin.fail', array($pluginModelName)));
-          }
-        }
-        
-        $targets[$i]['status'] = $plugins[ $pluginModelName ]->status($targets[$i]['CoProvisioningTarget']['id'],
-                                                                      null,
-                                                                      $coGroupId);
-      }
-    }
-    
-    return $targets;
-  }
-  
  /**
    * Determine if a CO Group is read only.
    *
@@ -644,31 +678,116 @@ class CoGroup extends AppModel {
   }
   
   /**
-   * Reconcile CO Person memberships in an automatic group.
+   * Reconcile CO Person memberships in a regular group.
    * 
-   * @since COmanage Registry 0.9.3
+   * @since COmanage Registry 3.3.0
    * @param Integer CoGroup Id
+   * @param String  Whether to disable safeties (only supported for automatic groups)
    * @return true on success
    * @throws InvalidArgumentException
    */
   
-  public function reconcileAutomaticGroup($id) {
+  public function reconcile($id, $safeties="on") {
     // First find the group
     $args = array();
     $args['conditions']['CoGroup.id'] = $id;
-    $args['contain'] = false;
+    $args['contain'][] = 'CoGroupNesting';
     
     $group = $this->find('first', $args);
-      
+    
     if(empty($group['CoGroup'])) {
       throw new InvalidArgumentException(_txt('er.gr.nf', array($id)));
     }
     
-    // Make sure the group is an automatic group.    
-    if(!$group['CoGroup']['auto']) {
-      throw new InvalidArgumentException(_txt('er.gr.reconcile.inv'));
+    // If this is an automatic group, hand off to reconcileAutomaticGroup()
+    if($group['CoGroup']['auto']) {
+      return $this->reconcileAutomaticGroup($group, $safeties);
     }
+    
+    // XXX we run into a similar problem here as in CoPipeline, which is that
+    // we can't have more than one CoGroupMember per CoPerson+GoGroup. While we
+    // can work around that here, it does mean that it's going to be hard to tell
+    // via the UI what direct, indirect, and automatic memberships a CO Person
+    // should have. This will need to get fixed in v5.0.0. (CO-1585)
+    // Until this is fixed, this could cause problems with some edge cases
+    // unlikely to occur in most deployments.
+    
+    $args = array();
+    $args['conditions']['CoGroupMember.co_group_id'] = $id;
+    // Since we're not checking validity dates here, an expired group membership
+    // will prevent a nested membership from manifesting. Is that a bug or a feature?
+    // Will it change in v5?
+    $args['contain'] = false;
+    
+    $tMembers = $this->CoGroupMember->find('all', $args);
 
+    $nMembers = array();
+    
+    foreach($group['CoGroupNesting'] as $n) {
+      // Pull the list of members of each nested group. This approach won't scale
+      // well to very large groups, but we can't use subselects because Cake doesn't
+      // support them natively, and buildStatement isn't directly supported by
+      // ChangelogBehavior. Joins aren't much more elegant.
+      
+      $args = array();
+      $args['conditions']['CoGroupMember.co_group_id'] = $n['co_group_id'];
+      $args['fields'] = array('co_person_id', 'id');
+      
+      $nMembers[ $n['id'] ] = $this->CoGroupMember->find('list', $args);
+    }
+    
+    // We start by deleting any no-longer-valid memberships, in case another group
+    // will re-grant eligibility. While we're here, build a hash of co person
+    // to group nestings.
+    
+    $tMembersByPerson = array();
+    
+    foreach($tMembers as $t) {
+      if(!$t['CoGroupMember']['co_group_nesting_id']) {
+        // This record is not from a nesting, so skip it
+        continue;
+      }
+      
+      if(!isset($nMembers[ $t['CoGroupMember']['co_group_nesting_id'] ][ $t['CoGroupMember']['co_person_id'] ])) {
+        // Remove the CoGroupMember record
+        $this->CoGroupMember->syncNestedMembership($group['CoGroup'], $t['CoGroupMember']['co_group_nesting_id'], $t['CoGroupMember']['co_person_id'], false);
+      } else {
+        $tMembersByPerson[ $t['CoGroupMember']['co_person_id'] ] = $t['CoGroupMember']['id'];
+      }
+    }
+    
+    // Pull the list of members of the nested group ($n) that are not already in
+    // the target group ($id) and add them.
+    
+    foreach($group['CoGroupNesting'] as $n) {
+      foreach($nMembers[ $n['id'] ] as $ncopid => $gmid) {
+        if(!isset($tMembersByPerson[$ncopid])) {
+          // For each person in $nMembers but not $tMembers, add them.
+          $this->CoGroupMember->syncNestedMembership($group['CoGroup'], $n['id'], $ncopid, true);
+          
+          // Also update $tMembers so we don't add them again from another group.
+          $tMembersByPerson[$ncopid] = $gmid;
+        }
+      }
+    }
+    
+    // For now, at least, we don't trigger reconciliation of the parent group,
+    // leaving that in the hands of the admin.
+    
+    return true;
+  }
+  
+  /**
+   * Reconcile CO Person memberships in an automatic group.
+   * 
+   * @since COmanage Registry 0.9.3
+   * @param  Array  Array of CO Group info to reconcile
+   * @param  String Whether to disable safety checks
+   * @return true on success
+   * @throws InvalidArgumentException
+   */
+  
+  protected function reconcileAutomaticGroup($group, $safeties="on") {
     // Determine the set of people who should be in the target group.
     // Currently we only support ActiveMembers and AllMembers.
     
@@ -696,15 +815,18 @@ class CoGroup extends AppModel {
     $args['contain'] = false;
     
     $coPeople = $this->Co->CoPerson->find('all', $args);
+    $members = array();
     
-    // Determine the set of people currently in the target group
-    $args = array();
-    $args['conditions']['CoGroupMember.co_group_id'] = $id;
-    $args['conditions']['CoGroupMember.co_group_id'] = $id;
-    $args['fields'] = array('CoGroupMember.co_person_id', 'CoGroupMember.id' );
-    $args['contain'] = false;
-    
-    $members = $this->Co->CoGroup->CoGroupMember->find('list', $args);
+    if($safeties != 'off') {
+      // Determine the set of people currently in the target group
+      $args = array();
+      $args['conditions']['CoGroupMember.co_group_id'] = $group['CoGroup']['id'];
+      $args['conditions']['CoGroupMember.co_group_id'] = $group['CoGroup']['id'];
+      $args['fields'] = array('CoGroupMember.co_person_id', 'CoGroupMember.id' );
+      $args['contain'] = false;
+      
+      $members = $this->Co->CoGroup->CoGroupMember->find('list', $args);
+    }
     
     // Make diff'able arrays
     $currentMembers = array_keys($members);
@@ -724,7 +846,7 @@ class CoGroup extends AppModel {
     
     foreach($toAdd as $coPersonId) {
       $data = array();
-      $data['CoGroupMember']['co_group_id'] = $id;
+      $data['CoGroupMember']['co_group_id'] = $group['CoGroup']['id'];
       $data['CoGroupMember']['co_person_id'] = $coPersonId;
       $data['CoGroupMember']['member'] = true;
       $data['CoGroupMember']['owner'] = false;
@@ -734,5 +856,33 @@ class CoGroup extends AppModel {
     }
     
     return true;  
+  }
+  
+  /**
+   * Perform a keyword search.
+   *
+   * @since  COmanage Registry v3.1.0
+   * @param  Integer $coId CO ID to constrain search to
+   * @param  String  $q    String to search for
+   * @return Array Array of search results, as from find('all)
+   */
+  
+  public function search($coId, $q) {
+    // Tokenize $q on spaces
+    $tokens = explode(" ", $q);
+    
+    $args = array();
+    foreach($tokens as $t) {
+      $args['conditions']['AND'][] = array(
+        'OR' => array(
+          'LOWER(CoGroup.name) LIKE' => '%' . strtolower($t) . '%'
+        )
+      );
+    }
+    $args['conditions']['CoGroup.co_id'] = $coId;
+    $args['order'] = array('CoGroup.name');
+    $args['contain'] = false;
+    
+    return $this->find('all', $args);
   }
 }

@@ -73,19 +73,21 @@
     <div class="field-info">
       <?php
         global $cm_lang, $cm_texts;
-        $attrs['value'] = (isset($cos) ? $cos[0]['Co']['status'] : 'A');
+        
+        $attrs = array();
+        $attrs['value'] = (isset($cos) ? $cos[0]['Co']['status'] : TemplateableStatusEnum::Active);
         $attrs['empty'] = false;
         
         if($e) {
           print $this->Form->select('status',
-                                    $cm_texts[ $cm_lang ]['en.status.susp'],
+                                    $cm_texts[ $cm_lang ]['en.status.temp'],
                                     $attrs);
           
           if($this->Form->isFieldError('status')) {
             print $this->Form->error('status');
           }
         } else {
-          print _txt('en.status.susp', null, $cos[0]['Co']['status']);
+          print _txt('en.status.temp', null, $cos[0]['Co']['status']);
         }
       ?>
     </div>

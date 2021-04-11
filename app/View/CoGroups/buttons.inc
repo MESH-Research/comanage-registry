@@ -58,7 +58,7 @@ if(!$e && !$v)
 
 // Add buttons
 if($permissions['reconcile']) {
-  // Reconcile read only groups
+  // Reconcile groups
   
   $buttonUrl = array(
     'controller'    => 'co_groups',
@@ -82,20 +82,6 @@ if($permissions['reconcile']) {
   );
 }
 
-if(!empty($co_groups[0]['CoGroup']['id'])
-   && !$co_groups[0]['CoGroup']['auto']) {
-  // Manage group memberships
-  $params['topLinks'][] = $this->Html->link(
-    _txt('op.manage.grm'),
-    array(
-      'controller' => 'co_group_members',
-      'action'     => 'select',
-      'cogroup'    => $co_groups[0]['CoGroup']['id']
-    ),
-    array('class' => 'editbutton')
-  );
-}
-
 if($permissions['provision'] && !empty($co_groups[0]['CoGroup']['id'])) {
   // Provisioning status
   $params['topLinks'][] = $this->Html->link(
@@ -105,7 +91,7 @@ if($permissions['provision'] && !empty($co_groups[0]['CoGroup']['id'])) {
       'action'     => 'provision',
       $co_groups[0]['CoGroup']['id']
     ),
-    array('class' => 'notebutton')
+    array('class' => 'runbutton')
   );
 }
 

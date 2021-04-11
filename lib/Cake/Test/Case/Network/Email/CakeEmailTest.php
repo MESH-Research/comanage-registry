@@ -275,6 +275,10 @@ class CakeEmailTest extends CakeTestCase {
 		$expected = array('cake@cakephp.org' => 'CakePHP');
 		$this->assertSame($expected, $this->CakeEmail->to());
 
+		$this->CakeEmail->to('cake@cake_php.org', 'CakePHPUnderscore');
+		$expected = array('cake@cake_php.org' => 'CakePHPUnderscore');
+		$this->assertSame($expected, $this->CakeEmail->to());
+
 		$list = array(
 			'root@localhost' => 'root',
 			'bjørn@hammeröath.com' => 'Bjorn',
@@ -330,23 +334,34 @@ class CakeEmailTest extends CakeTestCase {
 /**
  * testBuildInvalidData
  *
- * @dataProvider invalidEmails
  * @expectedException SocketException
+ * @expectedExceptionMessage The email set for "_to" is empty.
  * @return void
  */
-	public function testInvalidEmail($value) {
-		$this->CakeEmail->to($value);
+	public function testInvalidEmail() {
+		$this->CakeEmail->to('');
 	}
 
 /**
  * testBuildInvalidData
  *
- * @dataProvider invalidEmails
  * @expectedException SocketException
+ * @expectedExceptionMessage Invalid email set for "_from". You passed "cake.@"
  * @return void
  */
-	public function testInvalidEmailAdd($value) {
-		$this->CakeEmail->addTo($value);
+	public function testInvalidFrom() {
+		$this->CakeEmail->from('cake.@');
+	}
+
+/**
+ * testBuildInvalidData
+ *
+ * @expectedException SocketException
+ * @expectedExceptionMessage Invalid email set for "_to". You passed "1"
+ * @return void
+ */
+	public function testInvalidEmailAdd() {
+		$this->CakeEmail->addTo('1');
 	}
 
 /**
@@ -419,7 +434,7 @@ class CakeEmailTest extends CakeTestCase {
  * @return void
  *
  * @expectedException SocketException
- * @expectedExceptionMessage Invalid email: "fail.@example.com"
+ * @expectedExceptionMessage Invalid email set for "_to". You passed "fail.@example.com"
  */
 	public function testUnsetEmailPattern() {
 		$email = new CakeEmail();

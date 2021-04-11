@@ -302,6 +302,10 @@ class Sqlserver extends DboSource {
 					$prepend = 'DISTINCT ';
 					$fields[$i] = trim(str_replace('DISTINCT', '', $fields[$i]));
 				}
+				if (strpos($fields[$i], 'COUNT(DISTINCT') !== false) {
+					$prepend = 'COUNT(DISTINCT ';
+					$fields[$i] = trim(str_replace('COUNT(DISTINCT', '', $this->_quoteFields($fields[$i])));
+				}
 
 				if (!preg_match('/\s+AS\s+/i', $fields[$i])) {
 					if (substr($fields[$i], -1) === '*') {
@@ -411,7 +415,7 @@ class Sqlserver extends DboSource {
 				$rt = ' TOP';
 			}
 			$rt .= sprintf(' %u', $limit);
-			if (is_int($offset) && $offset > 0) {
+			if ((is_int($offset) || ctype_digit($offset)) && $offset > 0) {
 				$rt = sprintf(' OFFSET %u ROWS FETCH FIRST %u ROWS ONLY', $offset, $limit);
 			}
 			return $rt;

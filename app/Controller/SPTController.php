@@ -30,7 +30,42 @@ App::uses("StandardController", "Controller");
 class SPTController extends StandardController {
   // SPTs need a CO to be set
   public $requires_co = true;
+  
+// We can't use $uses because it clobbers our other models and it's hard to
+// dynamically reconstruct that list.
+//  public $uses = array('Server');
 
+  /**
+   * Callback before other controller methods are invoked or views are rendered.
+   * - postcondition: requires_co possibly set
+   *
+   * @since  COmanage Registry v3.2.0
+   */
+
+  function beforeFilter() {
+    parent::beforeFilter();
+    
+    // Get a pointer to our model name
+    $req = $this->modelClass;
+    $model = $this->$req;
+    
+    // Dynamically adjust validation rules to include the current CO ID for dynamic types.
+    // This is a common case for provisioner configuration, but this could plausibly go
+    // in StandardController.
+    
+    foreach($model->validate as $attr => $acfg) {
+      if(isset($acfg['content']['rule'][0])
+         && $acfg['content']['rule'][0] == 'validateExtendedType') {
+        // Inject the current CO so validateExtendedType() works correctly
+        
+        $vrule = $acfg['content']['rule'];
+        $vrule[1]['coid'] = $this->cur_co['Co']['id'];
+        
+        $model->validator()->getField($attr)->getRule('content')->rule = $vrule;
+      }
+    }
+  }
+  
   /**
    * Callback before views are rendered.
    *

@@ -37,6 +37,26 @@
   if(!$e && !$permissions['view'])
     return false;
   
+  // Add breadcrumbs
+  print $this->element("coCrumb");
+
+  $args = array();
+  $args['plugin'] = null;
+  $args['controller'] = 'org_identity_sources';
+  $args['action'] = 'index';
+  $args['co'] = $cur_co['Co']['id'];
+  $this->Html->addCrumb(_txt('ct.org_identity_sources.pl'), $args);
+
+  $args = array();
+  $args['plugin'] = null;
+  $args['controller'] = 'org_identity_sources';
+  $args['action'] = 'edit';
+  $args[] = $vv_oisid;
+  $this->Html->addCrumb($net_forum_sources[0]['OrgIdentitySource']['description'], $args);
+
+  $crumbTxt = _txt('op.config');
+  $this->Html->addCrumb($crumbTxt);
+  
   print $this->Form->hidden('org_identity_source_id', array('default' => $vv_oisid)) . "\n";
 
 ?>
@@ -73,6 +93,18 @@
     </div>
     <div class="field-info">
       <?php print ($e ? $this->Form->input('password') : filter_var($net_forum_sources[0]['NetForumSource']['password'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print _txt('pl.netforumsource.querycmts'); ?></div>
+      <div class="field-desc"><?php print _txt('pl.netforumsource.querycmts.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e
+                   ? $this->Form->input('query_committees')
+                   : ($net_forum_sources[0]['NetForumSource']['query_committees']
+                      ? _txt('fd.yes') : _txt('fd.no'))); ?>
     </div>
   </li>
   <li>

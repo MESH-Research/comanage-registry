@@ -28,7 +28,7 @@
 App::uses("StandardController", "Controller");
 
 class MVPAController extends StandardController {
-  // MVPAs require a Person ID (CO or Org)
+  // MVPAs require a Person ID (CO or Org, or Dept as of v3.1.0)
   public $requires_person = true;
   
   /**
@@ -63,13 +63,6 @@ class MVPAController extends StandardController {
     $this->set('pool_org_identities', $pool);
     
     parent::beforeFilter();
-    
-    // Dynamically adjust validation rules to include the current CO ID for dynamic types.
-    
-    $vrule = $model->validate['type']['content']['rule'];
-    $vrule[1]['coid'] = $this->cur_co['Co']['id'];
-    
-    $model->validator()->getField('type')->getRule('content')->rule = $vrule;
   }
   
   /**
@@ -84,6 +77,7 @@ class MVPAController extends StandardController {
     // Get a pointer to our model
     $req = $this->modelClass;
     $model = $this->$req;
+    $modelpl = Inflector::tableize($req);
     
     if(!$this->request->is('restful')){
       // Provide a hint as to available types for this model
@@ -121,6 +115,71 @@ class MVPAController extends StandardController {
         
         $this->set('vv_available_types', $availableTypes);
       }
+      
+      // Set the person info for view usage
+      $this->set('vv_pid', $pid);
+      
+      // We should have a name useful for breadcrumbs in the associated data
+
+      if(!empty($this->viewVars[$modelpl][0]['CoDepartment']['name'])) {
+        $this->set('vv_bc_name', $this->viewVars[$modelpl][0]['CoDepartment']['name']);
+      } elseif(!empty($this->viewVars[$modelpl][0]['CoPerson']['PrimaryName']['id'])) {
+        $this->set('vv_bc_name', generateCn($this->viewVars[$modelpl][0]['CoPerson']['PrimaryName']));
+      } elseif(!empty($this->viewVars[$modelpl][0]['CoPersonRole']['CoPerson']['PrimaryName']['id'])) {
+        if(!empty($this->viewVars[$modelpl][0]['CoPersonRole']['title'])) {
+          $this->set('vv_bc_name', $this->viewVars[$modelpl][0]['CoPersonRole']['title']);
+        } else {
+          $this->set('vv_bc_name', _txt('ct.co_person_roles.1'));
+        }
+        // Also set a parent breadcrumb of the Person
+        $this->set('vv_pbc_id', $this->viewVars[$modelpl][0]['CoPersonRole']['CoPerson']['id']);
+        $this->set('vv_pbc_name', generateCn($this->viewVars[$modelpl][0]['CoPersonRole']['CoPerson']['PrimaryName']));
+      } elseif(!empty($this->viewVars[$modelpl][0]['OrgIdentity']['PrimaryName']['id'])) {
+        $this->set('vv_bc_name', generateCn($this->viewVars[$modelpl][0]['OrgIdentity']['PrimaryName']));
+      } elseif($this->action == 'add') {
+        // We need to manually pull a name for the breadcrumbs
+        if(!empty($pid['codeptid'])) {
+          $this->set('vv_bc_name', $model->CoDepartment->field('name', array('CoDepartment.id' => $pid['codeptid'])));
+        } elseif(!empty($pid['cogroupid'])) {
+          $this->set('vv_bc_name', $model->CoGroup->field('name', array('CoGroup.id' => $pid['cogroupid'])));
+        } elseif(!empty($pid['copersonid'])) {
+          $args = array();
+          $args['conditions']['CoPerson.id'] = $pid['copersonid'];
+          $args['contain'][] = 'PrimaryName';
+          
+          $p = $model->CoPerson->find('first', $args);
+          
+          $this->set('vv_bc_name', generateCn($p['PrimaryName']));
+        } elseif(!empty($pid['copersonroleid'])) {
+          $args = array();
+          $args['conditions']['CoPersonRole.id'] = $pid['copersonroleid'];
+          $args['contain']['CoPerson'] = 'PrimaryName';
+          
+          $p = $model->CoPersonRole->find('first', $args);
+          
+          // Set the bc name to the role's title
+          if(!empty($p['CoPersonRole']['title'])) {
+            $this->set('vv_bc_name', $p['CoPersonRole']['title']);
+          } else {
+            $this->set('vv_bc_name', _txt('ct.co_person_roles.1'));
+          }
+          
+          // But also set a parent breadcrumb of the Person
+          $this->set('vv_pbc_id', $p['CoPerson']['id']);
+          $this->set('vv_pbc_name', generateCn($p['CoPerson']['PrimaryName']));
+        } elseif(!empty($pid['orgidentityid'])) {
+          $args = array();
+          $args['conditions']['OrgIdentity.id'] = $pid['orgidentityid'];
+          $args['contain'][] = 'PrimaryName';
+          
+          $p = $model->OrgIdentity->find('first', $args);
+          
+          $this->set('vv_bc_name', generateCn($p['PrimaryName']));
+        }
+      } else {
+        // Default to using the model label
+        $this->set('vv_bc_name', _txt('ct.'.$modelpl.'.1')); 
+      }
     }
     
     parent::beforeRender();
@@ -153,7 +212,7 @@ class MVPAController extends StandardController {
         // Default is readwrite, so start with the current types and remove those
         // explicitly not permitted
         
-        $perms = $model->validator()->getfield('type')->getRule('content')->rule[1];
+        $perms = $model->validator()->getfield('type')->getRule('content')->rule[1]['default'];
         
         foreach(array_keys($this->viewVars['permissions']['selfsvc'][$req]) as $a) {
           if($a != '*' // Skip default
@@ -177,7 +236,7 @@ class MVPAController extends StandardController {
       }
       
       // Update the validation rule
-      $model->validator()->getfield('type')->getRule('content')->rule[1] = $perms;
+      $model->validator()->getfield('type')->getRule('content')->rule[1]['default'] = $perms;
     }
     
     return true;
@@ -228,6 +287,14 @@ class MVPAController extends StandardController {
                                                      $this->Session->read('Auth.User.co_person_id'),
                                                      ActionEnum::OrgIdEditedManual,
                                                      $cstr);
+        } elseif(!empty($newdata[$req]['co_group_id'])) {
+          $model->CoGroup->HistoryRecord->record(null,
+                                                 null,
+                                                 null,
+                                                 $this->Session->read('Auth.User.co_person_id'),
+                                                 ActionEnum::CoGroupEdited,
+                                                 $cstr,
+                                                 $newdata[$req]['co_group_id']);
         } elseif(!empty($newdata[$req]['co_person_role_id'])) {
           // Map CO Person Role to CO Person
           $copid = $model->CoPersonRole->field('co_person_id', array('CoPersonRole.id' => $newdata[$req]['co_person_role_id']));
@@ -255,6 +322,14 @@ class MVPAController extends StandardController {
                                                      $this->Session->read('Auth.User.co_person_id'),
                                                      ActionEnum::OrgIdEditedManual,
                                                      $cstr);
+        } elseif(!empty($olddata[$req]['co_group_id'])) {
+          $model->CoGroup->HistoryRecord->record(null,
+                                                 null,
+                                                 null,
+                                                 $this->Session->read('Auth.User.co_person_id'),
+                                                 ActionEnum::CoGroupEdited,
+                                                 $cstr,
+                                                 $olddata[$req]['co_group_id']);
         } elseif(!empty($olddata[$req]['co_person_role_id'])) {
           // Map CO Person Role to CO Person
           $copid = $model->CoPersonRole->field('co_person_id', array('CoPersonRole.id' => $olddata[$req]['co_person_role_id']));

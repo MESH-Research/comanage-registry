@@ -18,7 +18,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  * @link          http://www.internet2.edu/comanage COmanage Project
  * @package       registry
  * @since         COmanage Registry v0.1
@@ -41,7 +41,7 @@
     <?php print $this->Html->meta(array('name' => 'viewport', 'content' => 'width=device-width, initial-scale=1.0')) . "\n"; ?>
     <?php print $this->Html->charset() . "\n"; ?>
 
-    <title><?php print _txt('coordinate') . ': ' . filter_var($title_for_layout,FILTER_SANITIZE_STRING); ?></title>
+    <title><?php print filter_var($title_for_layout,FILTER_SANITIZE_STRING); ?></title>
     <!-- <?php
       // Include version number, but only if logged in
       if($this->Session->check('Auth.User')) {
@@ -51,6 +51,16 @@
 
     <?php print $this->Html->meta('favicon.ico','/favicon.ico',array('type' => 'icon')) . "\n"; ?>
 
+    <!-- Allow pages to request periodic refresh -->
+    <?php
+    if(!empty($vv_refresh_interval)) {
+      print $this->Html->meta(array(
+        'http-equiv' => 'refresh',
+        'content' => $vv_refresh_interval)
+      );
+    }
+    ?>
+
     <!-- Load CSS -->
     <?php
       print $this->Html->css('jquery/jquery-ui-1.12.1.custom/jquery-ui.min') . "\n    ";
@@ -59,7 +69,7 @@
       print $this->Html->css('fonts/Font-Awesome-4.6.3/css/font-awesome.min') . "\n    ";
       print $this->Html->css('co-base') . "\n    ";
       print $this->Html->css('co-responsive') . "\n    ";
-      
+
       // Until used more broadly, limit loading of Magnific Popup
       if ($this->controller = 'history_records') {
         print $this->Html->css('jquery/magnificpopup/magnific-popup');
@@ -68,7 +78,7 @@
 
     <!-- Load JavaScript -->
     <?php /* only JQuery here - other scripts at bottom */
-      print $this->Html->script('jquery/jquery-3.2.1.min.js') . "\n    ";
+      print $this->Html->script('jquery/jquery-3.5.1.min.js') . "\n    ";
       print $this->Html->script('jquery/jquery-ui-1.12.1.custom/jquery-ui.min.js') . "\n    ";
     ?>
 
@@ -78,7 +88,7 @@
       print $this->fetch('css');
       print $this->fetch('script');
     ?>
-    
+
     <!-- Include custom CSS -->
     <?php if(!empty($vv_theme_css)): ?>
       <style type="text/css">
@@ -88,11 +98,23 @@
   </head>
 
   <?php
-    $bodyClasses = $this->params->controller . ' ' . $this->params->action;
+    // cleanse the controller and action strings and insert them into the body classes
+    $controller_stripped = preg_replace('/[^a-zA-Z0-9\-_]/', '', $this->params->controller);
+    $action_stripped = preg_replace('/[^a-zA-Z0-9\-_]/', '', $this->params->action);
+    $bodyClasses = $controller_stripped . ' ' .$action_stripped;
+
+    // add further body classes as needed
     if($this->Session->check('Auth.User') != NULL) {
       $bodyClasses .= ' logged-in';
     } else {
       $bodyClasses .= ' logged-out';
+    }
+    if(!empty($vv_ui_mode)) {
+      if($vv_ui_mode === EnrollmentFlowUIMode::Basic) {
+        $bodyClasses .= ' ui-mode-basic';
+      } else {
+        $bodyClasses .= ' ui-mode-full';
+      }
     }
     if(!empty($vv_NavLinks) || !empty($vv_CoNavLinks)) {
       $bodyClasses .=  ' with-user-defined-links';
@@ -115,21 +137,21 @@
       <a href="#content-start" id="skip-to-content">Skip to main content.</a>
     </div>
 
-    <!-- Include custom header -->
-    <?php if(!empty($vv_theme_header)): ?>
-      <header id="customHeader">
-        <div class="contentWidth">
-          <?php print $vv_theme_header; ?>
-        </div>
-      </header>
-    <?php endif; ?>
-
     <!-- Primary layout -->
     <div id="comanage-wrapper" class="mdl-layout mdl-js-layout mdl-layout--fixed-drawer">
-      
+
+      <!-- Include custom header -->
+      <?php if(!empty($vv_theme_header)): ?>
+        <header id="customHeader">
+          <div class="contentWidth">
+            <?php print $vv_theme_header; ?>
+          </div>
+        </header>
+      <?php endif; ?>
+
       <div id="top-menu">
-        <?php if($this->Session->check('Auth.User')): ?>
-          <div id="desktop-hamburger"><em class="material-icons">menu</em></div>
+        <?php if($vv_ui_mode === EnrollmentFlowUIMode::Full): ?>
+          <button id="desktop-hamburger" class="cm-toggle" aria-controls="navigation-drawer"><em class="material-icons">menu</em></button>
         <?php endif; ?>
         <?php if(!empty($vv_NavLinks) || !empty($vv_CoNavLinks)): ?>
           <div id="user-defined-links-top">
@@ -185,7 +207,7 @@
 
       </header>
 
-      <?php if($this->Session->check('Auth.User')): ?>
+      <?php if($vv_ui_mode === EnrollmentFlowUIMode::Full): ?>
         <div id="navigation-drawer" class="mdl-layout__drawer">
           <nav id="navigation" aria-label="main menu" class="mdl-navigation">
             <?php print $this->element('menuMain'); ?>
@@ -198,7 +220,15 @@
         </div>
       <?php endif ?>
 
-      <main id="main" class="mdl-layout__content">
+      <?php
+        $mainCssClasses = 'cm-main-full mdl-layout__content';
+        if(!empty($vv_ui_mode)) {
+          if($vv_ui_mode === EnrollmentFlowUIMode::Basic) {
+            $mainCssClasses = 'cm-main-basic';
+          }
+        }
+      ?>
+      <main id="main" class="<?php print $mainCssClasses; ?>">
 
         <div id="content" class="mdl-grid">
         <?php
@@ -210,11 +240,10 @@
             print '<div id="content-inner" class="mdl-cell mdl-cell--12-col">';
           }
 
-          // insert breadcrumbs on all but the homepage if logged in
-          if($this->Session->check('Auth.User')) {
-            if ($this->request->here != $this->request->webroot) {
-              print '<div id="breadcrumbs">' . $this->Html->getCrumbs(' &gt; ', _txt('bc.home')) . "</div>";
-            }
+          // insert breadcrumbs on all but the homepage
+          if( $vv_ui_mode === EnrollmentFlowUIMode::Full
+              && $this->request->here !== $this->request->webroot) {
+            print '<div id="breadcrumbs">' . $this->Html->getCrumbs(' &gt; ', _txt('bc.home')) . "</div>";
           }
 
           // insert the anchor that is the target of accessible "skip to content" link
@@ -222,7 +251,7 @@
 
           // insert the page internal content
           print $this->fetch('content');
-          print '</div>';
+          print '</div>'; // end #content-inner
 
           if(!empty($sidebarButtons) || !empty($enrollmentFlowSteps)) {
             print '<div id="right-sidebar" class="mdl-cell mdl-cell--3-col mdl-cell--9-col-tablet mdl-cell--9-col-phone">';
@@ -243,6 +272,13 @@
         ?>
         </div>
 
+        <!-- Include custom footer -->
+        <?php if(!empty($vv_theme_footer)): ?>
+          <footer id="customFooter">
+            <?php print $vv_theme_footer; ?>
+          </footer>
+        <?php endif; ?>
+
         <?php if(Configure::read('debug') > 0): ?>
           <div id="debug" class="mdl-grid">
             <?php print $this->element('sql_dump'); ?>
@@ -253,13 +289,6 @@
       <?php if(!isset($vv_theme_hide_footer_logo) || !$vv_theme_hide_footer_logo): ?>
         <footer id="co-footer">
           <?php print $this->element('footer'); ?>
-        </footer>
-      <?php endif; ?>
-
-      <!-- Include custom footer -->
-      <?php if(!empty($vv_theme_footer)): ?>
-        <footer id="customFooter">
-          <?php print $vv_theme_footer; ?>
         </footer>
       <?php endif; ?>
 
@@ -285,7 +314,7 @@
       var tz = jstz.determine();
       // This won't be available for the first delivered page, but after that the
       // server side should see it and process it
-      document.cookie = "cm_registry_tz_auto=" + tz.name() + "; path=/";
+      document.cookie = "cm_registry_tz_auto=" + tz.name() + "; path=/; SameSite=Strict";
     </script>
 
 

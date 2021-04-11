@@ -93,6 +93,11 @@ class CoEnrollmentAttribute extends AppModel {
       'required' => false,
       'allowEmpty' => true
     ),
+    'default_env' => array(
+      'rule' => '/.*/',
+      'required' => false,
+      'allowEmpty' => true
+    ),
     'language' => array(
       'rule'       => array('validateLanguage'),
       'required'   => false,
@@ -107,11 +112,53 @@ class CoEnrollmentAttribute extends AppModel {
       'rule' => array('numeric'),
       'required' => false,
       'allowEmpty' => true
+    ),
+    'hidden' => array(
+      'validateRequired' => array(
+        'rule' => array('boolean'),
+        'required' => false,
+        'allowEmpty' => true
+      ),
+      'validateHidden' => array(
+        'rule' => array('validateHidden'),
+        'required' => false
+      )
     )
-  );  
+  );
+
+  /**
+   * Validate that the field is allowed to be hidden based on the attribute and default value
+   *
+   * @param  array Array of fields to validate
+   * @return boolean True if allowed, false if not
+   */
+  public function validateHidden($a) {
+    // Hidden attribute is only applicable to CO Person Role attributes (type 'r'), CO Person attributes (type 'g'),
+    // Organizational Identity attributes (type 'o'), or Extended Attributes (type 'x')
+    $attrCode = explode(':', $this->data['CoEnrollmentAttribute']['attribute']);
+    if(!in_array($attrCode[0], array('r', 'g', 'o', 'x'))) {
+      return true;
+    }
+
+    // A default value must be provided if field is hidden
+    $defaultValue = $this->data['CoEnrollmentAttributeDefault'][0]['value'];
+    if(isset($a['hidden']) && $a['hidden'] && empty($defaultValue)) {
+      return _txt('er.field.hidden.req');
+    }
+
+    return true;
+  }
   
   /**
    * Determine the attributes available to be requested as part of an Enrollment Flow.
+   * (1)  (code=r) Single valued CO Person Role attributes
+   * (2)  (code=p) Multi valued CO Person attributes
+   * (2a) (code=g) Group Memberships are Multi valued CO Person attributes, but have all sorts of special logic around them so they get their own code
+   * (3)  (code=m) Multi valued CO Person Role attributes
+   * (4)  (code=x) CO Person Role Extended attributes
+   * (5)  (code=o) Single valued Org Identity attributes, if enabled
+   * (6)  (code=i) Multi valued Org Identity attributes, if enabled.Note that since org identities don't support extended types, we use default values here.
+   * (7)  (code=e) Enrollment Flow specific attributes -- these don't get copied out of the petition
    *
    * @since  COmanage Registry v0.3
    * @param  integer Identifier of the CO to assemble attributes for
@@ -136,15 +183,15 @@ class CoEnrollmentAttribute extends AppModel {
     // COU ID is only available if at least one COU is defined
     $cous = $this->CoEnrollmentFlow->Co->Cou->allCous($coid);
     if(!empty($cous)) {
-      $ret['r:cou_id'] = _txt('fd.cou') . " (" . _txt('ct.co_person_roles.1') . ")";
+      $ret[_txt('ct.co_person_roles.1')]['r:cou_id'] = _txt('fd.cou');
     }
-    $ret['r:affiliation'] = _txt('fd.affiliation') . " (" . _txt('ct.co_person_roles.1') . ")";
-    $ret['r:sponsor_co_person_id'] = _txt('fd.sponsor') . " (" . _txt('ct.co_person_roles.1') . ")";
-    $ret['r:title'] = _txt('fd.title') . " (" . _txt('ct.co_person_roles.1') . ")";
-    $ret['r:o'] = _txt('fd.o') . " (" . _txt('ct.co_person_roles.1') . ")";
-    $ret['r:ou'] = _txt('fd.ou') . " (" . _txt('ct.co_person_roles.1') . ")";
-    $ret['r:valid_from'] = _txt('fd.valid_from') . " (" . _txt('ct.co_person_roles.1') . ")";
-    $ret['r:valid_through'] = _txt('fd.valid_through') . " (" . _txt('ct.co_person_roles.1') . ")";
+    $ret[_txt('ct.co_person_roles.1')]['r:affiliation'] = _txt('fd.affiliation');
+    $ret[_txt('ct.co_person_roles.1')]['r:sponsor_co_person_id'] = _txt('fd.sponsor');
+    $ret[_txt('ct.co_person_roles.1')]['r:title'] = _txt('fd.title');
+    $ret[_txt('ct.co_person_roles.1')]['r:o'] = _txt('fd.o');
+    $ret[_txt('ct.co_person_roles.1')]['r:ou'] = _txt('fd.ou');
+    $ret[_txt('ct.co_person_roles.1')]['r:valid_from'] = _txt('fd.valid_from');
+    $ret[_txt('ct.co_person_roles.1')]['r:valid_through'] = _txt('fd.valid_through');
     
     // (2) Multi valued CO Person attributes (code=p)
     
@@ -153,25 +200,31 @@ class CoEnrollmentAttribute extends AppModel {
     $nameTypes = $Name->types($coid, 'type');
     
     foreach(array_keys($nameTypes) as $k)
-      $ret['p:name:'.$k] = _txt('fd.name') . " (" . $nameTypes[$k] . ", " . _txt('ct.co_people.1') . ")";
+      $ret[_txt('ct.co_people.1')]['p:name:'.$k] = _txt('fd.name') . " (" . $nameTypes[$k] . ")";
     
     $Identifier = ClassRegistry::init('Identifier');
     $identifierTypes = $Identifier->types($coid, 'type');
     
     foreach(array_keys($identifierTypes) as $k)
-      $ret['p:identifier:'.$k] = _txt('fd.identifier.identifier') . " (" . $identifierTypes[$k] . ", " . _txt('ct.co_people.1') . ")";
+      $ret[_txt('ct.co_people.1')]['p:identifier:'.$k] = _txt('fd.identifier.identifier') . " (" . $identifierTypes[$k] . ")";
     
     $EmailAddress = ClassRegistry::init('EmailAddress');
     $emailAddressTypes = $EmailAddress->types($coid, 'type');
     
     foreach(array_keys($emailAddressTypes) as $k)
-      $ret['p:email_address:'.$k] = _txt('fd.email_address.mail') . " (" . $emailAddressTypes[$k] . ", " . _txt('ct.co_people.1') . ")";
+      $ret[_txt('ct.co_people.1')]['p:email_address:'.$k] = _txt('fd.email_address.mail') . " (" . $emailAddressTypes[$k] . ")";
+    
+    $Url = ClassRegistry::init('Url');
+    $urlTypes = $Url->types($coid, 'type');
+    
+    foreach(array_keys($urlTypes) as $k)
+      $ret[_txt('ct.co_people.1')]['p:url:'.$k] = _txt('fd.url.url') . " (" . $urlTypes[$k] . ")";
     
     // (2a) Group Memberships are Multi valued CO Person attributes, but have all sorts
     // of special logic around them so they get their own code (code=g)
     
-    $ret['g:co_group_member'] = _txt('fd.group.grmem') . " (" . _txt('ct.co_people.1') . ")";
-    $ret['g:co_group_member_owner'] = _txt('fd.group.grmemown') . " (" . _txt('ct.co_people.1') . ")";
+    $ret[_txt('ct.co_people.1')]['g:co_group_member'] = _txt('fd.group.grmem');
+    $ret[_txt('ct.co_people.1')]['g:co_group_member_owner'] = _txt('fd.group.grmemown');
     
     // (3) Multi valued CO Person Role attributes (code=m)
     
@@ -179,52 +232,55 @@ class CoEnrollmentAttribute extends AppModel {
     $telephoneNumberTypes = $TelephoneNumber->types($coid, 'type');
     
     foreach(array_keys($telephoneNumberTypes) as $k)
-      $ret['m:telephone_number:'.$k] = _txt('fd.telephone_number.number') . " (" . $telephoneNumberTypes[$k] . ", " . _txt('ct.co_person_roles.1') . ")";
+      $ret[_txt('ct.co_person_roles.1')]['m:telephone_number:'.$k] = _txt('fd.telephone_number.number') . " (" . $telephoneNumberTypes[$k] . ")";
     
     $Address = ClassRegistry::init('Address');
     $addressTypes = $Address->types($coid, 'type');
     
     foreach(array_keys($addressTypes) as $k)
-      $ret['m:address:'.$k] = _txt('fd.address') . " (" . $addressTypes[$k] . ", " . _txt('ct.co_person_roles.1') . ")";
+      $ret[_txt('ct.co_person_roles.1')]['m:address:'.$k] = _txt('fd.address') . " (" . $addressTypes[$k] . ")";
     
     // (4) CO Person Role Extended attributes (code=x)
     
     $extAttrs = $this->CoEnrollmentFlow->Co->CoExtendedAttribute->findAllByCoId($coid);
     
     foreach($extAttrs as $e)
-      $ret['x:' . $e['CoExtendedAttribute']['name']] = $e['CoExtendedAttribute']['display_name'];
+      $ret[_txt('ct.co_person_roles.1')]['x:' . $e['CoExtendedAttribute']['name']] = $e['CoExtendedAttribute']['display_name'];
     
     $cmpEnrollmentConfiguration = ClassRegistry::init('CmpEnrollmentConfiguration');
     
     if($cmpEnrollmentConfiguration->orgIdentitiesFromCOEF()) {
       // (5) Single valued Org Identity attributes, if enabled (code=o)
       
-      $ret['o:affiliation'] = _txt('fd.affiliation') . " (" . _txt('ct.org_identities.1') . ")";
-      $ret['o:title'] = _txt('fd.title') . " (" . _txt('ct.org_identities.1') . ")";
-      $ret['o:o'] = _txt('fd.o') . " (" . _txt('ct.org_identities.1') . ")";
-      $ret['o:ou'] = _txt('fd.ou') . " (" . _txt('ct.org_identities.1') . ")";
+      $ret[_txt('ct.org_identities.1')]['o:affiliation'] = _txt('fd.affiliation');
+      $ret[_txt('ct.org_identities.1')]['o:title'] = _txt('fd.title');
+      $ret[_txt('ct.org_identities.1')]['o:o'] = _txt('fd.o');
+      $ret[_txt('ct.org_identities.1')]['o:ou'] = _txt('fd.ou');
       
       // (6) Multi valued Org Identity attributes, if enabled (code=i)
       // Note that since org identities don't support extended types, we use default values here.
       
       foreach(array_keys($cm_texts[ $cm_lang ]['en.name.type']) as $k)
-        $ret['i:name:'.$k] = _txt('fd.name') . " (" . $cm_texts[ $cm_lang ]['en.name.type'][$k] . ", " . _txt('ct.org_identities.1') . ")";
+        $ret[_txt('ct.org_identities.1')]['i:name:'.$k] = _txt('fd.name') . " (" . $cm_texts[ $cm_lang ]['en.name.type'][$k] . ")";
       
       foreach(array_keys($cm_texts[ $cm_lang ]['en.identifier.type']) as $k)
-        $ret['i:identifier:'.$k] = _txt('fd.identifier.identifier') . " (" . $cm_texts[ $cm_lang ]['en.identifier.type'][$k] . ", " . _txt('ct.org_identities.1') . ")";
+        $ret[_txt('ct.org_identities.1')]['i:identifier:'.$k] = _txt('fd.identifier.identifier') . " (" . $cm_texts[ $cm_lang ]['en.identifier.type'][$k] . ")";
       
       foreach(array_keys($cm_texts[ $cm_lang ]['en.address.type']) as $k)
-        $ret['i:address:'.$k] = _txt('fd.address') . " (" . $cm_texts[ $cm_lang ]['en.address.type'][$k] . ", " . _txt('ct.org_identities.1') . ")";
+        $ret[_txt('ct.org_identities.1')]['i:address:'.$k] = _txt('fd.address') . " (" . $cm_texts[ $cm_lang ]['en.address.type'][$k] . ")";
       
       foreach(array_keys($cm_texts[ $cm_lang ]['en.email_address.type']) as $k)
-        $ret['i:email_address:'.$k] = _txt('fd.email_address.mail') . " (" . $cm_texts[ $cm_lang ]['en.email_address.type'][$k] . ", " . _txt('ct.org_identities.1') . ")";
+        $ret[_txt('ct.org_identities.1')]['i:email_address:'.$k] = _txt('fd.email_address.mail') . " (" . $cm_texts[ $cm_lang ]['en.email_address.type'][$k] . ")";
         
       foreach(array_keys($cm_texts[ $cm_lang ]['en.telephone_number.type']) as $k)
-        $ret['i:telephone_number:'.$k] = _txt('fd.telephone_number.number') . " (" . $cm_texts[ $cm_lang ]['en.telephone_number.type'][$k] . ", " . _txt('ct.org_identities.1') . ")";
+        $ret[_txt('ct.org_identities.1')]['i:telephone_number:'.$k] = _txt('fd.telephone_number.number') . " (" . $cm_texts[ $cm_lang ]['en.telephone_number.type'][$k] . ")";
+        
+      foreach(array_keys($cm_texts[ $cm_lang ]['en.url.type']) as $k)
+        $ret[_txt('ct.org_identities.1')]['i:url:'.$k] = _txt('fd.url.url') . " (" . $cm_texts[ $cm_lang ]['en.url.type'][$k] . ")";
     }
     
     // (7) Enrollment Flow specific attributes -- these don't get copied out of the petition (code=e)
-    $ret['e:textfield'] = _txt('fd.pt.textfield');
+    $ret[_txt('ct.petitions.1')]['e:textfield'] = _txt('fd.pt.textfield');
     
     return($ret);
   }
@@ -247,8 +303,9 @@ class CoEnrollmentAttribute extends AppModel {
     // the flow changes after the petition is created), but Enrollment Attributes stay
     // with the current flow definition. So we need to check if there is a parent id.
     $actualEfId = $this->CoEnrollmentFlow->field('co_enrollment_flow_id', array('CoEnrollmentFlow.id' => $coef));
-    
-    if(!$actualEfId) {
+
+    // if there is no parent id then the co_enrollment_flow_id field will always be null
+    if(is_null($actualEfId)) {
       $actualEfId = $coef;
     }
     
@@ -325,17 +382,21 @@ class CoEnrollmentAttribute extends AppModel {
         // type 'o' or 'r' and is required by the data model.
         $attr['required'] = $efAttr['CoEnrollmentAttribute']['required'];
         $attr['mvpa_required'] = false; // does not apply
-        
-        if(($attrCode == 'o' || $attrCode == 'r')
-           && $attrModel->validate[$attrName]['content']['required'])
-          $attr['required'] = true;
+
+        // We check if the attribute is requested by the Model's validation rules
+        // If this is true then it does not matter if we choose required or not
+        // Also it does not matter if we want it empty or not
+        if( $attrCode == 'o' || $attrCode == 'r') {
+          $attr['required'] = (bool)$attrModel->validate[$attrName]['content']['required'];
+          $attr['allow_empty'] = (bool)$attrModel->validate[$attrName]['content']['allowEmpty'];
+        }
         
         // Label
         $attr['label'] = $efAttr['CoEnrollmentAttribute']['label'];
         
         // Description
         $attr['description'] = $efAttr['CoEnrollmentAttribute']['description'];
-        
+
         // Single value attributes are never hidden, unless there is a non-modifable
         // default value
         $attr['hidden'] =
@@ -411,10 +472,17 @@ class CoEnrollmentAttribute extends AppModel {
           } else {
             $attr['default'] = $efAttr['CoEnrollmentAttributeDefault'][0]['value'];
           }
-          
           $attr['modifiable'] = $efAttr['CoEnrollmentAttributeDefault'][0]['modifiable'];
+        } elseif($efAttr['CoEnrollmentAttribute']['attribute'] == 'r:sponsor_co_person_id') {
+          // Special case for sponsor, we want to make sure the modifiable field passes
+          // through even if there is no default value
+          if(isset($efAttr['CoEnrollmentAttributeDefault'][0]['modifiable'])) {
+            $attr['modifiable'] = $efAttr['CoEnrollmentAttributeDefault'][0]['modifiable'];
+          } else {
+            $attr['modifiable'] = true;
+          }
         }
-        
+
         // Attach the validation rules so the form knows how to render the field.
         if($attrCode == 'o') {
           $attr['validate'] = $attrModel->validate[$attrName];
@@ -442,22 +510,39 @@ class CoEnrollmentAttribute extends AppModel {
             $args['joins'][0]['type'] = 'INNER';
             $args['joins'][0]['conditions'][0] = 'Cou.co_id=CoEnrollmentFlow.co_id';
             $args['order'] = 'Cou.name ASC';
-            
+
             $attr['select'] = $this->CoEnrollmentFlow->CoPetition->Cou->find('list', $args);
             $attr['validate']['content']['rule'][0] = 'inList';
             $attr['validate']['content']['rule'][1] = array_keys($attr['select']);
             // As of Cake 2.1, inList doesn't work for integers unless you set strict to false
             // https://cakephp.lighthouseapp.com/projects/42648/tickets/2770-inlist-doesnt-work-more-in-21
             $attr['validate']['content']['rule'][2] = false;
+            if(isset($efAttr['CoEnrollmentAttributeDefault'][0]['value'])
+               && !is_null($efAttr['CoEnrollmentAttributeDefault'][0]['value'])) {
+              $attr['default'] = $efAttr['CoEnrollmentAttributeDefault'][0]['value'];
+              // If there's a default value, then the attribute can be hidden
+              $attr['hidden'] = (isset($efAttr['CoEnrollmentAttribute']['hidden'])
+                && $efAttr['CoEnrollmentAttribute']['hidden']);
+            }
+            $attr['modifiable'] = (isset($efAttr['CoEnrollmentAttributeDefault'][0]['modifiable'])
+                                    ? $efAttr['CoEnrollmentAttributeDefault'][0]['modifiable']
+                                    : false);
           } elseif($attrName == 'sponsor_co_person_id') {
             // Like COU ID, we need to set up a select
             
-            $attr['select'] = $this->CoEnrollmentFlow->CoPetition->Co->CoPerson->sponsorList($efAttr['CoEnrollmentFlow']['co_id']);
-            $attr['validate']['content']['rule'][0] = 'inList';
-            $attr['validate']['content']['rule'][1] = array_keys($attr['select']);
-            // As of Cake 2.1, inList doesn't work for integers unless you set strict to false
-            // https://cakephp.lighthouseapp.com/projects/42648/tickets/2770-inlist-doesnt-work-more-in-21
-            $attr['validate']['content']['rule'][2] = false;
+            try {
+              $attr['select'] = $this->CoEnrollmentFlow->CoPetition->Co->CoPerson->sponsorList($efAttr['CoEnrollmentFlow']['co_id']);
+              $attr['validate']['content']['rule'][0] = 'inList';
+              $attr['validate']['content']['rule'][1] = array_keys($attr['select']);
+              // As of Cake 2.1, inList doesn't work for integers unless you set strict to false
+              // https://cakephp.lighthouseapp.com/projects/42648/tickets/2770-inlist-doesnt-work-more-in-21
+              $attr['validate']['content']['rule'][2] = false;
+            }
+            catch(OverflowException $e) {
+              // Use the people picker instead
+              
+              // We don't need to inject a validation rule
+            }
           } else {
             // Default behavior for all other attributes
             
@@ -545,10 +630,17 @@ class CoEnrollmentAttribute extends AppModel {
         
         foreach(array_keys($attrModel->validate) as $k) {
           // Skip fields that are autopopulated
-          if($k != 'co_person_id'
+          if($k != 'co_department_id'
+             && $k != 'co_group_id'
+             && $k != 'co_person_id'
              && $k != 'co_person_role_id'
+             && $k != 'co_provisioning_target_id'
              && $k != 'org_identity_id'
-             && $k != 'source_' . $attrName . '_id') {
+             && $k != 'source_' . $attrName . '_id'
+             // For now, we skip description (introduced to MVPAs in 3.1.0)
+             // because it will generally be too confusing to people.
+             // "What's my email description?" This could become configurable, though.
+             && $k != 'description') {
             $attr = array();
               
             // The attribute ID and attribute key will be the same for all components
@@ -558,7 +650,7 @@ class CoEnrollmentAttribute extends AppModel {
             $attr['attribute'] = $efAttr['CoEnrollmentAttribute']['attribute'];
             
             // Track if the mvpa itself is required
-            $attr['mvpa_required'] = $efAttr['CoEnrollmentAttribute']['required'];
+            $attr['mvpa_required'] = (bool)$efAttr['CoEnrollmentAttribute']['required'];
             
             // For certain MVPAs, check if this field is even permitted (currently only names)
             // XXX this is kind of clunky -- rewrite if this expands to more attributes
@@ -599,12 +691,12 @@ class CoEnrollmentAttribute extends AppModel {
                && $efAttr['CoEnrollmentAttribute']['ignore_authoritative']);
             
             // We hide language, primary_name, type, status, and verified
-            $attr['hidden'] = ($k == 'language'
-                               || $k == 'login'
-                               || $k == 'primary_name'
-                               || $k == 'type'
-                               || $k == 'status'
-                               || $k == 'verified' ? 1 : 0);
+            $attr['hidden'] = ($k === 'language'
+                               || $k === 'login'
+                               || $k === 'primary_name'
+                               || $k === 'type'
+                               || $k === 'status'
+                               || $k === 'verified' ? true : false);
             
             if($attr['hidden']) {
               // Populate a default value.
@@ -717,7 +809,6 @@ class CoEnrollmentAttribute extends AppModel {
         $attr['modifiable'] = (isset($efAttr['CoEnrollmentAttributeDefault'][0]['modifiable'])
                                ? $efAttr['CoEnrollmentAttributeDefault'][0]['modifiable']
                                : false);
-        $attr['validate']['content']['rule'][0] = 'inList';
         
         // Pull the set of groups for the select
         $args = array();
@@ -726,7 +817,13 @@ class CoEnrollmentAttribute extends AppModel {
         $args['contain'] = false;
         
         $attr['select'] = $this->CoEnrollmentFlow->Co->CoGroup->find('list', $args);
-        
+
+        $attr['validate']['content']['rule'][0] = 'inList';
+        $attr['validate']['content']['rule'][1] = array_keys($attr['select']);
+        // As of Cake 2.1, inList doesn't work for integers unless you set strict to false
+        // https://cakephp.lighthouseapp.com/projects/42648/tickets/2770-inlist-doesnt-work-more-in-21
+        $attr['validate']['content']['rule'][2] = false;
+
         $attrs[] = $attr;
         
         // We allow a petitioner to opt-in (ie: tick the box) for membership when
@@ -740,7 +837,7 @@ class CoEnrollmentAttribute extends AppModel {
         $optin = (!empty($attr['default'])
                   && !$attr['modifiable']
                   && !$attr['hidden']
-                  && $attr['required'] == RequiredEnum::Optional);
+                  && $attr['required'] === RequiredEnum::Optional);
         
         // Inject hidden attributes to specify membership
         
@@ -823,7 +920,7 @@ class CoEnrollmentAttribute extends AppModel {
    * @param  integer Record to retrieve for
    * @return integer Corresponding CO ID, or NULL if record has no corresponding CO ID
    * @throws InvalidArgumentException
-   * @throws RunTimeException
+   * @throws RuntimeException
    */
   
   public function findCoForRecord($id) {
@@ -861,65 +958,109 @@ class CoEnrollmentAttribute extends AppModel {
     // use different formats in their attribute column (the former does not
     // include field names while the latter does).
     
-    $eaMap = array();
-    
-    for($i = 0;$i < count($enrollmentAttributes);$i++) {
-      $model = explode('.', $enrollmentAttributes[$i]['model'], 2);
+    if(!empty($envValues)) {
+      $eaMap = array();
       
-      // Only track org identity attributes
-      if($model[0] == "EnrolleeOrgIdentity"
-         // that aren't hidden
-         && !$enrollmentAttributes[$i]['hidden']
-         // and that are modifiable
-         && (!isset($enrollmentAttributes[$i]['modifiable'])
-             || $enrollmentAttributes[$i]['modifiable'])
-         // and that aren't set to ignore authoritative values
-         && (!isset($enrollmentAttributes[$i]['ignore_authoritative'])
-             || !$enrollmentAttributes[$i]['ignore_authoritative'])) {
-        $key = "";
+      for($i = 0, $iMax = count($enrollmentAttributes); $i < $iMax; $i++) {
+        $model = explode('.', $enrollmentAttributes[$i]['model'], 2);
         
-        if(!empty($model[1])) {
-          // Inflect the associated model name, minus any model ID
-          // (ie: we want "EmailAddress", not "EmailAddress.3")
+        // Only track org identity attributes
+        if($model[0] == "EnrolleeOrgIdentity"
+           // that aren't hidden
+           && !$enrollmentAttributes[$i]['hidden']
+           // and that are modifiable
+           && (!isset($enrollmentAttributes[$i]['modifiable'])
+               || $enrollmentAttributes[$i]['modifiable'])
+           // and that aren't set to ignore authoritative values
+           && (!isset($enrollmentAttributes[$i]['ignore_authoritative'])
+               || !$enrollmentAttributes[$i]['ignore_authoritative'])) {
+          $key = "";
           
-          $m = explode(".", $model[1], 2);
-          $key = Inflector::pluralize(Inflector::tableize($m[0])) . ":";
-        }
-        
-        $key .= $enrollmentAttributes[$i]['field'];
-        
-        $eaMap[$key] = $i;
-      }
-    }
-    
-    // Now walk through the CMP Enrollment Attributes. If an env_name is defined,
-    // look for the corresponding CO Enrollment Attribute.
-    
-    foreach($envValues as $e) {
-      if(!empty($e['env_name']) && isset($eaMap[ $e['attribute'] ])) {
-        $i = $eaMap[ $e['attribute'] ];
-        
-        if(!empty($e['type'])) {
-          // Check the type. The enrollment attribute is of the form i:name:official.
-          
-          $xeattr = explode(':', $enrollmentAttributes[$i]['attribute'], 3);
-          
-          if(empty($xeattr[2]) || ($e['type'] != $xeattr[2])) {
-            // This is not the right type of attribute, move on
-            continue;
+          if(!empty($model[1])) {
+            // Inflect the associated model name, minus any model ID
+            // (ie: we want "EmailAddress", not "EmailAddress.3")
+            
+            $m = explode(".", $model[1], 2);
+            $key = Inflector::pluralize(Inflector::tableize($m[0])) . ":";
           }
+          
+          $key .= $enrollmentAttributes[$i]['field'];
+          
+          $eaMap[$key] = $i;
         }
-        // If no type specified, match any instance of this attribute, regardless of type
-        
-        $enrollmentAttributes[$i]['default'] = getenv($e['env_name']);
-        
-        // Make sure the modifiable value is set. If a value was found, we will
-        // make it not-modifiable.
-        
-        $enrollmentAttributes[$i]['modifiable'] = !(boolean)$enrollmentAttributes[$i]['default'];
+      }
+      
+      // Now walk through the CMP Enrollment Attributes. If an env_name is defined,
+      // look for the corresponding CO Enrollment Attribute.
+      
+      foreach($envValues as $e) {
+        if(!empty($e['env_name']) && isset($eaMap[ $e['attribute'] ])) {
+          $i = $eaMap[ $e['attribute'] ];
+          
+          if(!empty($e['type'])) {
+            // Check the type. The enrollment attribute is of the form i:name:official.
+            
+            $xeattr = explode(':', $enrollmentAttributes[$i]['attribute'], 3);
+            
+            if(empty($xeattr[2]) || ($e['type'] != $xeattr[2])) {
+              // This is not the right type of attribute, move on
+              continue;
+            }
+          }
+          // If no type specified, match any instance of this attribute, regardless of type
+          
+          $enrollmentAttributes[$i]['default'] = getenv($e['env_name']);
+          
+          // Make sure the modifiable value is set. If a value was found, we will
+          // make it not-modifiable.
+          
+          $enrollmentAttributes[$i]['modifiable'] = !(boolean)$enrollmentAttributes[$i]['default'];
+        }
       }
     }
     
+    // Check for default values from env variables.
+
+    for($i = 0, $iMax = count($enrollmentAttributes); $i < $iMax; $i++) {
+      // Skip anything that's hidden. This will prevent us from setting a
+      // default value for metadata attributes, and will also prevent using
+      // default values in hidden attributes (which is probably a feature, not
+      // a bug).
+      
+      if($enrollmentAttributes[$i]['hidden']) {
+        continue;
+      }
+      
+      if(!empty($enrollmentAttributes[$i]['CoEnrollmentAttribute']['default_env'])) {
+        if(strstr($enrollmentAttributes[$i]['attribute'], ':name:')) {
+          // Handle name specially
+          $envVar = $enrollmentAttributes[$i]['CoEnrollmentAttribute']['default_env']
+                  . "_"
+                  . strtoupper($enrollmentAttributes[$i]['field']);
+        } else {
+          $envVar = $enrollmentAttributes[$i]['CoEnrollmentAttribute']['default_env'];
+        }
+
+        // The default value is either the default envVar or the default hardcoded value if the envVar is not present
+        // in the session. For example community Identity Providers might not provide affiliation attributes.
+        $enrollmentAttributes[$i]['default'] = !empty(getenv($envVar)) ? getenv($envVar)
+          : ( !empty($enrollmentAttributes[$i]['default'])
+            ? $enrollmentAttributes[$i]['default'] : '');
+
+        $enrollmentAttributes[$i]['modifiable'] = (!isset($enrollmentAttributes[$i]['modifiable'])) ? true :
+          $enrollmentAttributes[$i]['modifiable'];
+        // XXX Should we define default value for each env_var in case of complex attributes, e.g. given name
+        // We use allowEmpty to check, which is more accurate than $validate->required.
+        // Required is true if the attribute is required by the enrollment flow configuration,
+        // AND if the MVPA's element is also required/allowEmpty (eg: Email requires mail to be set).
+        // In the new style, these are defaults, not canonical values
+        if( empty($enrollmentAttributes[$i]['default'])
+          && $enrollmentAttributes[$i]['required']) {
+          $enrollmentAttributes[$i]['modifiable'] = true;
+        }
+      }
+    }
+
     return $enrollmentAttributes;
   }
   

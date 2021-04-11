@@ -116,6 +116,7 @@
         $user = $this->in(_txt('se.cf.admin.user'));        
       }
       
+      /* As of v3.1.0, pooling can no longer be enabled for new deployments (CO-1471)
       if(!empty($this->params['enable-pooling'])) {
         $pooling = $this->params['enable-pooling'];
       } else {
@@ -123,22 +124,14 @@
                              array(_txt('fd.yes'), _txt('fd.no')),
                              _txt('fd.no'));
       }
+      */
       
       // Since we'll be doing some direct DB manipulation, find the table prefix
       $prefix = "";
-      $db =& ConnectionManager::getDataSource('default');
+      $db = ConnectionManager::getDataSource('default');
 
       if(isset($db->config['prefix']))
         $prefix = $db->config['prefix'];
-      
-      $this->out("- " . _txt('se.users.view'));
-      $this->Identifier->query("CREATE VIEW " . $prefix . "users AS
-SELECT a.username as username, a.password as password, a.id as api_user_id
-FROM cm_api_users a
-UNION SELECT i.identifier as username, '*' as password, null as api_user_id
-FROM cm_identifiers i
-WHERE i.login=true;
-");
       
       // We need the following:
       // - The COmanage CO

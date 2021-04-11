@@ -39,8 +39,10 @@
   if($this->action == "edit" && $permissions['editself'])
     $es = true;
 
-  // We shouldn't get here if we don't have at least read permission, but check just in case
+  // Array to hold inline editable field properties
+  $inlineEditableFields = [];
 
+  // We shouldn't get here if we don't have at least read permission, but check just in case
   if(!$e && !$permissions['view'])
     return(false);
 
@@ -55,18 +57,26 @@
       print $this->Form->hidden('id', array('default' => $co_person_roles[0]['CoPersonRole']['id']));
   }
 
+  // CO-1891: Label language strings should render the COU name if available, otherwise the CO name
+  $cur_cou = $cur_co['Co']['name'];
+  if(!empty($menuContent["cous"])
+      && !empty($co_person_roles[0]['CoPersonRole']['cou_id'])) {
+    $cur_cou = $menuContent["cous"][$co_person_roles[0]['CoPersonRole']['cou_id']];
+  }
+
   // Line number, for rendering
   $l = 1;
 
   // Add breadcrumbs
   print $this->element("coCrumb");
-  $args = array();
-  $args['plugin'] = null;
-  $args['controller'] = 'co_people';
-  $args['action'] = 'index';
-  $args['co'] = $cur_co['Co']['id'];
-  $this->Html->addCrumb(_txt('me.population'), $args);
-
+  if($permissions['index']) {
+    $args = array();
+    $args['plugin'] = null;
+    $args['controller'] = 'co_people';
+    $args['action'] = 'index';
+    $args['co'] = $cur_co['Co']['id'];
+    $this->Html->addCrumb(_txt('me.population'), $args);
+  }
   $args = array(
     'controller' => 'co_people',
     'action' => 'canvas',
@@ -90,7 +100,47 @@
           $(this).find(".material-icons").text("indeterminate_check_box");
         }
       });
+
+      $('#CoPersonRoleCouId').on('change', '', function () {
+        var selectedCOU = $(this).children("option:selected").html();
+        if(selectedCOU.trim() === "") {
+          selectedCOU = '<?php print $cur_cou;?>';
+        }
+        $("label[for='CoPersonRoleAffiliation']").text(selectedCOU + ' Affiliation');
+        $("label[for='CoPersonRoleTitle']").text(selectedCOU + ' Title');
+      });
+      
+      <?php if($vv_sponsor_mode != SponsorEligibilityEnum::None && !isset($vv_sponsors)): ?>
+      $("#sponsors").autocomplete({
+        source: "<?php print $this->Html->url(array('controller' => 'co_people', 'action' => 'find', 'co' => $cur_co['Co']['id'], 'mode' => PeoplePickerModeEnum::Sponsor)); ?>",
+        minLength: 3,
+        select: function(event, ui) {
+          $("#sponsors").val(ui.item.label);
+          $("#sponsor_co_person_id").val(ui.item.value);
+          return false;
+        }
+      });
+      <?php endif; // vv_sponsor_mode ?>
+
+      <?php if($vv_sponsor_mode != SponsorEligibilityEnum::None && !isset($vv_sponsors)): ?>
+        reset_sponsor();
+      <?php endif; // vv_sponsor_mode ?>
+
+      // Used in inline-edit mode for Sponsor (i.e. when sponsor list > 50)
+      $("#cm-ief-button-remove-sponsor_co_person_id").click(function() {
+        reset_sponsor();
+        $(this).closest(".cm-ief-val").hide();
+        $(this).closest(".cm-inline-editable-field").find(".cm-ief-widget").removeClass('hidden');
+        $("#sponsors").focus();
+      });
+
     });
+    
+    function reset_sponsor() {
+      $("#sponsors").val("");
+      $("#sponsor_co_person_id").val(null);
+    }
+
   </script>
 
   <div id="<?php print $this->action; ?>_role_attributes" class="explorerContainer">
@@ -142,7 +192,7 @@
                     $attrs['value'] = (isset($co_person_roles[0]['CoPersonRole']['cou_id'])
                       ? $co_person_roles[0]['CoPersonRole']['cou_id']
                       : 0);
-                    $attrs['empty'] = false;
+                    $attrs['empty'] = $vv_allow_empty_cou;
 
                     if($e && !$es) {
                       print $this->Form->select('cou_id',
@@ -162,7 +212,7 @@
             <li>
               <div class="field-name">
                 <?php
-                  $label = _txt('fd.affil-a', array(filter_var($cur_co['Co']['name'],FILTER_SANITIZE_SPECIAL_CHARS)));
+                  $label = _txt('fd.affil-a', array(filter_var($cur_cou,FILTER_SANITIZE_SPECIAL_CHARS)));
 
                   if($e && !$es) {
                     print $this->Form->label('affiliation', $label);
@@ -243,7 +293,28 @@
             <li>
               <div class="field-name">
                 <?php
-                  $label = _txt('fd.title-a', array(filter_var($cur_co['Co']['name'],FILTER_SANITIZE_SPECIAL_CHARS)));
+                  if ($e && !$es) {
+                    print $this->Form->label('ordr', _txt('fd.order'));
+                  } else {
+                    print _txt('fd.order');
+                  }
+                ?>
+              </div>
+              <div class="field-info">
+                <?php
+                  if($e && !$es) {
+                    // XXX not sure why model introspection isn't picking up the type...
+                    print $this->Form->input('ordr', array('type' => 'numeric'));
+                  } else {
+                    print filter_var($co_person_roles[0]['CoPersonRole']['ordr'],FILTER_SANITIZE_SPECIAL_CHARS);
+                  }
+                ?>
+              </div>
+            </li>
+            <li>
+              <div class="field-name">
+                <?php
+                  $label = _txt('fd.title-a', array(filter_var($cur_cou,FILTER_SANITIZE_SPECIAL_CHARS)));
 
                   if($e && !$es) {
                     print $this->Form->label('title', $label);
@@ -382,44 +453,87 @@
                 ?>
               </div>
             </li>
+            <?php if($vv_sponsor_mode != SponsorEligibilityEnum::None): ?>
             <li>
               <div class="field-name">
                 <?php
                   if($e && !$es) {
-                    print $this->Form->label('sponsor_co_person_id', _txt('fd.sponsor') . " " . _txt('fd.sponsor.desc'));
+                    // The sponsors field is a manual placeholder, so we generate the label manually too
+                    print '<label for="sponsors">' . _txt('fd.sponsor') . "</label>";
                   } else {
-                    print _txt('fd.sponsor') . " " . _txt('fd.sponsor.desc');
+                    print _txt('fd.sponsor');
                   }
-                ?>
+                ?><br />
               </div>
               <div class="field-info">
+                <?php if(isset($vv_sponsor_valid) && !$vv_sponsor_valid): ?>
+                  <div class="field-desc">
+                    <span class="ui-icon ui-icon-info co-info"></span>
+                    <em><?php print _txt('fd.sponsor.inel'); ?></em>
+                  </div>
+                <?php endif; ?>
+
                 <?php
-                if(!empty($vv_sponsors)) {
-                  if(!empty($co_person_roles[0]['CoPersonRole']['sponsor_co_person_id'])
-                    && !isset($vv_sponsors[ $co_person_roles[0]['CoPersonRole']['sponsor_co_person_id'] ])) {
-                    if(!empty($co_person_roles[0]['SponsorCoPerson']['PrimaryName'])) {
-                      print $this->Html->link(generateCn($co_person_roles[0]['SponsorCoPerson']['PrimaryName']),
-                        array('controller' => 'co_people',
-                          'action' => 'canvas',
-                          $co_person_roles[0]['SponsorCoPerson']['id']));
-                    }
-
-                    print '<div class="field-desc">
-                              <span class="ui-icon ui-icon-info co-info"></span>
-                              <em>' . _txt('fd.sponsor.inel') . '</em>
-                            </div>';
-                  }
-
                   if($e && !$es) {
-                    print $this->Form->select('sponsor_co_person_id', $vv_sponsors);
-                  } elseif(!empty($co_person_roles[0]['CoPersonRole']['sponsor_co_person_id'])) {
-                    print filter_var($vv_sponsors[ $co_person_roles[0]['CoPersonRole']['sponsor_co_person_id'] ],FILTER_SANITIZE_SPECIAL_CHARS);
+                    if(!empty($vv_sponsors)) {
+                      // Use a simple drop down
+                      print $this->Form->select('sponsor_co_person_id', $vv_sponsors);
+                    } else {
+                      // Use a people picker
+                      print '<div class="cm-inline-editable-field">';
+                      $inlineEditableFields['sponsor-val']['set'] = false;
+
+                      if(!empty($co_person_roles[0]['CoPersonRole']['sponsor_co_person_id'])
+                         && !empty($co_person_roles[0]['SponsorCoPerson']['PrimaryName'])) {
+
+                        $inlineEditableFields['sponsor-val']['set'] = true;
+
+                        print '<div class="cm-ief-val">';
+                        print $this->Html->link(
+                          generateCn($co_person_roles[0]['SponsorCoPerson']['PrimaryName']),
+                          array(
+                            'controller' => 'co_people',
+                            'action' => 'canvas',
+                            $co_person_roles[0]['SponsorCoPerson']['id']
+                          )
+                        );
+
+                        print $this->element('inlineEditControls', array(
+                          'fieldName' => 'sponsor_co_person_id',
+                          'actions' => array('remove')
+                        ));
+                        
+                        print '</div>';
+                      }
+
+                      $iefClasses = "cm-ief-widget";
+                      if ($inlineEditableFields['sponsor-val']['set']) {
+                        $iefClasses .= " hidden";
+                      }
+
+                      print '<div class="' . $iefClasses . '">
+                               <div class="ui-widget">                      
+                                 <input id="sponsors" type="text" />'
+                                 . $this->Form->hidden('sponsor_co_person_id',
+                                 array(
+                                   'id'      => 'sponsor_co_person_id',
+                                   'default' => (!empty($co_person_roles[0]['CoPersonRole']['sponsor_co_person_id'])) ? $co_person_roles[0]['CoPersonRole']['sponsor_co_person_id'] : null
+                                 ))
+                            . '</div>
+                               <div class="field-desc">
+                                 <span class="ui-icon ui-icon-info co-info"></span>
+                                 <em>' . _txt('fd.sponsor.desc') . '</em>
+                               </div>';
+                      print '</div>';
+                      // We need to unlock the field for autocomplete manipulation
+                      $this->Form->unlockField('CoPersonRole.sponsor_co_person_id');
+                    }
                   }
-                }
                 ?>
               </div>
             </li>
-            <li>
+            <?php endif; // vv_sponsor_mode ?>
+            <li class="modelbox-data">
               <div class="field-name">
                 <?php
                   if($e && !$es) {
@@ -455,7 +569,7 @@
                 ?>
               </div>
             </li>
-            <li>
+            <li class="modelbox-data">
               <div class="field-name">
                 <?php
                   if($e && !$es) {
@@ -501,7 +615,7 @@
               foreach($vv_extended_attributes as $c) {
                 $attr = strtolower($c['CoExtendedAttribute']['name']);
                 ?>
-                <li>
+                <li class="modelbox-data">
                   <div class="field-name">
                     <?php
                       if($e && !$es) {
@@ -542,233 +656,32 @@
           </ul><!-- tabs-role -->
         </li><!-- fields-role -->
 
-        <?php if($this->action != "add"): ?>
-
-          <li id="fields-phone" class="fieldGroup">
-
-            <?php if($this->Permission->selfService($permissions, $e, 'TelephoneNumber') == PermissionEnum::ReadWrite): ?>
-              <div class="coAddEditButtons">
-                <?php
-                print $this->Html->link(_txt('op.add'),
-                  array(
-                    'controller' => 'telephone_numbers',
-                    'action' => 'add',
-                    'copersonroleid' => $co_person_roles[0]['CoPersonRole']['id']
-                  ),
-                  array('class' => 'addbutton')
-                );
-                ?>
-              </div>
-            <?php endif; // ReadWrite permission, telephone ?>
-
-            <a href="#tabs-phone" class="fieldGroupName">
-              <em class="material-icons">indeterminate_check_box</em>
-              <?php print _txt('ct.telephone_numbers.pl'); ?>
-            </a>
-
-            <ul id="tabs-phone" class="fields data-list">
-
-              <?php if(!empty($co_person_roles[0]['TelephoneNumber'])): ?>
-                <?php foreach($co_person_roles[0]['TelephoneNumber'] as $t): ?>
-                  <?php
-                    if(!empty($t['SourceTelephoneNumber']['id'])) {
-                      // This telephone number came from an OIS and so can't be edited
-                      print '<li>';
-                      print '<div class="field-data">';
-                      print $this->Html->link($t['number'], array('controller' => 'telephone_numbers', 'action' => 'view', $t['id']));
-                      print " &nbsp;("
-                        . $t['SourceTelephoneNumber']['OrgIdentity']['OrgIdentitySourceRecord']['OrgIdentitySource']['description']
-                        . ", " . $vv_copr_telephonenumber_types[ $t['type'] ] . ")<br />\n";
-                      print '</div>';
-                      print '<div class="field-actions">';
-                      print $this->Html->link(_txt('op.view'),
-                                              array('controller' => 'telephone_numbers', 'action' => 'view', $t['id']),
-                                              array('class' => 'viewbutton')) . "\n";
-                      print '</div>';
-                      print '</li>';
-
-                      continue;
-                    }
-
-                    $perm = $this->Permission->selfService($permissions, $e, 'TelephoneNumber', $t['type']);
-                  ?>
-
-                  <?php if($perm == PermissionEnum::ReadWrite): ?>
-                    <li>
-                      <div class="field-data">
-                        <?php
-                          print $this->Html->link(formatTelephone($t),
-                            array(
-                              'controller' => 'telephone_numbers',
-                              'action' => 'edit',
-                              $t['id']
-                            )
-                          );
-                        ?>
-                        <span class="data-desc">
-                          (<?php print $vv_copr_telephonenumber_types[ $t['type'] ]; ?>)
-                        </span>
-                      </div>
-                      <div class="field-actions">
-                        <?php
-                          print '<button type="button" class="deletebutton" title="' . _txt('op.delete')
-                            . '" onclick="javascript:js_confirm_generic(\''
-                            . _txt('js.remove') . '\',\''    // dialog body text
-                            . $this->Html->url(              // dialog confirm URL
-                              array(
-                                'controller' => 'telephone_numbers',
-                                'action' => 'delete',
-                                $t['id']
-                              )
-                            ) . '\',\''
-                            . _txt('op.remove') . '\',\''    // dialog confirm button
-                            . _txt('op.cancel') . '\',\''    // dialog cancel button
-                            . _txt('op.remove') . '\',[\''   // dialog title
-                            . filter_var(_jtxt(formatTelephone($t)),FILTER_SANITIZE_STRING)  // dialog body text replacement strings
-                            . '\']);">'
-                            . _txt('op.delete')
-                            . '</button>';
-                          print $this->Html->link(_txt('op.edit'),
-                              array(
-                                'controller' => 'telephone_numbers',
-                                'action' => 'edit',
-                                $t['id']
-                              ),
-                              array('class' => 'editbutton')) . "\n";
-                        ?>
-                      </div>
-                    </li>
-
-                  <?php elseif($perm == PermissionEnum::ReadOnly): ?>
-                    <div class="field-data">
-                      <?php print filter_var(formatTelephone($t),FILTER_SANITIZE_SPECIAL_CHARS); ?>
-                      <span class="data-desc">
-                        (<?php print $vv_copr_telephonenumber_types[ $t['type'] ]; ?>)
-                      </span>
-                    </div>
-                  <?php endif; // ReadWrite permissions ?>
-
-
-                <?php endforeach; // TelephoneNumber ?>
-              <?php else: ?>
-                <li><div class="field-data field-data-alone"><?php print _txt('fd.none'); ?></div></li>
-              <?php endif; // TelephoneNumber ?>
-            </ul><!-- tabs-phone -->
-          </li><!-- fields-phone -->
-
-          <li id="fields-address" class="fieldGroup">
-
-            <?php if($this->Permission->selfService($permissions, $e, 'Address') == PermissionEnum::ReadWrite): ?>
-              <div class="coAddEditButtons">
-                <?php
-                print $this->Html->link(_txt('op.add'),
-                  array(
-                    'controller' => 'addresses',
-                    'action' => 'add',
-                    'copersonroleid' => $co_person_roles[0]['CoPersonRole']['id']),
-                  array('class' => 'addbutton'
-                  )
-                );
-                ?>
-              </div>
-            <?php endif; // ReadWrite permission, address ?>
-
-            <a href="#tabs-address" class="fieldGroupName">
-              <em class="material-icons">indeterminate_check_box</em>
-              <?php print _txt('ct.addresses.pl'); ?>
-            </a>
-
-            <ul id="tabs-address" class="fields data-list">
-
-              <?php if(!empty($co_person_roles[0]['Address'])): ?>
-                <?php foreach($co_person_roles[0]['Address'] as $addr): ?>
-                  <?php
-                    if(!empty($addr['SourceAddress']['id'])) {
-                      // This address came from an OIS and so can't be edited
-                      print '<li class="field-data-container">';
-                      print '<div class="field-data">';
-                      print $this->Html->link($addr['street'], array('controller' => 'addresses', 'action' => 'view', $addr['id']));
-                      print " &nbsp;("
-                        . $addr['SourceAddress']['OrgIdentity']['OrgIdentitySourceRecord']['OrgIdentitySource']['description']
-                        . ", " . $vv_copr_address_types[ $addr['type'] ] . ")<br />\n";
-                      print '</div>';
-                      print '<div class="field-actions">';
-                      print $this->Html->link(_txt('op.view'),
-                                              array('controller' => 'addresses', 'action' => 'view', $addr['id']),
-                                              array('class' => 'viewbutton')) . "\n";
-                      print '</div>';
-                      print '</li>';
-
-                      continue;
-                    }
-
-                    $perm = $this->Permission->selfService($permissions, $e, 'Address', $addr['type']);
-                  ?>
-
-                  <li>
-
-                    <?php if($perm == PermissionEnum::ReadWrite): ?>
-
-                      <div class="field-data">
-                        <?php
-                          print $this->Html->link($addr['street'],
-                            array(
-                              'controller' => 'addresses',
-                              'action' => 'edit',
-                              $addr['id'])
-                          );
-                        ?>
-                        <span class="data-desc">
-                            (<?php print $vv_copr_address_types[ $addr['type'] ]; ?>)
-                          </span>
-                      </div>
-                      <div class="field-actions">
-                        <?php
-                        print '<button type="button" class="deletebutton" title="' . _txt('op.delete')
-                          . '" onclick="javascript:js_confirm_generic(\''
-                          . _txt('js.remove') . '\',\''    // dialog body text
-                          . $this->Html->url(              // dialog confirm URL
-                            array(
-                              'controller' => 'addresses',
-                              'action' => 'delete',
-                              $addr['id'],
-                              'co' => $cur_co['Co']['id']
-                            )
-                          ) . '\',\''
-                          . _txt('op.remove') . '\',\''    // dialog confirm button
-                          . _txt('op.cancel') . '\',\''    // dialog cancel button
-                          . _txt('op.remove') . '\',[\''   // dialog title
-                          . filter_var(_jtxt($addr['street']),FILTER_SANITIZE_STRING)  // dialog body text replacement strings
-                          . '\']);">'
-                          . _txt('op.delete')
-                          . '</button>';
-                        print $this->Html->link(_txt('op.edit'),
-                            array(
-                              'controller' => 'addresses',
-                              'action' => 'edit',
-                              $addr['id']
-                            ),
-                            array('class' => 'editbutton')) . "\n";
-                        ?>
-                      </div>
-                    <?php elseif($perm == PermissionEnum::ReadOnly): ?>
-                      <div class="field-data">
-                        <?php print filter_var($addr['street'],FILTER_SANITIZE_SPECIAL_CHARS); ?>
-                        <span class="data-desc">
-                          (<?php $vv_copr_address_types[ $addr['type'] ]; ?>)
-                        </span>
-                      </div>
-                    <?php endif; // ReadWrite permissions ?>
-                  </li>
-                <?php endforeach; // Address ?>
-              <?php else: ?>
-                <li>
-                  <div class="field-data"><?php print _txt('fd.none'); ?></div>
-                </li>
-              <?php endif; // Address ?>
-            </ul><!-- tabs-address -->
-          </li><!-- fields-address -->
-        <?php endif; // !add ?>
+        <?php
+          if($this->action != "add") {
+            $args = array(
+              'edit'         => $e,
+              'self_service' => true,
+              'model'        => 'CoPersonRole',
+              'model_param'  => 'copersonroleid',
+              'mvpa_model'   => 'TelephoneNumber',
+              'mvpa_field'   => null,
+              'mvpa_format'  => 'formatTelephone'
+            );
+            
+            print $this->element('mvpa', $args);
+            
+            $args['mvpa_model'] = 'Address';
+            $args['mvpa_format'] = 'formatAddress';
+            
+            print $this->element('mvpa', $args);
+            
+            $args['mvpa_model'] = 'AdHocAttribute';
+            $args['self_service'] = false;
+            $args['mvpa_format'] = 'formatAdHoc';
+            
+            print $this->element('mvpa', $args);
+          }
+        ?>
       </ul>
     </div>
   </div>

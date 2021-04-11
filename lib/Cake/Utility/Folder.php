@@ -122,7 +122,7 @@ class Folder {
  *
  * @param string $path Path to folder
  * @param bool $create Create folder if not found
- * @param string|bool $mode Mode (CHMOD) to apply to created folder, false to ignore
+ * @param int|bool $mode Mode (CHMOD) to apply to created folder, false to ignore
  * @link https://book.cakephp.org/2.0/en/core-utility-libraries/file-folder.html#Folder
  */
 	public function __construct($path = false, $create = false, $mode = false) {
@@ -323,7 +323,7 @@ class Folder {
  * Returns true if given $path is a registered stream wrapper.
  *
  * @param string $path Path to check
- * @return boo true If path is registered stream wrapper.
+ * @return bool true If path is registered stream wrapper.
  */
 	public static function isRegisteredStreamWrapper($path) {
 		if (preg_match('/^[A-Z]+(?=:\/\/)/i', $path, $matches) &&
@@ -520,7 +520,7 @@ class Folder {
 		foreach ($iterator as $itemPath => $fsIterator) {
 			if ($skipHidden) {
 				$subPathName = $fsIterator->getSubPathname();
-				if ($subPathName{0} === '.' || strpos($subPathName, DS . '.') !== false) {
+				if ($subPathName[0] === '.' || strpos($subPathName, DS . '.') !== false) {
 					continue;
 				}
 			}

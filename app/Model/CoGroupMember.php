@@ -36,6 +36,7 @@ class CoGroupMember extends AppModel {
   public $belongsTo = array(
     // A CoGroupMember is attached to one CoGroup
     "CoGroup",
+    "CoGroupNesting",
     // A CoGroupMember is attached to one CoPerson
     "CoPerson",
     // A CoGroupMember created from a Pipeline has a Source Org Identity
@@ -58,6 +59,12 @@ class CoGroupMember extends AppModel {
 
   // Validation rules for table elements
   public $validate = array(
+    'co_group_id' => array(
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => true
+      )
+    ),
     'co_person_id' => array(
       'content' => array(
         'rule' => 'numeric',
@@ -74,7 +81,28 @@ class CoGroupMember extends AppModel {
         'rule' => array('boolean')
       )
     ),
+    'valid_from' => array(
+      'content' => array(
+        'rule' => array('validateTimestamp'),
+        'required' => false,
+        'allowEmpty' => true
+      )
+    ),
+    'valid_through' => array(
+      'content' => array(
+        'rule' => array('validateTimestamp'),
+        'required' => false,
+        'allowEmpty' => true
+      )
+    ),
     'source_org_identity_id' => array(
+      'content' => array(
+        'rule' => array('numeric'),
+        'required' => false,
+        'allowEmpty' => true
+      )
+    ),
+    'co_group_nesting_id' => array(
       'content' => array(
         'rule' => array('numeric'),
         'required' => false,
@@ -146,6 +174,114 @@ class CoGroupMember extends AppModel {
   }
   
   /**
+   * Execute logic after model delete.
+   *
+   * @since  COmanage Registry v3.3.0
+   */
+
+  public function afterDelete() {
+    // On save, we pull any nestings for this group and sync memberships for the
+    // parent group(s). (We don't need to recurse since that should trigger a
+    // CO Group Member update for that group, which will then call afterSave
+    // again.)
+    
+    // Due to ChangelogBehavior these references should still be valid after delete.
+    
+    $group = $this->field('co_group_id');
+    $person = $this->field('co_person_id');
+    
+    if($group && $person) {
+      $args = array();
+      $args['conditions']['CoGroupNesting.co_group_id'] = $group;
+      $args['contain'][] = 'TargetCoGroup';
+      
+      $nestings = $this->CoGroupNesting->find('all', $args);
+      
+      if(!empty($nestings)) {
+        foreach($nestings as $n) {
+          $this->syncNestedMembership($n['TargetCoGroup'],
+                                      $n['CoGroupNesting']['id'],
+                                      $person,
+                                      false);
+        }
+      }
+    }
+    
+    return true;
+  }
+  
+  /**
+   * Callback after model save.
+   *
+   * @since  COmanage Registry v3.3.0
+   * @param  Boolean $created True if new model is saved (ie: add)
+   * @param  Array $options Options, as based to model::save()
+   * @return Boolean True on success
+   */
+
+  public function afterSave($created, $options = Array()) {
+    if(isset($options['safeties']) && $options['safeties'] == 'off') {
+      return true;
+    }
+    
+    // On save, we pull any nestings for this group and sync memberships for the
+    // parent group(s). (We don't need to recurse since that should trigger a
+    // CO Group Member update for that group, which will then call afterSave
+    // again.)
+    
+    if(!empty($this->data['CoGroupMember']['co_group_id'])
+       && !empty($this->data['CoGroupMember']['co_person_id'])) {
+      $args = array();
+      $args['conditions']['CoGroupNesting.co_group_id'] = $this->data['CoGroupMember']['co_group_id'];
+      $args['contain'][] = 'TargetCoGroup';
+      
+      $nestings = $this->CoGroupNesting->find('all', $args);
+      
+      if(!empty($nestings)) {
+        foreach($nestings as $n) {
+          $this->syncNestedMembership($n['TargetCoGroup'],
+                                      $n['CoGroupNesting']['id'],
+                                      $this->data['CoGroupMember']['co_person_id'],
+                                      $this->data['CoGroupMember']['member']);
+        }
+      }
+    }
+    
+    return true;
+  }
+  
+  /**
+   * Actions to take before a save operation is executed.
+   *
+   * @since  COmanage Registry v3.1.0
+   */
+
+  public function beforeSave($options = array()) {
+    // Possibly convert the requested timestamps to UTC from browser time.
+    // Do this before the strtotime/time calls below, both of which use UTC.
+
+    if($this->tz) {
+      $localTZ = new DateTimeZone($this->tz);
+
+      if(!empty($this->data['CoGroupMember']['valid_from'])) {
+        // This returns a DateTime object adjusting for localTZ
+        $offsetDT = new DateTime($this->data['CoGroupMember']['valid_from'], $localTZ);
+
+        // strftime converts a timestamp according to server localtime (which should be UTC)
+        $this->data['CoGroupMember']['valid_from'] = strftime("%F %T", $offsetDT->getTimestamp());
+      }
+
+      if(!empty($this->data['CoGroupMember']['valid_through'])) {
+        // This returns a DateTime object adjusting for localTZ
+        $offsetDT = new DateTime($this->data['CoGroupMember']['valid_through'], $localTZ);
+
+        // strftime converts a timestamp according to server localtime (which should be UTC)
+        $this->data['CoGroupMember']['valid_through'] = strftime("%F %T", $offsetDT->getTimestamp());
+      }
+    }
+  }
+  
+  /**
    * Obtain the member roles for a CO Group.
    *
    * @since  COmanage Registry v0.8
@@ -161,6 +297,19 @@ class CoGroupMember extends AppModel {
     
     $args = array();
     $args['conditions']['CoGroupMember.co_group_id'] = $coGroupId;
+    // Only pull currently valid group memberships
+    $args['conditions']['AND'][] = array(
+      'OR' => array(
+        'CoGroupMember.valid_from IS NULL',
+        'CoGroupMember.valid_from < ' => date('Y-m-d H:i:s', time())
+      )
+    );
+    $args['conditions']['AND'][] = array(
+      'OR' => array(
+        'CoGroupMember.valid_through IS NULL',
+        'CoGroupMember.valid_through > ' => date('Y-m-d H:i:s', time())
+      )
+    );
     $args['contain'] = false;
     
     $memberships = $this->find('all', $args);
@@ -194,6 +343,19 @@ class CoGroupMember extends AppModel {
     
     $args = array();
     $args['conditions']['CoGroupMember.co_person_id'] = $coPersonId;
+    // Only pull currently valid group memberships
+    $args['conditions']['AND'][] = array(
+      'OR' => array(
+        'CoGroupMember.valid_from IS NULL',
+        'CoGroupMember.valid_from < ' => date('Y-m-d H:i:s', time())
+      )
+    );
+    $args['conditions']['AND'][] = array(
+      'OR' => array(
+        'CoGroupMember.valid_through IS NULL',
+        'CoGroupMember.valid_through > ' => date('Y-m-d H:i:s', time())
+      )
+    );
     $args['contain'] = false;
     
     $memberships = $this->find('all', $args);
@@ -220,11 +382,12 @@ class CoGroupMember extends AppModel {
    * @param  Integer Maximium number of results to retrieve (or null)
    * @param  Integer Offset to start retrieving results from (or null)
    * @param  String Field to sort by (or null)
+   * @param  Boolean Whether to only return valid (validfrom/through) entries
    * @return Array Group information, as returned by find
    * @todo   Rewrite to a custom find type
    */
   
-  public function findForCoGroup($coGroupId, $limit=null, $offset=null, $order=null) {
+  public function findForCoGroup($coGroupId, $limit=null, $offset=null, $order=null, $validOnly=false) {
     $args = array();
     $args['joins'][0]['table'] = 'co_groups';
     $args['joins'][0]['alias'] = 'CoGroup';
@@ -235,6 +398,21 @@ class CoGroupMember extends AppModel {
     );
     $args['conditions']['CoGroup.status'] = StatusEnum::Active;
     $args['conditions']['CoGroup.id'] = $coGroupId;
+    if($validOnly) {
+      // Only pull currently valid group memberships
+      $args['conditions']['AND'][] = array(
+        'OR' => array(
+          'CoGroupMember.valid_from IS NULL',
+          'CoGroupMember.valid_from < ' => date('Y-m-d H:i:s', time())
+        )
+      );
+      $args['conditions']['AND'][] = array(
+        'OR' => array(
+          'CoGroupMember.valid_through IS NULL',
+          'CoGroupMember.valid_through > ' => date('Y-m-d H:i:s', time())
+        )
+      );
+    }
     $args['contain'] = false;
     
     return $this->findForUpdate($args['conditions'],
@@ -243,6 +421,37 @@ class CoGroupMember extends AppModel {
                                 $limit,
                                 $offset,
                                 $order);
+  }
+  
+  /**
+   * Determine if the specified CO Person is an active, valid member of the
+   * specified CO Group.
+   *
+   * @since  COmanage Registry v3.3.0
+   * @param  Integer $coGroupId  CO Group ID
+   * @param  Integer $coPersonId CO Person ID
+   * @return boolean             True if CO Person is a member of CO Group, false otherwse
+   */
+  
+  public function isMember($coGroupId, $coPersonId) {
+    $args = array();
+    $args['conditions']['CoGroup.status'] = StatusEnum::Active;
+    $args['conditions']['CoGroupMember.co_group_id'] = $coGroupId;
+    $args['conditions']['CoGroupMember.co_person_id'] = $coPersonId;
+    $args['conditions']['AND'][] = array(
+      'OR' => array(
+        'CoGroupMember.valid_from IS NULL',
+        'CoGroupMember.valid_from < ' => date('Y-m-d H:i:s', time())
+      )
+    );
+    $args['conditions']['AND'][] = array(
+      'OR' => array(
+        'CoGroupMember.valid_through IS NULL',
+        'CoGroupMember.valid_through > ' => date('Y-m-d H:i:s', time())
+      )
+    );
+    
+    return (bool)$this->find('count', $args);
   }
 
   /**
@@ -280,6 +489,204 @@ class CoGroupMember extends AppModel {
     } else {
       return array();
     }
+  }
+  
+  /**
+   * Reprovision records associated with CoGroupMembers where the validity dates
+   * have recently become effective.
+   *
+   * @since  COmanage Registry 3.2.0
+   * @param  Integer $coId   CO ID
+   * @param  Integer $window Time in minutes to look back for changes (ie: within the last $window minutes)
+   */
+  
+  public function reprovisionByValidity($coId, $window=DEF_GROUP_SYNC_WINDOW) {
+    // Pull all group memberships with valid_from or valid_through timestamps
+    // in the last $window minutes
+    
+    $timeend = time();
+    $timestart = $timeend - ($window * 60);
+    
+    $args = array();
+    /* JOIN not needed due to contain
+    $args['joins'][0]['table'] = 'co_groups';
+    $args['joins'][0]['alias'] = 'CoGroup';
+    $args['joins'][0]['type'] = 'INNER';
+    $args['joins'][0]['conditions'][0] = 'CoGroup.id=CoGroupMember.co_group_id';
+    */
+    $args['conditions']['CoGroup.co_id'] = $coId;
+    $args['conditions']['OR'][] = array(
+      // Membership just became active
+      'AND' => array(
+        'CoGroupMember.valid_from >= ' => date('Y-m-d H:i:s', $timestart),
+        'CoGroupMember.valid_from <= ' => date('Y-m-d H:i:s', $timeend)
+      )
+    );
+    $args['conditions']['OR'][] = array(
+      // Membership just became inactive
+      'AND' => array(
+        'CoGroupMember.valid_through >= ' => date('Y-m-d H:i:s', $timestart),
+        'CoGroupMember.valid_through <= ' => date('Y-m-d H:i:s', $timeend)
+      )
+    );
+    $args['contain'] = array('CoGroup');
+    
+    $memberships = $this->find('all', $args);
+    
+    // Register a new CoJob. This will throw an exception if a job is already in progress.
+    $jobId = $this->CoPerson->Co->CoJob->register($coId,
+                                                  JobTypeEnum::GroupValidity,
+                                                  null,
+                                                  "",
+                                                  _txt('fd.co_group_member.sync.count',
+                                                       array(count($memberships))));
+    
+    // Flag the Job as started
+    $cnt = 0;
+    $this->CoPerson->Co->CoJob->start($jobId);
+    
+    foreach($memberships as $grm) {
+      try {
+        $this->manualProvision(null, 
+                               null,
+                               null,
+                               ProvisioningActionEnum::CoPersonReprovisionRequested,
+                               null,
+                               $grm['CoGroupMember']['id']);
+        
+        $cmt =  _txt('rs.grm.prov.validity', array($grm['CoGroup']['name'],
+                                                   $grm['CoGroupMember']['co_group_id']));
+        
+        $this->CoPerson->HistoryRecord->record($grm['CoGroupMember']['co_person_id'],
+                                               null,
+                                               null,
+                                               null,
+                                               ActionEnum::CoGroupMemberValidityTriggered,
+                                               $cmt,
+                                               $grm['CoGroupMember']['co_group_id']);
+        
+        $this->CoPerson->Co->CoJob->CoJobHistoryRecord->record($jobId,
+                                                               $grm['CoGroupMember']['id'],
+                                                               $cmt,
+                                                               $grm['CoGroupMember']['co_person_id'],
+                                                               null,
+                                                               JobStatusEnum::Complete);
+        
+        $cnt++;
+      }
+      catch(Exception $e) {
+        $this->CoPerson->Co->CoJob->CoJobHistoryRecord->record($jobId,
+                                                               $grm['CoGroupMember']['id'],
+                                                               $e->getMessage(),
+                                                               $grm['CoGroupMember']['co_person_id'],
+                                                               null,
+                                                               JobStatusEnum::Failed);
+      }
+    }
+    
+    $this->CoPerson->Co->CoJob->finish($jobId, _txt('fd.co_group_member.sync.count.done', array($cnt)));
+  }
+  
+  /**
+   * Set a group membership for a CO Person.
+   *
+   * @since  COmanage Registry v3.1.0
+   * @param  RoleComponent $Role      RoleComponent
+   * @param  Integer $coGroupId       CO Group ID
+   * @param  Integer $coPersonId      CO Person ID to set membership for
+   * @param  Boolean $member          Whether Person is a member of the Group
+   * @param  Boolean $owner           Whether Person is an owner of the Group
+   * @param  Integer $actorCoPersonId CO Person ID of requestor
+   * @param  Boolean $provision       Whether to fire provisioners on save
+   * @return Boolean True on success
+   * @throws InvalidArgumentException
+   * @throws RuntimeException
+   * @todo   This should become the core function used by all other calls, except maybe syncMembership.
+   */
+  
+  public function setMembership($Role, $coGroupId, $coPersonId, $member, $owner, $actorCoPersonId, $provision=true) {
+    // First pull the group info
+    
+    $args = array();
+    $args['conditions']['CoGroup.id'] = $coGroupId;
+    $args['contain'] = false;
+    
+    $group = $this->CoGroup->find('first', $args);
+    
+    if(!$group) {
+      throw new InvalidArgumentException(_txt('er.notfound', array(_txt('ct.co_groups.1'), $coGroupId)));
+    }
+    
+    // Reject updates to auto groups
+    
+    if($group['CoGroup']['auto']) {
+      throw new InvalidArgumentException(_txt('er.gr.auto.edit'));
+    }
+    
+    // Or to closed groups where $actorCoPersonId is not an owner or admin
+    
+    if(!$group['CoGroup']['open']
+       && !$Role->isGroupManager($coPersonId, $coGroupId)) {
+      throw new RuntimeException(_txt('er.permission'));
+    }
+    
+    // See if there is already a row for this group+person, if so update it
+    
+    $args = array();
+    $args['conditions']['CoGroupMember.co_group_id'] = $coGroupId;
+    $args['conditions']['CoGroupMember.co_person_id'] = $coPersonId;
+    $args['contain'] = false;
+    
+    $grmem = $this->find('first', $args);
+
+    // Store the membership
+    // Contrary to former practice, we save empty rows (is this a problem for existing code?)
+    
+    $hAction = null;
+    $hText = "";
+    
+    $this->clear();
+    $data = array();
+    $data['CoGroupMember']['co_group_id'] = $coGroupId;
+    $data['CoGroupMember']['co_person_id'] = $coPersonId;
+    $data['CoGroupMember']['member'] = $member;
+    $data['CoGroupMember']['owner'] = $owner;
+    if(!empty($grmem['CoGroupMember']['id'])) {
+      $data['CoGroupMember']['id'] = $grmem['CoGroupMember']['id'];
+      
+      $hAction = ActionEnum::CoGroupMemberEdited;
+      $hText = _txt('rs.grm.edited', array($group['CoGroup']['name'],
+                                          $coGroupId,
+                                          ($grmem['CoGroupMember']['member'] ? _txt('fd.yes') : _txt('fd.no')),
+                                          ($grmem['CoGroupMember']['owner'] ? _txt('fd.yes') : _txt('fd.no')),
+                                          ($member ? _txt('fd.yes') : _txt('fd.no')),
+                                          ($owner ? _txt('fd.yes') : _txt('fd.no'))));
+    } else {
+      $hAction = ActionEnum::CoGroupMemberAdded;
+      $hText = _txt('rs.grm.added', array($group['CoGroup']['name'],
+                                          $coGroupId,
+                                          ($member ? _txt('fd.yes') : _txt('fd.no')),
+                                          ($owner ? _txt('fd.yes') : _txt('fd.no'))));
+    }
+    
+    $options = array();
+    if(!$provision) {
+      $options['provision'] = false;
+    }
+    
+    $this->save($data, $options);
+    
+    // Create a history record
+      
+    $this->CoPerson->HistoryRecord->record($coPersonId,
+                                           null,
+                                           null,
+                                           $actorCoPersonId,
+                                           $hAction,
+                                           $hText,
+                                           $coGroupId);
+
+    return true;
   }
   
   /**
@@ -384,21 +791,89 @@ class CoGroupMember extends AppModel {
   }
   
   /**
+   * Sync a group membership based on a nested membership.
+   *
+   * @since  COmanage Registry v3.3.0
+   * @param  Array     $targetGroup      Array describing CO Group to add the membership to
+   * @param  Array     $coGroupNestingId CO Group Nesting ID
+   * @param  Integer   $coPersonId       CO Person ID of member
+   * @param  Boolean   $eligible         Whether the CO Person is eligible to be a member of $targetGroup
+   */
+  
+  public function syncNestedMembership($targetGroup, $coGroupNestingId, $coPersonId, $eligible) {
+    // This is similar to syncMembership(), however we assume our caller has already
+    // determined the correct current state.
+    
+    if($eligible) {
+      $this->clear();
+      
+      $data = array();
+      $data['CoGroupMember']['co_group_id'] = $targetGroup['id'];
+      $data['CoGroupMember']['co_person_id'] = $coPersonId;
+      $data['CoGroupMember']['member'] = true;
+      $data['CoGroupMember']['owner'] = false;
+      $data['CoGroupMember']['co_group_nesting_id'] = $coGroupNestingId;
+      
+      $this->save($data);
+      
+      $htxtkey = 'rs.grm.added-n';
+      $hAction = ActionEnum::CoGroupMemberAdded;
+    } else {
+      $conditions = array(
+        'CoGroupMember.co_person_id' => $coPersonId,
+        'CoGroupMember.co_group_nesting_id' => $coGroupNestingId
+      );
+      
+      $this->deleteAll($conditions, true, true);
+      
+      $htxtkey = 'rs.grm.deleted-n';
+      $hAction = ActionEnum::CoGroupMemberDeleted;
+    }
+    
+    // Pull the nested group name
+    $args = array();
+    $args['CoGroupNesting.id'] = $coGroupNestingId;
+    $args['contain'] = array('CoGroup');
+
+    $coGroupNesting = $this->CoGroup->CoGroupNesting->find('first', $args);
+    
+    $hText = _txt($htxtkey, array($targetGroup['name'],
+                                  $targetGroup['id'],
+                                  !empty($coGroupNesting['CoGroup']['name']) ? $coGroupNesting['CoGroup']['name'] : "(?)",
+                                  !empty($coGroupNesting['CoGroup']['id']) ? $coGroupNesting['CoGroup']['id'] : "(?)"));
+    
+    // Cut a history record
+    $this->CoPerson->HistoryRecord->record($coPersonId,
+                                           null,
+                                           null,
+                                           null,
+                                           $hAction,
+                                           $hText,
+                                           $targetGroup['id']);
+  }
+  
+  /**
    * Update the CO Group Memberships for a CO Person.
    *
    * @since  COmanage Registry v0.8
    * @param  Integer CO Person ID
    * @param  Array Array of CO Group Member attributes (id, co_group_id, member, owner)
    * @param  Integer CO Person ID of requester
+   * @param  Boolean True if $requesterCoPersonId is a CO admin
    * @return Boolean True on success, false otherwise
    * @throws LogicException
    */
   
-  public function updateMemberships($coPersonId, $memberships, $requesterCoPersonId) {
+  public function updateMemberships($coPersonId,
+                                    $memberships,
+                                    $requesterCoPersonId,
+                                    $requesterIsAdmin=false) {
     if($coPersonId && !empty($memberships)) {
       // First, pull the current group roles.
-      
       $curRoles = $this->findCoPersonGroupRoles($coPersonId);
+      
+      // And also the roles of $requesterCoPersonId, in case we need to check ownership
+      $requesterRoles = $this->findCoPersonGroupRoles($requesterCoPersonId);
       
       foreach($memberships as $m) {
         // Reset model state between transactions
@@ -415,13 +890,20 @@ class CoGroupMember extends AppModel {
         
         $grp = $this->CoGroup->find('first', $args);
         
-        // If this is an automatic group skip it
-        if(!empty($grp)) {
-          if(isset($grp['CoGroup']['auto']) && $grp['CoGroup']['auto']) {
-            continue;
-          }
-        } else {
+        if(empty($grp)) {
           throw new InvalidArgumentException(_txt('er.gr.nf', array($m['co_group_id'])));
+        }
+        
+        // If this is an automatic group skip it
+        if(isset($grp['CoGroup']['auto']) && $grp['CoGroup']['auto']) {
+          continue;
+        }
+        
+        // If this is a closed group and $requesterCoPersonId is not an owner or admin, skip it
+        if(!$requesterIsAdmin
+           && (!isset($grp['CoGroup']['open']) || !$grp['CoGroup']['open'])
+           && !in_array($m['co_group_id'], $requesterRoles['owner'])) {
+          continue;
         }
         
         if(!empty($m['id'])) {

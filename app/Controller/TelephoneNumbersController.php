@@ -39,8 +39,17 @@ class TelephoneNumbersController extends MVPAController {
     )
   );
 
+  public $edit_contains = array(
+    'CoDepartment',
+    'CoPersonRole' => array('CoPerson' => 'PrimaryName'),
+    'OrgIdentity' => array('PrimaryName')
+  );
+
   public $view_contains = array(
-    'OrgIdentity' => array('OrgIdentitySourceRecord' => array('OrgIdentitySource')),
+    'CoDepartment',
+    'CoPersonRole' => array('CoPerson' => 'PrimaryName'),
+    'OrgIdentity' => array('OrgIdentitySourceRecord' => array('OrgIdentitySource'),
+                           'PrimaryName'),
     'SourceTelephoneNumber'
   );
   
@@ -76,24 +85,32 @@ class TelephoneNumbersController extends MVPAController {
     // an OrgIdentity Source Record. As of the initial implementation, not even
     // CMP admins can edit such a record.
     
+    $readOnly = false;
+    
     if($this->action == 'edit' && !empty($this->request->params['pass'][0])) {
-      $orgIdentityId = $this->TelephoneNumber->field('org_identity_id', array('id' => $this->request->params['pass'][0]));
-      
-      if($orgIdentityId) {
-        $readOnly = $this->TelephoneNumber->OrgIdentity->readOnly($orgIdentityId);
+      $sourceAttributeId = (bool)$this->TelephoneNumber->field('source_telephone_number_id', array('id' => $this->request->params['pass'][0]));
+
+      if($sourceAttributeId) {
+        $readOnly = true;
+      } else {
+        $orgIdentityId = $this->TelephoneNumber->field('org_identity_id', array('id' => $this->request->params['pass'][0]));
         
-        if($readOnly) {
-          // Proactively redirect to view. This will also prevent (eg) the REST API
-          // from editing a read only record.
-          $args = array(
-            'controller' => 'telephone_numbers',
-            'action'     => 'view',
-            filter_var($this->request->params['pass'][0],FILTER_SANITIZE_SPECIAL_CHARS)
-          );
-          
-          $this->redirect($args);
+        if($orgIdentityId) {
+          $readOnly = $this->TelephoneNumber->OrgIdentity->readOnly($orgIdentityId);
         }
       }
+    }
+    
+    if($readOnly) {
+      // Proactively redirect to view. This will also prevent (eg) the REST API
+      // from editing a read only record.
+      $args = array(
+        'controller' => 'telephone_numbers',
+        'action'     => 'view',
+        filter_var($this->request->params['pass'][0],FILTER_SANITIZE_SPECIAL_CHARS)
+      );
+      
+      $this->redirect($args);
     }
     
     // In order to manipulate an telephone number, the authenticated user must have permission
@@ -184,17 +201,20 @@ class TelephoneNumbersController extends MVPAController {
     
     // Add a new Telephone Number?
     $p['add'] = ($roles['cmadmin']
-                 || ($managed && ($roles['coadmin'] || $roles['couadmin']))
+                 || $roles['coadmin']
+                 || ($managed && $roles['couadmin'])
                  || $selfperms['add']);
     
     // Delete an existing Telephone Number?
     $p['delete'] = ($roles['cmadmin']
-                    || ($managed && ($roles['coadmin'] || $roles['couadmin']))
+                    || $roles['coadmin']
+                    || ($managed && $roles['couadmin'])
                     || $selfperms['delete']);
     
     // Edit an existing Telephone Number?
     $p['edit'] = ($roles['cmadmin']
-                  || ($managed && ($roles['coadmin'] || $roles['couadmin']))
+                  || $roles['coadmin']
+                  || ($managed && $roles['couadmin'])
                   || $selfperms['edit']);
     
     // View all existing Telephone Numbers?
@@ -203,7 +223,8 @@ class TelephoneNumbersController extends MVPAController {
     
     // View an existing TelephoneNumber?
     $p['view'] = ($roles['cmadmin']
-                  || ($managed && ($roles['coadmin'] || $roles['couadmin']))
+                  || $roles['coadmin']
+                  || ($managed && $roles['couadmin'])
                   || $selfperms['view']);
     
     $this->set('permissions', $p);

@@ -40,6 +40,8 @@ class EmailAddress extends AppModel {
   
   // Association rules from this model to other models
   public $belongsTo = array(
+    // An email address may be attached to a CO Department
+    "CoDepartment",
     // An email address may be attached to a CO Person
     "CoPerson",
     // An email address may be attached to an Org Identity
@@ -52,11 +54,7 @@ class EmailAddress extends AppModel {
   );
   
   public $hasOne = array(
-    "CoInvite",
-    "PipelineEmailAddress" => array(
-      'className' => 'EmailAddress',
-      'foreignKey' => 'source_email_address_id'
-    )
+    "CoInvite"
   );
   
   // Default display field for cake generated views
@@ -81,12 +79,20 @@ class EmailAddress extends AppModel {
                         array('filter' => FILTER_SANITIZE_EMAIL))
       )
     ),
+    'description' => array(
+      'content' => array(
+        'rule' => array('validateInput'),
+        'required' => false,
+        'allowEmpty' => true
+      )
+    ),
     'type' => array(
       'content' => array(
         'rule' => array('validateExtendedType',
                         array('attribute' => 'EmailAddress.type',
                               'default' => array(EmailAddressEnum::Delivery,
                                                  EmailAddressEnum::Forwarding,
+                                                 EmailAddressEnum::MailingList,
                                                  EmailAddressEnum::Official,
                                                  EmailAddressEnum::Personal,
                                                  EmailAddressEnum::Preferred,
@@ -108,6 +114,13 @@ class EmailAddress extends AppModel {
       )
     ),
     'org_identity_id' => array(
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true
+      )
+    ),
+    'co_department_id' => array(
       'content' => array(
         'rule' => 'numeric',
         'required' => false,
@@ -142,14 +155,17 @@ class EmailAddress extends AppModel {
    * actions taken based on availability are atomic.
    *
    * @since  COmanage Registry v0.7
-   * @param  Integer CO Person ID
-   * @param  String Type of candidate email address
+   * @param  String  Object Type ("CoDepartment", "CoGroup", "CoPerson")
+   * @param  Integer Object ID
+   * @param  String  Type of candidate email address
    * @return Boolean True if an email address of the specified type is already assigned, false otherwise
    */
   
-  public function assigned($coPersonID, $emailType) {
+  public function assigned($objType, $objId, $emailType) {
+    $fk = Inflector::underscore($objType) . "_id";
+    
     $args = array();
-    $args['conditions']['EmailAddress.co_person_id'] = $coPersonID;
+    $args['conditions']['EmailAddress.'.$fk] = $objId;
     $args['conditions']['EmailAddress.type'] = $emailType;
     $args['contain'] = false;
 
@@ -168,6 +184,10 @@ class EmailAddress extends AppModel {
    */
   
   public function beforeSave($options = array()) {
+    if(isset($options['safeties']) && $options['safeties'] == 'off') {
+      return true;
+    }
+    
     // Make sure verified is set appropriately. As of v2.0.0, Org Identity Sources
     // can assert verified status (CO-1331), so we can't just always reset verified
     // to false.
@@ -247,6 +267,25 @@ class EmailAddress extends AppModel {
   }
   
   /**
+   * Perform a keyword search.
+   *
+   * @since  COmanage Registry v3.1.0
+   * @param  Integer $coId CO ID to constrain search to
+   * @param  String  $q    String to search for
+   * @return Array Array of search results, as from find('all)
+   */
+  
+  public function search($coId, $q) {
+    $args = array();
+    $args['conditions']['LOWER(EmailAddress.mail)'] = strtolower($q);
+    $args['conditions']['CoPerson.co_id'] = $coId;
+    $args['order'] = array('EmailAddress.mail');
+    $args['contain']['CoPerson'] = 'PrimaryName';
+    
+    return $this->find('all', $args);
+  }
+  
+  /**
    * Mark an address as verified.
    *
    * @since  COmanage Registry v0.7
@@ -262,41 +301,53 @@ class EmailAddress extends AppModel {
     // First find the record
     
     $args = array();
-    if($orgIdentityId) {
-      $args['conditions']['EmailAddress.org_identity_id'] = $orgIdentityId;
-    }
-    if($coPersonId) {
-      $args['conditions']['EmailAddress.co_person_id'] = $coPersonId;
+    // As a temporary workaround for CO-1624, we will accept both an $orgIdentityId
+    // and a $coPersonId, and verify whatever we pull. (This is similar to CO-1651.)
+    // We need to carefully construct the conditions here, though.
+    if($orgIdentityId && $coPersonId) {
+      $args['conditions']['OR'] = array(
+        'EmailAddress.co_person_id' => $coPersonId,
+        'EmailAddress.org_identity_id' => $orgIdentityId
+      );
+    } else {
+      if($orgIdentityId) {
+        $args['conditions']['EmailAddress.org_identity_id'] = $orgIdentityId;
+      } elseif($coPersonId) {
+        $args['conditions']['EmailAddress.co_person_id'] = $coPersonId;
+      }
     }
     $args['conditions']['EmailAddress.mail'] = $address;
+    $args['conditions']['EmailAddress.verified'] = false;
     $args['contain'] = false;
     
-    $mail = $this->find('first', $args);
+    $mails = $this->find('all', $args);
     
-    if(empty($mail)) {
-      throw new InvalidArgumentException(_txt('er.notfound', array(_txt('ct.email_addresses.1'), $address)));
+    if(!empty($mails)) {
+      foreach($mails as $m) {
+        // Mark the address as verified
+        $this->clear();
+        $this->id = $m['EmailAddress']['id'];
+        
+        // Make sure to disable callbacks since beforeSave will try to update this field, too
+        if(!$this->saveField('verified', true, array('callbacks' => false))) {
+          throw new RuntimeException(_txt('er.db.save-a', array('EmailAddress::verify()')));
+        }
+        
+        // Finally, create a history record
+        
+        try {
+          $this->CoPerson->HistoryRecord->record($m['EmailAddress']['co_person_id'],
+                                                 null,
+                                                 $m['EmailAddress']['org_identity_id'],
+                                                 $verifierCoPersonId,
+                                                 ActionEnum::EmailAddressVerified,
+                                                 _txt('rs.mail.verified', array($address)));
+        }
+        catch(Exception $e) {
+          throw new RuntimeException($e->getMessage());
+        }
+      }
     }
-    
-    // And then update it
-    $this->id = $mail['EmailAddress']['id'];
-    
-    // Make sure to disable callbacks since beforeSave will try to update this field, too
-    if(!$this->saveField('verified', true, array('callbacks' => false))) {
-      throw new RuntimeException(_txt('er.db.save'));
-    }
-    
-    // Finally, create a history record
-    
-    try {
-      $this->CoPerson->HistoryRecord->record($coPersonId,
-                                             null,
-                                             $orgIdentityId,
-                                             $verifierCoPersonId,
-                                             ActionEnum::EmailAddressVerified,
-                                             _txt('rs.mail.verified', array($address)));
-    }
-    catch(Exception $e) {
-      throw new RuntimeException($e->getMessage());
-    }
+    // else for now we'll fail silently, which is probably not what we really want to do
   }
 }

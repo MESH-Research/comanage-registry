@@ -28,13 +28,20 @@
 class UpgradeVersionShell extends AppShell {
   var $uses = array('Meta',
                     'Address',
+                    'ApiUser',
                     'CmpEnrollmentConfiguration',
                     'Co',
                     'CoEnrollmentAttributeDefault',
                     'CoEnrollmentFlow',
+                    'CoExtendedType',
                     'CoGroup',
+                    'CoIdentifierAssignment',
+                    'CoJob',
                     'GrouperProvisioner.CoGrouperProvisionerTarget',
-                    'Identifier');
+                    'HttpServer',
+                    'Identifier',
+                    'SshKeyAuthenticator.SshKey',
+                    'SshKeyAuthenticator.SshKeyAuthenticator');
   
   // A list of known versions, must be semantic versioning compliant. The value
   // is a "blocker" if it is a version that prevents an upgrade from happening.
@@ -70,7 +77,19 @@ class UpgradeVersionShell extends AppShell {
     "2.0.0" => array('block' => false, 'post' => 'post110'),
     "2.0.1" => array('block' => false),
     "2.0.2" => array('block' => false),
-    "3.0.0" => array('block' => false)
+    "2.0.3" => array('block' => false),
+    "3.0.0" => array('block' => false),
+    "3.1.0" => array('block' => false, 'post' => 'post310'),
+    "3.1.1" => array('block' => false),
+    "3.2.0" => array('block' => false),
+    "3.2.1" => array('block' => false),
+    "3.2.2" => array('block' => false),
+    "3.2.3" => array('block' => false),
+    "3.2.4" => array('block' => false),
+    "3.2.5" => array('block' => false),
+    "3.3.0" => array('block' => false, 'pre' => 'pre330', 'post' => 'post330'),
+    "3.3.1" => array('block' => false),
+    "3.3.2" => array('block' => false)
   );
   
   public function getOptionParser() {
@@ -355,5 +374,132 @@ class UpgradeVersionShell extends AppShell {
     // 2.0.0 uses SuspendableStatusEnum for Identifier::status
     $this->out(_txt('sh.ug.110.is'));
     $this->Identifier->_ug110();
+  }
+  
+  public function post310() {
+    // 3.1.0 adds the Url MVPA, so we instantiate the default types across all COs.
+    $this->out(_txt('sh.ug.310.url'));
+    
+    $args = array();
+    $args['contain'] = false;
+    
+    $cos = $this->Co->find('all', $args);
+    
+    // We update inactive COs as well, in case they become active again
+    foreach($cos as $co) {
+      $this->out('- ' . $co['Co']['name']);
+
+      $this->CoExtendedType->addDefault($co['Co']['id'], 'Url.type');
+    }
+  }
+
+  public function post330() {
+    // 3.3.0 moves SSH key management into an authenticator plugin.
+    $this->out(_txt('sh.ug.330.ssh'));
+    
+    $args = array();
+    $args['contain'] = false;
+    
+    $cos = $this->Co->find('all', $args);
+    
+    // We update inactive COs as well, in case they become active again
+    foreach($cos as $co) {
+      $this->out('- ' . $co['Co']['name']);
+      
+      $this->SshKeyAuthenticator->_ug330($co['Co']['id']);
+      $this->CoExtendedType->addDefault($co['Co']['id'], 'CoDepartment.type');
+    }
+    
+    // The users view is no longer required.
+    $prefix = "";
+    $db = ConnectionManager::getDataSource('default');
+
+    if(isset($db->config['prefix'])) {
+      $prefix = $db->config['prefix'];
+    }
+    
+    $this->out(_txt('sh.ug.330.users'));
+    $this->Co->query("DROP VIEW " . $prefix . "users");
+    
+    // API Users is now more configurable. Set existing api users to be
+    // active and fully privileged.
+    $this->out(_txt('sh.ug.330.api'));
+    $this->ApiUser->updateAll(
+      array(
+        'ApiUser.co_id' => 1,
+        'ApiUser.privileged' => true,
+        'ApiUser.status' => "'A'"  // Wacky updateAll syntax
+      ),
+      true
+    );
+    
+    // Identifier Assignments now have a context, all existing Identifier
+    // Assignments applied to CoPeople, and while we're here give all 
+    // everything Active status
+    $this->out(_txt('sh.ug.330.ia'));
+    $this->CoIdentifierAssignment->updateAll(
+      array(
+        'CoIdentifierAssignment.context' => "'CP'",  // Wacky updateAll syntax
+        'CoIdentifierAssignment.status' => "'A'"
+      ),
+      true
+    );
+
+    // Resize SshKey type column
+    $this->out(_txt('sh.ug.330.ssh.key'));
+    $this->SshKey->_ug330();
+
+    // Resize CoJob job_type column
+    $this->out(_txt('sh.ug.330.cojob'));
+    $this->CoJob->_ug330();
+    
+    // 3.3.0 adds multiple types of Password Sources, however the PasswordAuthenticator
+    // plugin might not be enabled.
+    
+    if(CakePlugin::loaded('PasswordAuthenticator')) {
+      // We can't add models to $uses since they may not exist
+      $this->loadModel('PasswordAuthenticator.PasswordAuthenticator');
+      
+      // All existing Password Authenticators have a password_source of Self Select
+      $this->out(_txt('sh.ug.340.password'));
+      
+      $this->PasswordAuthenticator->updateAll(
+        array(
+          'PasswordAuthenticator.password_source' => "'SL'"  // Wacky updateAll syntax
+        ),
+        array(
+          'PasswordAuthenticator.password_source' => null
+        )
+      );
+    }
+    
+    // HttpServers now have SSL configuration options, which should default to true
+    $this->out(_txt('sh.ug.330.http'));
+    $this->HttpServer->updateAll(
+      array(
+        'HttpServer.ssl_verify_host' => true,
+        'HttpServer.ssl_verify_peer' => true
+      ),
+      true
+    );
+  }
+  
+  public function pre330() {
+    // 3.3.0 renames CoEnrollmentFlow::return_url_whitelist to return_url_allowlist.
+    // As a new technique, we'll manually rename the column before running the
+    // database schema in order to maintain existing values without having to
+    // copy attributes and then delete the old column. The downside of this approach
+    // is we need to directly execute SQL.
+    
+    $prefix = "";
+    $db = ConnectionManager::getDataSource('default');
+
+    if(isset($db->config['prefix'])) {
+      $prefix = $db->config['prefix'];
+    }
+    
+    $this->out(_txt('sh.ug.330.rename'));
+    // SQL: Alter table foo rename column bar to baz (should be cross plaform)
+    $this->CoEnrollmentFlow->query("ALTER TABLE " . $prefix . "co_enrollment_flows RENAME COLUMN return_url_whitelist TO return_url_allowlist");
   }
 }

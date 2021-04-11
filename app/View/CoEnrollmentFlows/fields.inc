@@ -61,8 +61,10 @@
     
     if(approval) {
       document.getElementById('approvergroupdiv').style.display = "block";
+      document.getElementById('approvalnotifydiv').style.display = "block";
     } else {
       document.getElementById('approvergroupdiv').style.display = "none";
+      document.getElementById('approvalnotifydiv').style.display = "none";
       document.getElementById('CoEnrollmentFlowApproverCoGroupId').value = "";
     }
   }
@@ -146,6 +148,7 @@
       var atemplate = document.getElementById('CoEnrollmentFlowApprovalTemplateId').value;
       
       $("#CoEnrollmentFlowApprovalTemplateId").closest("li").show('fade');
+      $("#CoEnrollmentFlowDenialTemplateId").closest("li").show('fade');
       
       if(atemplate) {
         $("#CoEnrollmentFlowApprovalSubject").closest("li").hide('fade');
@@ -158,6 +161,7 @@
       $("#CoEnrollmentFlowApprovalTemplateId").closest("li").hide('fade');
       $("#CoEnrollmentFlowApprovalSubject").closest("li").hide('fade');
       $("#CoEnrollmentFlowApprovalBody").closest("li").hide('fade');
+      $("#CoEnrollmentFlowDenialTemplateId").closest("li").hide('fade');
     }
     
     // If notify on finalize is enabled, show the template selector
@@ -167,6 +171,27 @@
     } else {
       $("#CoEnrollmentFlowFinalizationTemplateId").closest("li").hide('fade');
     }
+    
+    // If Establish Authenticators is enabled, show the available authenticators.
+    // Note during add, Authenticators are not yet available for configuration.
+    
+    <?php if(!empty($vv_authenticators) && !empty($co_enrollment_flows[0]['CoEnrollmentFlow']['id'])): ?>
+    if(document.getElementById('CoEnrollmentFlowEstablishAuthenticators').checked) {
+      $("#authenticators").show('fade');
+    } else {
+      $("#authenticators").hide('fade');
+    }
+    <?php endif; // $vv_authenticators ?>
+    
+    // If Establish Clusters is enabled, show the available clusters
+    
+    <?php if(!empty($vv_clusters) && !empty($co_enrollment_flows[0]['CoEnrollmentFlow']['id'])): ?>
+    if(document.getElementById('CoEnrollmentFlowEstablishClusterAccounts').checked) {
+      $("#clusters").show('fade');
+    } else {
+      $("#clusters").hide('fade');
+    }
+    <?php endif; // $vv_clusters ?>
   }
   
   function tandc_update_gadgets() {
@@ -214,19 +239,19 @@
       <?php
         global $cm_lang, $cm_texts;
         $attrs = array();
-        $attrs['value'] = (isset($co_enrollment_flows) ? $co_enrollment_flows[0]['CoEnrollmentFlow']['status'] : EnrollmentFlowStatusEnum::Active);
+        $attrs['value'] = (isset($co_enrollment_flows) ? $co_enrollment_flows[0]['CoEnrollmentFlow']['status'] : TemplateableStatusEnum::Active);
         $attrs['empty'] = false;
 
         if($e) {
           print $this->Form->select('status',
-                                    $cm_texts[ $cm_lang ]['en.status.ef'],
+                                    $cm_texts[ $cm_lang ]['en.status.temp'],
                                     $attrs);
 
           if($this->Form->isFieldError('status')) {
             print $this->Form->error('status');
           }
         } else {
-          print _txt('en.status', null, $co_enrollment_flows[0]['CoEnrollmentFlow']['status']);
+          print _txt('en.status.temp', null, $co_enrollment_flows[0]['CoEnrollmentFlow']['status']);
         }
       ?>
     </div>
@@ -267,7 +292,7 @@
             $attrs['value'] = (isset($co_enrollment_flows)
                                ? $co_enrollment_flows[0]['CoEnrollmentFlow']['authz_co_group_id']
                                : null);
-            $attrs['empty'] = true;
+            $attrs['empty'] = _txt('op.select.empty');
 
             if($e) {
               print $this->Form->label('authz_co_group_id', _txt('fd.ef.authz.group')) . ': ';
@@ -310,37 +335,20 @@
       </div>
     </div>
   </li>
-  <?php if(!empty($vv_co_pipelines)): ?>
   <li>
-    <div class="field-name">
+    <div class="field-name vtop">
       <div class="field-title">
-        <?php print ($e ? $this->Form->label('co_pipeline_id',_txt('fd.pipeline')) : _txt('fd.pipeline')); ?>
+        <?php print _txt('fd.ef.shortcut'); ?>
       </div>
-      <div class="field-desc"><?php print _txt('fd.pipeline.desc.ef'); ?></div>
+      <div class="field-desc"><?php print _txt('fd.ef.shortcut.desc'); ?></div>
     </div>
-    <div class="field-info">
-      <?php
-        global $cm_lang, $cm_texts;
-        $attrs['value'] = (!empty($co_enrollment_flows[0]['CoEnrollmentFlow']['co_pipeline_id'])
-                           ? $co_enrollment_flows[0]['CoEnrollmentFlow']['co_pipeline_id']
-                           : '');
-        $attrs['empty'] = true;
-
-        if($e) {
-          print $this->Form->select('co_pipeline_id',
-                                    $vv_co_pipelines,
-                                    $attrs);
-
-          if($this->Form->isFieldError('co_pipeline_id')) {
-            print $this->Form->error('co_pipeline_id');
-          }
-        } else {
-          print $vv_co_pipelines[ $co_enrollment_flows[0]['CoEnrollmentFlow']['co_pipeline_id'] ];
-        }
-      ?>
+    <div class="field-info checkbox">
+      <?php print ($e
+                   ? $this->Form->input('my_identity_shortcut') . 
+                     $this->Form->label('my_identity_shortcut', _txt('fd.ef.shortcut'))
+                   : ($co_enrollment_flows[0]['CoEnrollmentFlow']['my_identity_shortcut'] ? _txt('fd.yes') : _txt('fd.no'))); ?>
     </div>
   </li>
-  <?php endif; // vv_co_pipelines ?>
   <li>
     <div class="field-name">
       <div class="field-title">
@@ -603,82 +611,113 @@
       ?>
     </div>
   </li>
-  <li>
-    <div class="field-name">
-      <div class="field-title">
-        <?php print _txt('fd.ef.noap'); ?>
+  <div id="approvalnotifydiv" class="subfield" style="display:none">
+    <li>
+      <div class="field-name">
+        <div class="field-title">
+          <?php print _txt('fd.ef.noap'); ?>
+        </div>
+        <div class="field-desc"><?php print _txt('fd.ef.noap.desc'); ?></div>
       </div>
-      <div class="field-desc"><?php print _txt('fd.ef.noap.desc'); ?></div>
-    </div>
-    <div class="field-info checkbox">
-      <?php print ($e
-                   ? $this->Form->input('notify_on_approval', array('onChange' => 'fields_update_gadgets();')) . ' ' .
-                     $this->Form->label('notify_on_approval', _txt('fd.ef.noap'))
-                   : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['notify_on_approval'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-    </div>
-    <ul class="field-children">
+      <div class="field-info checkbox">
+        <?php print ($e
+                     ? $this->Form->input('notify_on_approval', array('onChange' => 'fields_update_gadgets();')) . ' ' .
+                       $this->Form->label('notify_on_approval', _txt('fd.ef.noap'))
+                     : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['notify_on_approval'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+      </div>
+      <ul class="field-children">
+        <li>
+          <div class="field-name">
+            <div class="field-title"><?php print _txt('fd.ef.amt'); ?></div>
+            <div class="field-desc"><?php print _txt('fd.ef.amt.desc'); ?></div>
+          </div>
+          <div class="field-info">
+            <?php
+              global $cm_lang, $cm_texts;
+              $attrs = array();
+              $attrs['value'] = (!empty($co_enrollment_flows[0]['CoEnrollmentFlow']['approval_template_id'])
+                ? $co_enrollment_flows[0]['CoEnrollmentFlow']['approval_template_id']
+                : null);
+              $attrs['empty'] = true;
+              $attrs['onchange'] = "fields_update_gadgets();";
 
-      <li>
-        <div class="field-name">
-          <div class="field-title"><?php print _txt('fd.ef.amt'); ?></div>
-          <div class="field-desc"><?php print _txt('fd.ef.amt.desc'); ?></div>
-        </div>
-        <div class="field-info">
-          <?php
-            global $cm_lang, $cm_texts;
-            $attrs = array();
-            $attrs['value'] = (!empty($co_enrollment_flows[0]['CoEnrollmentFlow']['approval_template_id'])
-              ? $co_enrollment_flows[0]['CoEnrollmentFlow']['approval_template_id']
-              : null);
-            $attrs['empty'] = true;
-            $attrs['onchange'] = "fields_update_gadgets();";
+              if($e) {
+                print $this->Form->select('approval_template_id',
+                  (!empty($vv_message_templates[MessageTemplateEnum::EnrollmentApproval])
+                    ? $vv_message_templates[MessageTemplateEnum::EnrollmentApproval]
+                    : array()),
+                  $attrs);
 
-            if($e) {
-              print $this->Form->select('approval_template_id',
-                (!empty($vv_message_templates[MessageTemplateEnum::EnrollmentApproval])
-                  ? $vv_message_templates[MessageTemplateEnum::EnrollmentApproval]
-                  : array()),
-                $attrs);
-
-              if($this->Form->isFieldError('approval_template_id')) {
-                print $this->Form->error('approval_template_id');
+                if($this->Form->isFieldError('approval_template_id')) {
+                  print $this->Form->error('approval_template_id');
+                }
+              } elseif(!empty($co_enrollment_flows[0]['CoEnrollmentFlow']['approval_template_id'])) {
+                print filter_var($vv_message_templates[MessageTemplateEnum::EnrollmentApproval][ $co_enrollment_flows[0]['CoEnrollmentFlow']['approval_template_id'] ],FILTER_SANITIZE_SPECIAL_CHARS);
               }
-            } elseif(!empty($co_enrollment_flows[0]['CoEnrollmentFlow']['approval_template_id'])) {
-              print filter_var($vv_message_templates[MessageTemplateEnum::EnrollmentApproval][ $co_enrollment_flows[0]['CoEnrollmentFlow']['approval_template_id'] ],FILTER_SANITIZE_SPECIAL_CHARS);
-            }
-          ?>
-        </div>
-      </li>
-      <li style="display:none">
-        <div class="field-name">
-          <div class="field-title">
-            <?php print ($e ? $this->Form->label('approval_subject',_txt('fd.ef.asub')) : _txt('fd.ef.asub')); ?>
+            ?>
           </div>
-          <div class="field-desc"><?php print _txt('fd.ef.asub.desc'); ?></div>
-        </div>
-        <div class="field-info">
-          <?php print ($e
-            ? $this->Form->input('approval_subject',
-              array('default' => _txt('em.approval.subject.ef')))
-            : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['approval_subject'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-        </div>
-      </li>
-      <li class="field-stack" style="display:none">
-        <div class="field-name">
-          <div class="field-title">
-            <?php print ($e ? $this->Form->label('approval_body', _txt('fd.ef.abody')) : _txt('fd.ef.abody')); ?>
+        </li>
+        <li style="display:none">
+          <div class="field-name">
+            <div class="field-title">
+              <?php print ($e ? $this->Form->label('approval_subject',_txt('fd.ef.asub')) : _txt('fd.ef.asub')); ?>
+            </div>
+            <div class="field-desc"><?php print _txt('fd.ef.asub.desc'); ?></div>
           </div>
-          <div class="field-desc"><?php print _txt('fd.ef.abody.desc'); ?></div>
-        </div>
-        <div class="field-info">
-          <?php print ($e
-            ? $this->Form->input('approval_body',
-              array('default' => _txt('em.approval.body.ef')))
-            : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['approval_body'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-        </div>
-      </li>
-    </ul>
-  </li>
+          <div class="field-info">
+            <?php print ($e
+              ? $this->Form->input('approval_subject',
+                array('default' => _txt('em.approval.subject.ef')))
+              : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['approval_subject'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+          </div>
+        </li>
+        <li class="field-stack" style="display:none">
+          <div class="field-name">
+            <div class="field-title">
+              <?php print ($e ? $this->Form->label('approval_body', _txt('fd.ef.abody')) : _txt('fd.ef.abody')); ?>
+            </div>
+            <div class="field-desc"><?php print _txt('fd.ef.abody.desc'); ?></div>
+          </div>
+          <div class="field-info">
+            <?php print ($e
+              ? $this->Form->input('approval_body',
+                array('default' => _txt('em.approval.body.ef')))
+              : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['approval_body'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+          </div>
+        </li>
+        <li>
+          <div class="field-name">
+            <div class="field-title"><?php print _txt('fd.ef.dmt'); ?></div>
+            <div class="field-desc"><?php print _txt('fd.ef.dmt.desc'); ?></div>
+          </div>
+          <div class="field-info">
+            <?php
+              global $cm_lang, $cm_texts;
+              $attrs = array();
+              $attrs['value'] = (!empty($co_enrollment_flows[0]['CoEnrollmentFlow']['denial_template_id'])
+                ? $co_enrollment_flows[0]['CoEnrollmentFlow']['denial_template_id']
+                : null);
+              $attrs['empty'] = true;
+
+              if($e) {
+                print $this->Form->select('denial_template_id',
+                  (!empty($vv_message_templates[MessageTemplateEnum::EnrollmentApproval])
+                    ? $vv_message_templates[MessageTemplateEnum::EnrollmentApproval]
+                    : array()),
+                  $attrs);
+
+                if($this->Form->isFieldError('denial_template_id')) {
+                  print $this->Form->error('denial_template_id');
+                }
+              } elseif(!empty($co_enrollment_flows[0]['CoEnrollmentFlow']['denial_template_id'])) {
+                print filter_var($vv_message_templates[MessageTemplateEnum::EnrollmentApproval][ $co_enrollment_flows[0]['CoEnrollmentFlow']['denial_template_id'] ],FILTER_SANITIZE_SPECIAL_CHARS);
+              }
+            ?>
+          </div>
+        </li>
+      </ul>
+    </li>
+  </div>
   <li>
     <div class="field-name">
       <div class="field-title">
@@ -808,6 +847,32 @@
         : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['redirect_on_confirm'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
     </div>
   </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title">
+        <?php print ($e ? $this->Form->label('redirect_on_finalize', _txt('fd.ef.rd.finalize')) : _txt('fd.ef.rd.finalize')); ?>
+      </div>
+      <div class="field-desc"><?php print _txt('fd.ef.rd.finalize.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e
+                   ? $this->Form->input('redirect_on_finalize', array('size' => 60))
+        : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['redirect_on_finalize'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li class="field-stack">
+    <div class="field-name">
+      <div class="field-title">
+        <?php print ($e ? $this->Form->label('return_url_allowlist', _txt('fd.ef.allowlist')) : _txt('fd.ef.allowlist')); ?>
+      </div>
+      <div class="field-desc"><?php print _txt('fd.ef.allowlist.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e
+                   ? $this->Form->input('return_url_allowlist')
+                   : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['return_url_allowlist'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
   <?php if(isset($vv_attributes_from_env) && $vv_attributes_from_env): ?>
   <li>
     <div class="field-name">
@@ -827,6 +892,162 @@
     </div>
   </li>
   <?php endif; ?>
+  <?php if(!empty($vv_authenticators) && !empty($co_enrollment_flows[0]['CoEnrollmentFlow']['id'])): ?>
+  <li>
+    <div class="field-name">
+      <div class="field-title">
+        <?php print ($e ? $this->Form->label('establish_authenticators', _txt('fd.ef.authenticators')) : _txt('fd.ef.authenticators')); ?>
+      </div>
+      <div class="field-desc"><?php print _txt('fd.ef.authenticators.desc'); ?></div>
+    </div>
+    <div class="field-info checkbox">
+      <?php
+        print ($e
+               ? $this->Form->input('establish_authenticators',
+                                    array('onChange' => 'fields_update_gadgets();',
+                                          'default' => false))
+               : ($co_enrollment_flows[0]['CoEnrollmentFlow']['establish_authenticators']
+                  ? _txt('fd.yes') : _txt('fd.no')));
+      ?>
+    </div>
+    <div id="authenticators" style="display:none">
+    <ul class="field-children">
+      <?php 
+        // We need to make sure fields match to Cake's index number, unless we
+        // have a new authenticator. This is similar logic to LdapProvisioner.
+        
+        $newid = count($vv_authenticators);
+        
+        foreach($vv_authenticators as $authid => $authname): 
+      ?>
+      <li>
+        <div class="field-name">
+          <div class="field-title"><?php print filter_var($authname,FILTER_SANITIZE_SPECIAL_CHARS); ?></div>
+        </div>
+        <div class="field-info">
+          <?php
+            if($e) {
+              // Do we have a current record for this authenticator?
+              $cur = Hash::extract($co_enrollment_flows[0]['CoEnrollmentAuthenticator'],
+                                   '{n}[authenticator_id='.$authid.']');
+              $checked = false;
+              
+              $xindex = -1;
+              
+              if(!empty($cur[0]['id'])) {
+                $xindex = $cur[0]['id'];
+              } else {
+                $xindex = $newid;
+                $newid++;
+              }
+              
+              $xprefix = 'CoEnrollmentAuthenticator.' . $xindex;
+              
+              if(!empty($cur)) {
+                print $this->Form->hidden($xprefix . '.id', array('default' => $cur[0]['id']));
+              }
+              
+              print $this->Form->hidden($xprefix . '.co_enrollment_flow_id', 
+                                        array('default' => $co_enrollment_flows[0]['CoEnrollmentFlow']['id']));
+              
+              print $this->Form->hidden($xprefix . '.authenticator_id', 
+                                        array('default' => $authid));
+              
+              global $cm_lang, $cm_texts;
+              $attrs = array();
+              $attrs['value'] = (isset($cur[0]['required'])
+                                 ? $cur[0]['required']
+                                 : RequiredEnum::NotPermitted);
+              $attrs['empty'] = false;
+              
+              print $this->Form->select($xprefix . '.required',
+                                        $cm_texts[ $cm_lang ]['en.required'],
+                                        $attrs);
+              
+              if($this->Form->isFieldError($xprefix . '.required')) {
+                print $this->Form->error($xprefix . '.required');
+              }
+            }
+          ?>
+        </div>
+      </li>
+    <?php endforeach; // vv_authenticators ?>
+    </ul>
+    </div>
+  </li>
+  <?php endif; // vv_authenticators ?>
+  <?php if(!empty($vv_clusters) && !empty($co_enrollment_flows[0]['CoEnrollmentFlow']['id'])): ?>
+  <li>
+    <div class="field-name">
+      <div class="field-title">
+        <?php print ($e ? $this->Form->label('establish_cluster_accounts', _txt('fd.ef.clusters')) : _txt('fd.ef.clusters')); ?>
+      </div>
+      <div class="field-desc"><?php print _txt('fd.ef.clusters.desc'); ?></div>
+    </div>
+    <div class="field-info checkbox">
+      <?php
+        print ($e
+               ? $this->Form->input('establish_cluster_accounts',
+                                    array('onChange' => 'fields_update_gadgets();',
+                                          'default' => false))
+               : ($co_enrollment_flows[0]['CoEnrollmentFlow']['establish_cluster_accounts']
+                  ? _txt('fd.yes') : _txt('fd.no')));
+      ?>
+    </div>
+    <div id="clusters" style="display:none">
+    <ul class="field-children">
+      <?php 
+        // We need to make sure fields match to Cake's index number, unless we
+        // have a new cluster. This is similar logic to authenticators, above.
+        
+        $newid = count($vv_clusters);
+        
+        foreach($vv_clusters as $clusterid => $clustername): 
+      ?>
+      <li>
+        <div class="field-name">
+          <div class="field-title"><?php print filter_var($clustername,FILTER_SANITIZE_SPECIAL_CHARS); ?></div>
+        </div>
+        <div class="field-info">
+          <?php
+            if($e) {
+              // Do we have a current record for this cluster?
+              $cur = Hash::extract($co_enrollment_flows[0]['CoEnrollmentCluster'],
+                                   '{n}[cluster_id='.$clusterid.']');
+              $checked = false;
+              
+              $xindex = -1;
+              
+              if(!empty($cur[0]['id'])) {
+                $xindex = $cur[0]['id'];
+              } else {
+                $xindex = $newid;
+                $newid++;
+              }
+              
+              $xprefix = 'CoEnrollmentCluster.' . $xindex;
+              
+              if(!empty($cur)) {
+                print $this->Form->hidden($xprefix . '.id', array('default' => $cur[0]['id']));
+              }
+              
+              print $this->Form->hidden($xprefix . '.co_enrollment_flow_id', 
+                                        array('default' => $co_enrollment_flows[0]['CoEnrollmentFlow']['id']));
+              
+              print $this->Form->hidden($xprefix . '.cluster_id', 
+                                        array('default' => $clusterid));
+              
+              print $this->Form->checkbox($xprefix . '.enabled',
+                                          array('default' => isset($cur[0]['enabled']) ? $cur[0]['enabled'] : false));
+            }
+          ?>
+        </div>
+      </li>
+    <?php endforeach; // vv_clusters ?>
+    </ul>
+    </div>
+  </li>
+  <?php endif; // vv_clusters ?>
   <li>
     <div class="field-name">
       <?php print $this->Form->label('co_theme_id', _txt('fd.theme'), array('class' => 'fieldTitle'));?>
@@ -860,7 +1081,7 @@
     <li class="fields-submit">
       <div class="field-name"></div>
       <div class="field-info">
-        <?php print $this->Form->submit($submit_label, array('onClick' => 'on_submit()')); ?>
+        <?php print $this->Form->submit($submit_label); ?>
       </div>
     </li>
   <?php endif; ?>

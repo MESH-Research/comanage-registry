@@ -36,12 +36,10 @@ class CoJobHistoryRecord extends AppModel {
     "OrgIdentity"
   );
   
-  public $hasOne = array(
-    "HistoryRecord"
-  );
-
   // Default display field for cake generated views
   public $displayField = "comment";
+  
+  public $actsAs = array('Containable');
   
   // Validation rules for table elements
   public $validate = array(
@@ -80,6 +78,32 @@ class CoJobHistoryRecord extends AppModel {
       'allowEmpty' => false
     )
   );
+  
+  /**
+   * Obtain the CO ID for a record.
+   *
+   * @since  COmanage Registry v3.3.0
+   * @param  integer Record to retrieve for
+   * @return integer Corresponding CO ID, or NULL if record has no corresponding CO ID
+   * @throws InvalidArgumentException
+   * @throws RuntimeException
+   */
+  
+  public function findCoForRecord($id) {
+    // We need to get the co id via the parent job
+
+    $args = array();
+    $args['conditions']['CoJobHistoryRecord.id'] = $id;
+    $args['contain'][] = 'CoJob';
+
+    $jhr = $this->find('first', $args);
+
+    if(!empty($jhr['CoJob']['co_id'])) {
+      return $jhr['CoJob']['co_id'];
+    }
+
+    return parent::findCoForRecord($id);
+  }
   
   /**
    * Create a CO Job History Record.

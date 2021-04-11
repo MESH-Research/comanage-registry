@@ -58,13 +58,16 @@
     var match = document.getElementById('CoPipelineMatchStrategy').value;
     
     if(match == '<?php print MatchStrategyEnum::EmailAddress; ?>') {
+      $("#CoPipelineMatchServerId").closest('li').hide('fade');
       $("#CoPipelineMatchType").closest('li').show('fade');
-      // XXX set types
+    } else if(match == '<?php print MatchStrategyEnum::External; ?>') {
+      $("#CoPipelineMatchServerId").closest('li').show('fade');
+      $("#CoPipelineMatchType").closest('li').hide('fade');
     } else if(match == '<?php print MatchStrategyEnum::Identifier; ?>') {
-      update_type_select();
+      $("#CoPipelineMatchServerId").closest('li').hide('fade');
       $("#CoPipelineMatchType").closest('li').show('fade');
-      // XXX set types
     } else {
+      $("#CoPipelineMatchServerId").closest('li').hide('fade');
       $("#CoPipelineMatchType").closest('li').hide('fade');
     }
     
@@ -90,6 +93,14 @@
     } else {
       $("#CoPipelineSyncStatusOnDelete").closest('li').hide('fade');
     }
+    
+    <?php if(!empty($vv_linkable_enrollment_flows)): ?>
+    if(document.getElementById('CoPipelineSyncOnAdd').checked) {
+      $("#CoPipelineCoEnrollmentFlowId").closest("li").show('fade');
+    } else {
+      $("#CoPipelineCoEnrollmentFlowId").closest("li").hide('fade');
+    }
+    <?php endif; // vv_linkable_enrollment_flows ?>
   }
   
   function update_type_select() {
@@ -126,6 +137,12 @@
     
     // And replace with the key/value pairs for the current model
     if(curmodel !== '') {
+      if(curmodel == 'EmailAddress') {
+        // EmailAddress allows an empty value, unlike Identifier
+        $('#CoPipelineMatchType').append($("<option></option>")
+          .attr("value", "").text(""));
+      }
+      
       $.each(options[curmodel], function(key, value) {
         $('#CoPipelineMatchType').append($("<option></option>")
           .attr("value", value).text(key));
@@ -278,6 +295,36 @@
               ?>
             </div>
           </li>
+          <li>
+            <div class="field-name">
+              <div class="field-title">
+                <?php print ($e ? $this->Form->label('CoPipeline.match_server', _txt('ct.match_servers.1')) : _txt('ct.match_servers.1')); ?>
+                <span class="required">*</span>
+              </div>
+            </div>
+            <div class="field-info">
+              <?php
+                $attrs = array();
+                $attrs['value'] = (isset($co_pipelines[0]['CoPipeline']['match_server_id'])
+                                   ? $co_pipelines[0]['CoPipeline']['match_server_id']
+                                   : '');
+                $attrs['empty'] = true;
+                
+                if($e) {
+                  $this->Form->unlockField('CoPipeline.match_server_id');
+                  print $this->Form->select('CoPipeline.match_server_id',
+                                            $vv_match_servers,
+                                            $attrs);
+                  
+                  if($this->Form->isFieldError('match_server_id')) {
+                    print $this->Form->error('match_server_id');
+                  }
+                } else {
+                  print filter_var($vv_match_servers[ $co_pipelines[0]['CoPipeline']['match_server_id'] ],FILTER_SANITIZE_SPECIAL_CHARS);
+                }
+              ?>
+            </div>
+          </li>
         </ul><!-- tabs-match -->
       </li><!-- fields-match -->
 
@@ -302,6 +349,36 @@
                              $this->Form->label('sync_on_add', _txt('fd.pi.sync.add'))
                            : (isset($co_pipelines[0]['CoPipeline']['sync_on_add']) ? _txt('fd.yes') : _txt('fd.no'))); ?>
             </div>
+            <ul class="field-children">
+              <li style="display:none">
+                <div class="field-name">
+                  <div class="field-title"><?php print _txt('fd.pi.sync.add.ef'); ?></div>
+                  <div class="field-desc"><?php print _txt('fd.pi.sync.add.ef.desc'); ?></div>
+                </div>
+                <div class="field-info">
+                  <?php
+                    global $cm_lang, $cm_texts;
+                    $attrs = array();
+                    $attrs['value'] = (!empty($co_pipelines[0]['CoPipeline']['co_enrollment_flow_id'])
+                      ? $co_pipelines[0]['CoPipeline']['co_enrollment_flow_id']
+                      : null);
+                    $attrs['empty'] = true;
+
+                    if($e) {
+                      print $this->Form->select('co_enrollment_flow_id',
+                        $vv_linkable_enrollment_flows,
+                        $attrs);
+
+                      if($this->Form->isFieldError('co_enrollment_flow_id')) {
+                        print $this->Form->error('co_enrollment_flow_id');
+                      }
+                    } elseif(!empty($co_pipelines[0]['CoPipeline']['co_enrollment_flow_id'])) {
+                      print filter_var($vv_linkable_enrollment_flows[ $co_pipelines[0]['CoPipeline']['co_enrollment_flow_id'] ],FILTER_SANITIZE_SPECIAL_CHARS);
+                    }
+                  ?>
+                </div>
+              </li>
+            </ul>
           </li>
           <li>
             <div class="field-name">
@@ -327,6 +404,33 @@
                            ? $this->Form->input('sync_on_delete', array('onChange' => 'fields_update_gadgets()')) . ' ' .
                              $this->Form->label('sync_on_delete', _txt('fd.pi.sync.del'))
                            : (isset($co_pipelines[0]['CoPipeline']['sync_on_del']) ? _txt('fd.yes') : _txt('fd.no'))); ?>
+            </div>
+          </li>
+          <li>
+            <div class="field-name">
+              <div class="field-title">
+                <?php print _txt('fd.pi.sync.coperson.status'); ?>
+              </div>
+              <span class="field-desc"><?php print _txt('fd.pi.sync.coperson.status.desc'); ?></span>
+            </div>
+            <div class="field-info">
+              <?php
+                global $cm_lang, $cm_texts;
+                $attrs['value'] = (isset($co_pipelines[0]['CoPipeline']['sync_coperson_status'])
+                                   ? $co_pipelines[0]['CoPipeline']['sync_coperson_status']
+                                   : '');
+                $attrs['empty'] = true;
+                if($e) {
+                  print $this->Form->select('sync_coperson_status',
+                                            $cm_texts[ $cm_lang ]['en.status'],
+                                            $attrs);
+                  if($this->Form->isFieldError('sync_coperson_status')) {
+                    print $this->Form->error('sync_coperson_status');
+                  }
+                } else {
+                  print _txt('en.status', null, $co_pipelines[0]['CoPipeline']['sync_coperson_status']);
+                }
+              ?>
             </div>
           </li>
           <li>
@@ -524,17 +628,17 @@
                   ?>
                 </div>
               </li>
-            <?php endforeach; ?>
-            <?php foreach($co_pipelines[0]['CoEnrollmentFlow'] as $ef): ?>
+            <?php endforeach; // OrgIdentitySource ?>
+            <?php if(!empty($co_pipelines[0]['CoEnrollmentFlow']['id'])): ?>
               <li>
                 <div class="field-name">
                   <div class="field-title">
                     <?php
-                      print $this->Html->link($ef['name'],
+                      print $this->Html->link($co_pipelines[0]['CoEnrollmentFlow']['name'],
                         array(
                           'controller' => 'co_enrollment_flows',
                           'action'     => 'edit',
-                          $ef['id']
+                          $co_pipelines[0]['CoEnrollmentFlow']['id']
                         ));
 
                       print " (" . _txt('ct.co_enrollment_flows.1') . ")";
@@ -547,13 +651,13 @@
                       array(
                         'controller' => 'co_enrollment_flows',
                         'action'     => 'edit',
-                        $ef['id']
+                        $co_pipelines[0]['CoEnrollmentFlow']['id']
                       ),
                       array('class' => 'editbutton'));
                   ?>
                 </div>
               </li>
-            <?php endforeach; ?>
+            <?php endif; // CoEnrollmentFlow ?>
           </ul><!-- tabs-cxn -->
         </li><!-- fields-cxn -->
       <?php endif; // add ?>
@@ -564,7 +668,7 @@
             <li class="fields-submit">
               <div class="field-name"><span class="required"><?php print _txt('fd.req'); ?></span></div>
               <div class="field-info">
-                <?php print $this->Form->submit($submit_label, array('onClick' => 'on_submit()')); ?>
+                <?php print $this->Form->submit($submit_label); ?>
               </div>
             </li>
           </ul>

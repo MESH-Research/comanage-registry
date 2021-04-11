@@ -118,7 +118,25 @@ class CoInvitesController extends AppController {
    */
   
   protected function calculateImpliedCoId($data = null) {
-    if($this->action == "confirm" || $this->action == "authconfirm") {
+    if($this->action == "add" && !empty($data['co_person_id'])) {
+      // For historical reasons, CO ID is also passed in, but we need to ignore
+      // it and lookup via the CO Person ID.
+
+      $coId = $this->CoInvite->CoPerson->field('co_id',
+                                               array('id' => $data['co_person_id']));
+
+      if($coId) {
+        return $coId;
+      } else {
+        throw new InvalidArgumentException(_txt('er.notfound',
+                                                array(_txt('ct.co_people.1'),
+                                                      filter_var($data['co_person_id'],FILTER_SANITIZE_SPECIAL_CHARS))));
+      }
+    }
+
+    if($this->action == "confirm"
+       || $this->action == "authconfirm"
+       || $this->action == "reply") {
       // Identifier assignment requires the CO ID to be set, but since CO ID isn't
       // provided as an explicit parameter, beforeFilter can't find it.
       
@@ -249,7 +267,7 @@ class CoInvitesController extends AppController {
     // Determine what operations this user can perform
     
     // Send an invite? (REST only)
-    $p['add'] = $roles['apiuser'];
+    $p['add'] = $roles['apiuser'] && ($roles['cmadmin'] || $roles['coadmin']);
     
     // Confirm an invite? (HTML, auth required)
     $p['authconfirm'] = true;
@@ -264,7 +282,7 @@ class CoInvitesController extends AppController {
     $p['decline'] = true;
     
     // Confirm or decline an invite? (REST only)
-    $p['index'] = $roles['apiuser'];
+    $p['index'] = $roles['apiuser'] && ($roles['cmadmin'] || $roles['coadmin']);
     
     // Reply to an invite? (HTML only)
     $p['reply'] = true;
@@ -439,6 +457,14 @@ class CoInvitesController extends AppController {
         }
       }
       
+      // Record that the invitee clicked the link
+      $this->CoInvite->CoPerson->HistoryRecord->record($invitee['CoPerson']['id'],
+                                                       null,
+                                                       null,
+                                                       // For now we just assume it's the CO Person?
+                                                       $invitee['CoPerson']['id'],
+                                                       ActionEnum::InvitationViewed);
+      
       // We also want to pull the enrollment flow and petition attributes, if appropriate
       
       if(isset($invite['CoPetition']['id'])) {
@@ -454,6 +480,11 @@ class CoInvitesController extends AppController {
         $args['contain'][] = 'CoEnrollmentAttribute';
         
         $enrollmentFlow = $this->CoInvite->CoPetition->CoEnrollmentFlow->find('first', $args);
+        
+        // Record the view to the petition history as well
+        $this->CoInvite->CoPetition->CoPetitionHistoryRecord->record($invite['CoPetition']['id'],
+                                                                     $invitee['CoPerson']['id'],
+                                                                     PetitionActionEnum::InviteViewed);
         
         // Before we do anything else, check the verification mode. If it's Automatic,
         // we simply redirect into confirm or authconfirm as appropriate. Otherwise,
@@ -473,6 +504,31 @@ class CoInvitesController extends AppController {
         // Not in Automatic mode, so prep for the view to render
         
         $this->set('co_enrollment_flow', $enrollmentFlow);
+        
+        $plugins = $this->loadAvailablePlugins('confirmer', 'simple');
+        
+        // Make sure $plugins is in alphabetical order so we have some sort of order.
+        sort($plugins);
+        
+        if(!empty($plugins)) {
+          // Walk through the identified plugins until one decides it wants to handle the request.
+          
+          foreach($plugins as $plugin) {
+            if($this->$plugin->willHandle((!empty($invitee['Co']['id']) ? $invitee['Co']['id'] : null),
+                                   (!empty($invite['CoInvite']['id']) ? $invite['CoInvite'] : null),
+                                   (!empty($invite['CoPetition']['id']) ? $invite['CoPetition'] : null))) {
+              // Issue a redirect into the plugin
+              
+              $target = array();
+              $target['plugin'] = Inflector::underscore($plugin);
+              $target['controller'] = Inflector::tableize($plugin);
+              $target['action'] = 'reply';
+              $target[] = $inviteid;
+              
+              $this->redirect($target);
+            }
+          }
+        }
         
         $enrollmentAttributes = $this->CoInvite
                                      ->CoPetition
@@ -782,7 +838,7 @@ class CoInvitesController extends AppController {
                                   $lnk['CoOrgIdentityLink']['co_person_id']);
               } elseif(!empty($ea['EmailAddress']['org_identity_id'])) {
                 // Redirect to the CO Person view
-                $nextPage = array('controller' => 'org_identity_id',
+                $nextPage = array('controller' => 'org_identities',
                                   'action'     => 'edit',
                                   $lnk['CoOrgIdentityLink']['org_identity_id']);
               }
@@ -804,5 +860,25 @@ class CoInvitesController extends AppController {
     } else {
       $this->Flash->set(_txt('er.notprov.id', array(_txt('ct.email_addresses.1'))), array('key' => 'error'));
     }
+  }
+
+  /**
+   * Determine the requested Enrollment Flow ID.
+   *
+   * @since  COmanage Registry v3.3
+   * @return Integer CO Enrollment Flow ID if found, or -1 otherwise
+   */
+
+  function enrollmentFlowID() {
+    // Get the inviteId
+    $inviteId = !empty($this->request->params["pass"][0]) ? $this->request->params["pass"][0] : '';
+    // Grab the invite info in case we need it later (we're about to delete it)
+    $args = array();
+    $args['conditions']['CoInvite.invitation'] = $inviteId;
+    $args['contain'] = array('CoPetition');
+
+    $invite = $this->CoInvite->find('first', $args);
+    $efId = !empty($invite["CoPetition"]["co_enrollment_flow_id"]) ? $invite["CoPetition"]["co_enrollment_flow_id"] : -1;
+    return $efId;
   }
 }

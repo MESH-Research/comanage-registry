@@ -33,6 +33,7 @@ class NetForumSourceBackend extends OrgIdentitySourceBackend {
   public $name = "NetForumSourceBackend";
   
   protected $groupAttrs = array(
+    'CommitteeName' => 'Committee Name',
     'EventProductCode' => 'Event Product Code',
     'ProductCode' => 'Product Code'
   );
@@ -112,7 +113,9 @@ class NetForumSourceBackend extends OrgIdentitySourceBackend {
     // If more than one search attribute was provided, we'll OR the results
     
     if(!empty($attributes['cstkey'])) {
-      $ret = array_merge($ret, $NF->queryByCustomerKey($attributes['cstkey'], $this->pluginCfg['query_events']));
+      $ret = array_merge($ret, $NF->queryByCustomerKey($attributes['cstkey'],
+                                                       $this->pluginCfg['query_events'],
+                                                       $this->pluginCfg['query_committees']));
     }
     
     if(!empty($attributes['mail'])) {
@@ -155,13 +158,22 @@ class NetForumSourceBackend extends OrgIdentitySourceBackend {
     
     foreach(array_keys($this->groupAttrs) as $gAttr) {
       if(!empty($attrs->$gAttr)) {
-        $ret[$gAttr][] = (string)$attrs->$gAttr;
+        $ret[$gAttr][] = array('value' => (string)$attrs->$gAttr);
       }
     }
     
     // Also check Events, if not empty
     if(!empty($attrs->Events->EventProductCode)) {
-      $ret['EventProductCode'] = $attrs->Events->EventProductCode;
+      foreach((array)$attrs->Events->EventProductCode as $v) {
+        $ret['EventProductCode'][] = array('value' => (string)$v);
+      }
+    }
+    
+    // Also check Committees, if not empty
+    if(!empty($attrs->Committees->CommitteeName)) {
+      foreach((array)$attrs->Committees->CommitteeName as $v) {
+        $ret['CommitteeName'][] = array('value' => (string)$v);
+      }
     }
     
     return $ret;

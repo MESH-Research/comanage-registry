@@ -132,8 +132,13 @@ class CoGroupMembersController extends StandardController {
 
     // Sets tab to open for redirects back to tabbed pages
     $this->redirectTab = 'email';
+    
+    if(!empty($this->viewVars['vv_tz'])) {
+      // Set the current timezone, primarily for beforeSave
+      $this->CoGroupMember->setTimeZone($this->viewVars['vv_tz']);
+    }
   }
-  
+
   /**
    * Determine the CO ID based on some attribute of the request.
    * This method is intended to be overridden by model-specific controllers.
@@ -304,13 +309,13 @@ class CoGroupMembersController extends StandardController {
   public function generateHistory($action, $newdata, $olddata) {
     switch($action) {
       case 'add':
-        $this->CoGroupMember->CoPerson->HistoryRecord->record($olddata['CoGroupMember']['co_person_id'],
+        $this->CoGroupMember->CoPerson->HistoryRecord->record($newdata['CoGroupMember']['co_person_id'],
                                                               null,
                                                               null,
                                                               $this->Session->read('Auth.User.co_person_id'),
                                                               ActionEnum::CoGroupMemberAdded,
-                                                              _txt('rs.grm.added', array($olddata['CoGroup']['name'],
-                                                                                         $olddata['CoGroup']['id'],
+                                                              _txt('rs.grm.added', array($newdata['CoGroup']['name'],
+                                                                                         $newdata['CoGroup']['id'],
                                                                                          _txt($newdata['CoGroupMember']['member'] ? 'fd.yes' : 'fd.no'),
                                                                                          _txt($newdata['CoGroupMember']['owner'] ? 'fd.yes' : 'fd.no'))),
                                                               $olddata['CoGroup']['id']);
@@ -447,6 +452,9 @@ class CoGroupMembersController extends StandardController {
     // Select from a list of potential members to add?
     $p['updateGroup'] = !$readOnly && ($roles['cmadmin'] || $managed);
     
+    // Search / filter a list of members in the select list?
+    $p['search'] = !$readOnly && ($roles['cmadmin'] || $managed);
+    
     // View members of a group?
     $p['view'] = ($roles['cmadmin'] || $managed || $member);
     
@@ -509,37 +517,162 @@ class CoGroupMembersController extends StandardController {
    */
   
   function select() {
-    // Find all available CO people
+    // Start by using paginate to pull the set of group members.
+
+    if(!$this->gid) {
+      throw new InvalidArgumentException(_txt('er.notprov.id', array(_txt('ct.co_groups.1'))));
+    }
+    
+    $this->Paginator->settings = $this->paginate;
+    $this->Paginator->settings['joins'][0] = array(
+      'table'      => 'co_groups',
+      'alias'      => 'CoGroup',
+      'type'       => 'INNER',
+      'conditions' => array('CoPerson.co_id=CoGroup.co_id')
+    );
+    $this->Paginator->settings['conditions'] = array('CoGroup.id' => $this->gid);
+
+    // Gather up search filters, if present:
+    // Filter by Given name
+    if(!empty($this->params['named']['search.givenName'])) {
+      $searchterm = strtolower($this->params['named']['search.givenName']);
+      // We set up LOWER() indices on these columns (CO-1006)
+      $this->Paginator->settings['conditions']['LOWER(Name.given) LIKE'] = "%$searchterm%";
+    }
+    // Filter by Family name
+    if(!empty($this->params['named']['search.familyName'])) {
+      $searchterm = strtolower($this->params['named']['search.familyName']);
+      $this->Paginator->settings['conditions']['LOWER(Name.family) LIKE'] = "%$searchterm%";
+    }
+    // Now prepare the join on the names
+    if(!empty($this->params['named']['search.givenName'])
+      || !empty($this->params['named']['search.familyName'])) {
+      $this->Paginator->settings['joins'][] = array(
+        'table' => 'names',
+        'alias' => 'Name',
+        'type' => 'INNER',
+        'conditions' => array(
+          'Name.co_person_id=CoPerson.id'
+        )
+      );
+    }
+
+    // Filter by start of Primary Family name (starts with searchterm)
+    if(!empty($this->params['named']['search.familyNameStart'])) {
+      $searchterm = strtolower($this->params['named']['search.familyNameStart']);
+      $this->Paginator->settings['conditions']['LOWER(PrimaryName.family) LIKE'] = "$searchterm%";
+    }
+
+    // Filter by email address
+    if(!empty($this->params['named']['search.mail'])) {
+      $searchterm = strtolower($this->params['named']['search.mail']);
+      $this->Paginator->settings['conditions']['LOWER(EmailAddress.mail) LIKE'] = "%$searchterm%";
+      $this->Paginator->settings['joins'][] = array(
+        'table' => 'email_addresses',
+        'alias' => 'EmailAddress',
+        'type' => 'INNER',
+        'conditions' => array(
+          'EmailAddress.co_person_id=CoPerson.id'
+        )
+      );
+    }
+
+    // Filter by identifier
+    if(!empty($this->params['named']['search.identifier'])) {
+      $searchterm = strtolower($this->params['named']['search.identifier']);
+      $this->Paginator->settings['conditions']['LOWER(Identifier.identifier) LIKE'] = "%$searchterm%";
+      $this->Paginator->settings['joins'][] = array(
+        'table' => 'identifiers',
+        'alias' => 'Identifier',
+        'type' => 'INNER',
+        'conditions' => array(
+          'Identifier.co_person_id=CoPerson.id'
+        )
+      );
+    }
+
+    // Filter by status
+    if(!empty($this->params['named']['search.status'])) {
+      $searchterm = $this->params['named']['search.status'];
+      $this->Paginator->settings['conditions']['CoPerson.status'] = $searchterm;
+    }
+
+    // Filter by members and owners
+    // If both member and owner are selected, use a single join with "OR"
+    if(!empty($this->params['named']['search.members']) && !empty($this->params['named']['search.owners'])) {
+      $this->Paginator->settings['joins'][] = array(
+        'table' => 'co_group_members',
+        'alias' => 'CoGroupMember',
+        'type' => 'INNER',
+        'conditions' => array(
+          "CoGroupMember.co_person_id=CoPerson.id",
+          "CoGroupMember.co_group_id=" . $this->gid,
+          'OR' => array(
+            "CoGroupMember.member = true",
+            "CoGroupMember.owner = true"
+          )
+        )
+      );
+    } else {
+      // Otherwise filter for members and owners individually
+      // Filter by membership
+      if (!empty($this->params['named']['search.members'])) {
+        $this->Paginator->settings['joins'][] = array(
+          'table' => 'co_group_members',
+          'alias' => 'CoGroupMember',
+          'type' => 'INNER',
+          'conditions' => array(
+            "CoGroupMember.co_person_id=CoPerson.id",
+            "CoGroupMember.co_group_id=" . $this->gid,
+            "CoGroupMember.member = true"
+          )
+        );
+      }
+
+      // Filter by ownership
+      if (!empty($this->params['named']['search.owners'])) {
+        $this->Paginator->settings['joins'][] = array(
+          'table' => 'co_group_members',
+          'alias' => 'CoGroupMember',
+          'type' => 'INNER',
+          'conditions' => array(
+            "CoGroupMember.co_person_id=CoPerson.id",
+            "CoGroupMember.co_group_id=" . $this->gid,
+            "CoGroupMember.owner = true"
+          )
+        );
+      }
+    }
+    
+    $this->Paginator->settings['contain'] = array(
+      // Make sure to contain only the CoGroupMembership we're interested in
+      // This doesn't appear to actually work, so we'll pull the group membership separately
+      // 'CoGroupMember' => array('conditions' => array('CoGroupMember.id' => $this->gid)),
+      'PrimaryName'
+    );
+
+    $coPeople = $this->Paginator->paginate('CoPerson');
+
+    $this->set('co_people', $coPeople);
+    
+    // Pull the CoGroupMemberships for the retrieved CoPeople
+    $coPids = Hash::extract($coPeople, '{n}.CoPerson.id');
     
     $args = array();
-    $args['joins'][0]['table'] = 'co_groups';
-    $args['joins'][0]['alias'] = 'CoGroup';
-    $args['joins'][0]['type'] = 'INNER';
-    $args['joins'][0]['conditions'][0] = 'CoPerson.co_id=CoGroup.co_id';
-    $args['conditions']['CoGroup.id'] = $this->request->params['named']['cogroup'];
-    $args['order'][] = 'PrimaryName.family';
-    $args['contain'][] = 'PrimaryName';
-    
-    $this->set('co_people', $this->CoGroupMember->CoPerson->find('all', $args));
-    
-    // Find current group members/owners, and rehash to make it easier for the
-    // view to process
-    
-    $args = array();
-    $args['conditions']['CoGroupMember.co_group_id'] = $this->request->params['named']['cogroup'];
-    $args['recursive'] = -1;
+    $args['conditions']['CoGroupMember.co_person_id'] = $coPids;
+    $args['conditions']['CoGroupMember.co_group_id'] = $this->gid;
+    $args['contain'] = false;
     
     $coGroupMembers = $this->CoGroupMember->find('all', $args);
     $coGroupRoles = array();
     
+    // Make one pass through to facilitate rendering
     foreach($coGroupMembers as $m) {
       if(isset($m['CoGroupMember']['member']) && $m['CoGroupMember']['member']) {
-        // Make it easy to find the corresponding co_group_member:id
         $coGroupRoles['members'][ $m['CoGroupMember']['co_person_id'] ] = $m['CoGroupMember']['id'];
       }
       
       if(isset($m['CoGroupMember']['owner']) && $m['CoGroupMember']['owner']) {
-        // Make it easy to find the corresponding co_group_member:id
         $coGroupRoles['owners'][ $m['CoGroupMember']['co_person_id'] ] = $m['CoGroupMember']['id'];
       }
     }
@@ -549,8 +682,8 @@ class CoGroupMembersController extends StandardController {
     // Also find the Group so that its details like name can be rendered
     
     $args = array();
-    $args['conditions']['CoGroup.id'] = $this->request->params['named']['cogroup'];
-    $args['contain']['Co'] = 'Cou';
+    $args['conditions']['CoGroup.id'] = $this->gid;
+    $args['contain'] = array('Co');
     
     $coGroup = $this->CoGroupMember->CoGroup->find('first', $args);
     
@@ -569,10 +702,14 @@ class CoGroupMembersController extends StandardController {
     if(!$this->request->is('restful')) {
       $targetCoPersonId = $this->request->data['CoGroupMember']['co_person_id'];
       $userCoPersonId   = $this->Session->read('Auth.User.co_person_id');
+      $requesterIsAdmin = $this->Role->isCoAdmin($userCoPersonId, $this->cur_co['Co']['id'])
+                          || $this->Role->identifierIsCmpAdmin($this->Session->read('Auth.User.username'));
+      
       try {
         $this->CoGroupMember->updateMemberships($targetCoPersonId,
                                                 $this->request->data['CoGroupMember']['rows'],
-                                                $userCoPersonId);
+                                                $userCoPersonId,
+                                                $requesterIsAdmin);
         
         $this->Flash->set(_txt('rs.saved'), array('key' => 'success'));
       }
@@ -625,6 +762,30 @@ class CoGroupMembersController extends StandardController {
                             'co'         => $this->cur_co['Co']['id']));
     }
   }
+
+  /**
+   * Insert search parameters into URL for members selection
+   * - precondition: $this->request->params holds cogroup
+   * - postcondition: Redirect generated
+   *
+   * @since  COmanage Registry v3.3.0
+   */
+
+  public function search() {
+    $url['action'] = 'select';
+    $url['cogroup'] = $this->request->data['CoGroupMember']['cogroup'];
+
+    // Append the URL with all the search elements; the resulting URL will be similar to
+    // example.com/registry/co_group_members/select/cogroup:xxx/search.givenName:albert/search.familyName:einstein
+    foreach($this->data['search'] as $field=>$value){
+      if(!empty($value)) {
+        $url['search.'.$field] = $value;
+      }
+    }
+
+    // redirect the user to the url
+    $this->redirect($url, null, true);
+  }
   
   /**
    * View a Standard Object.
@@ -638,10 +799,12 @@ class CoGroupMembersController extends StandardController {
     
     parent::view($id);
     
-    $gm = $this->viewVars['co_group_members'][0];
-    
-    $this->set('title_for_layout', _txt('op.grm.title', array(_txt('op.view'),
-                                                              $gm['CoGroup']['name'],
-                                                              generateCn($gm['CoPerson']['PrimaryName']))));
+    if(!$this->request->is('restful')) {
+      $gm = $this->viewVars['co_group_members'][0];
+      
+      $this->set('title_for_layout', _txt('op.grm.title', array(_txt('op.view'),
+                                                                $gm['CoGroup']['name'],
+                                                                generateCn($gm['CoPerson']['PrimaryName']))));
+    }
   }
 }

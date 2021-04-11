@@ -257,6 +257,10 @@ FROM
     $args['conditions']['Identifier.deleted'] = false;
     $args['contain'] = false;
 
+    // Since the identifier may be multi-valued in order to be deterministic
+    // we order by the creation time.
+    $args['order'] = 'Identifier.created ASC';
+
     $identifier = $this->CoProvisioningTarget->Co->CoPerson->Identifier->find('first', $args);
     if ($identifier) {
       return $identifier['Identifier']['identifier'];
@@ -486,6 +490,11 @@ FROM
 
   public function provisionCoGroupReprovisionRequested($coProvisioningTargetData, $coGroup) {
     $provisionerGroup = $this->CoGrouperProvisionerGroup->findProvisionerGroup($coProvisioningTargetData, $coGroup);
+
+    if(!isset($provisionerGroup)) {
+      $provisionerGroup = $this->CoGrouperProvisionerGroup->addProvisionerGroup($coProvisioningTargetData, $coGroup);
+    } 
+
     $groupName = $this->CoGrouperProvisionerGroup->getGrouperGroupName($provisionerGroup);
     $groupDescription = $this->CoGrouperProvisionerGroup->getGrouperGroupDescription($provisionerGroup);
     $groupDisplayExtension = $this->CoGrouperProvisionerGroup->getGroupDisplayExtension($provisionerGroup);
@@ -636,6 +645,10 @@ FROM
         if($m['member'] && !($m['deleted']) && !($m['co_group_member_id'])) {
           $provisionerGroup = $this->CoGrouperProvisionerGroup
                                    ->findProvisionerGroup($coProvisioningTargetData, $m);
+          if(empty($provisionerGroup)) {
+            $provisionerGroup = $this->CoGrouperProvisionerGroup
+                                     ->addProvisionerGroup($coProvisioningTargetData, $m);
+          }
           $groupName = $this->CoGrouperProvisionerGroup
                             ->getGrouperGroupName($provisionerGroup);
           $groupDescription = $this->CoGrouperProvisionerGroup
@@ -643,6 +656,8 @@ FROM
           $groupDisplayExtension = $this->CoGrouperProvisionerGroup
                                         ->getGroupDisplayExtension($provisionerGroup);
           $registryGroups[] = $groupName;
+
+          // Synchronize if necessary.
           if(!(in_array($groupName, $grouperGroups))){
             try {
               if(!$grouper->groupExists($groupName)) {
@@ -652,28 +667,37 @@ FROM
                                                  $groupDisplayExtension)) {
                   // Log the failure but go onto the next group.
                   $this->log("GrouperProvisioner unable to add subject $subject to group $groupName");
+                  continue;
                 }
               }
               
               $grouper->addManyMember($groupName, array($subject));
+
             } catch (GrouperRestClientException $e) {
               // Log the failure but go onto the next group.
               $this->log("GrouperProvisioner unable to add subject $subject to group $groupName");
+              continue;
             }
           }
+
+          // Update provisioner group table to record new modified time.
+          $this->CoGrouperProvisionerGroup->updateProvisionerGroup($provisionerGroup);     
         }
       }
     }
 
     // Loop over the Grouper group memberships and delete the user
-    // from any groups not passed in as provisioning data.
+    // from any groups not passed in as provisioning data, but only
+    // if this is a group managed by this plugin.
     foreach($grouperGroups as $g) {
       if(!(in_array($g, $registryGroups))) {
-        try {
-          $grouper->deleteMember($g, $subject);
-        } catch (GrouperRestClientException $e) {
-          // Log the failure but go onto the next group.
-          $this->log("GrouperProvisioner unable to remove subject $subject from group $g");
+        if($this->CoGrouperProvisionerGroup->isManaged($g)) {
+          try {
+            $grouper->deleteMember($g, $subject);
+          } catch (GrouperRestClientException $e) {
+            // Log the failure but go onto the next group.
+            $this->log("GrouperProvisioner unable to remove subject $subject from group $g");
+          }
         }
       }
     }
@@ -790,6 +814,20 @@ FROM
     $args['conditions']['CoPerson.status'][0] = StatusEnum::Active;
     $args['conditions']['CoPerson.status'][1] = StatusEnum::Approved;
 
+    // We only want memberships with valid dates.
+    $args['conditions']['AND'][] = array(
+      'OR' => array(
+        'CoGroupMember.valid_from IS NULL',
+        'CoGroupMember.valid_from < ' => date('Y-m-d H:i:s', time())
+      )
+    );
+    $args['conditions']['AND'][] = array(
+      'OR' => array(
+        'CoGroupMember.valid_through IS NULL',
+        'CoGroupMember.valid_through > ' => date('Y-m-d H:i:s', time())
+      )
+    );
+
     // Contain the query since we only want the identifiers.
     $args['contain'] = false;
 
@@ -850,28 +888,34 @@ FROM
    * Determine the provisioning status of this target.
    *
    * @since  COmanage Registry v0.8.3
-   * @param  integer $coProvisioningTargetId CO provisioning target ID
-   * @param  integer $coPersonId CoPerson ID (null if CoGroup ID is specified)
-   * @param  integer $coGroupId CoGroup ID (null if CoPerson ID is specified)
-   * @return array ProvisioningStatusEnum, Timestamp of last update in epoch seconds, Comment
+   * @param  Integer $coProvisioningTargetId CO Provisioning Target ID
+   * @param  Model   $Model                  Model being queried for status (eg: CoPerson, CoGroup, CoEmailList)
+   * @param  Integer $id                     $Model ID to check status for
+   * @return Array ProvisioningStatusEnum, Timestamp of last update in epoch seconds, Comment
+   * @throws InvalidArgumentException If $id not found
+   * @throws RuntimeException For other errors
    */
   
-  public function status($coProvisioningTargetId, $coPersonId, $coGroupId=null) {
+  public function status($coProvisioningTargetId, $Model, $id) {
     $ret = array(
       'status'    => ProvisioningStatusEnum::Unknown,
       'timestamp' => null,
       'comment'   => ""
     );
 
-    if(!empty($coPersonId)) {
+    if($Model->name == 'CoPerson') {
       // For CO people we just return unknown.
       $ret['comment'] = 'see status for individual groups';
       return $ret;
     }
-
+    
+    if($Model->name != 'CoGroup') {
+      throw new InvalidArgumentException(_txt('er.notimpl'));
+    }
+    
     $args = array();
     $args['conditions']['CoGrouperProvisionerTarget.co_provisioning_target_id'] = $coProvisioningTargetId;
-    $args['conditions']['CoGrouperProvisionerGroup.co_group_id'] = $coGroupId;
+    $args['conditions']['CoGrouperProvisionerGroup.co_group_id'] = $id;
 
     $group = $this->CoGrouperProvisionerGroup->find('first', $args);
 
@@ -880,7 +924,7 @@ FROM
       $ret['timestamp'] = $group['CoGrouperProvisionerGroup']['modified'];
     }
 
-   return $ret;
+    return $ret;
   }
 
   /**
@@ -971,8 +1015,15 @@ FROM
       // Only consider the identifier we are using as the Grouper subject.
       $args['conditions']['Identifier.type'] = $coProvisioningTargetData['CoGrouperProvisionerTarget']['subject_identifier'];
 
-      // Select identifiers of people not in the group by having the CoGroupMember id be null.
-      $args['conditions']['CoGroupMember.id'] = null;
+      // Select identifiers of people not in the group by having the CoGroupMember id be null
+      // or by not having valid_from and valid_through.
+      $args['conditions']['AND'][] = array(
+        'OR' => array(
+          'CoGroupMember.id IS NULL',
+          'CoGroupMember.valid_from > ' => date('Y-m-d H:i:s', time()),
+          'CoGroupMember.valid_through < ' => date('Y-m-d H:i:s', time())
+        )
+      );
 
       // Only consider CoPeople in our CO.
       $args['conditions']['CoPerson.co_id'] = $coGroup['CoGroup']['co_id'];

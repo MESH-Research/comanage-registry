@@ -87,8 +87,13 @@ class ApiComponent extends Component {
         $coId = $this->reqModel->CoPerson->field('co_id',
                                                  array('CoPerson.id' => $this->reqConvData['co_person_id']));
       } elseif(!empty($this->reqConvData['co_person_role_id'])) {
-        $coId = $this->reqModel->CoPersonRole->field('co_id',
-                                                     array('CoPersonRole.id' => $this->reqConvData['co_person_role_id']));
+        $coPersonId = $this->reqModel->CoPersonRole->field('co_person_id',
+                                                           array('CoPersonRole.id' => $this->reqConvData['co_person_role_id']));
+
+        if($coPersonId) {
+          $coId = $this->reqModel->CoPersonRole->CoPerson->field('co_id',
+                                                                 array('CoPerson.id' => $coPersonId));
+        }
       }
       
       if($coId) {
@@ -145,6 +150,12 @@ class ApiComponent extends Component {
             break;
           case 'CoRole':
             $this->reqConvData['co_person_role_id'] = $this->reqData[$attr]['Id'];
+            break;
+          case 'Dept':
+            $this->reqConvData['co_department_id'] = $this->reqData[$attr]['Id'];
+            break;
+          case 'Group':
+            $this->reqConvData['co_group_id'] = $this->reqData[$attr]['Id'];
             break;
           case 'Org':
             $this->reqConvData['org_identity_id'] = $this->reqData[$attr]['Id'];
@@ -265,11 +276,24 @@ class ApiComponent extends Component {
     $this->request = $controller->request;
     $this->response = $controller->response;
     
-    $mName = $controller->modelClass;
-    $this->reqModel = $controller->$mName;
-    $this->reqModelName = $controller->modelClass;
-    $this->reqModelNamePl = Inflector::pluralize($this->reqModelName);
-    
+    if($controller->name != 'Authenticators') {
+      // SAMController already cleans this up in beforeFilter, but apparently that
+      // doesn't get called earlier enough for initialize(). This is a big mess
+      // that hopefully gets cleaned up in Registry PE.
+      if($controller->modelClass == 'Authenticator') {
+        $mName = Inflector::singularize($controller->name);
+        
+        $controller->loadModel($mName.'Authenticator.'.$mName);
+        $this->reqModel = $controller->$mName;
+        $this->reqModelName = Inflector::singularize($controller->name);
+      } else {
+        $mName = $controller->modelClass;
+        $this->reqModel = $controller->$mName;
+        $this->reqModelName = $controller->modelClass;
+      }
+      $this->reqModelNamePl = Inflector::pluralize($this->reqModelName);
+    }
+
     // Add a detector so we can call request->is('restful')
     // If we want to check the Accept header we'll need a slightly more complicated detector
     $this->request->addDetector('restful', array('param' => 'ext', 'options' => array('json', 'xml')));
@@ -345,6 +369,113 @@ class ApiComponent extends Component {
   }
   
   /**
+   * Determine the requested COID based on the requested URL, and specifically
+   * its query parameters.
+   *
+   * @since  COmanage Registry v3.3.0
+   * @param  $model   Cake Model
+   * @param  $request Cake Request
+   * @param  $data    Parsed PUT/POST body
+   * @return int      CO ID, or null if not found
+   */
+  
+  public function requestedCOID($model, $request, $data) {
+    $coid = null;
+    
+    // As of Registry v3.3.0, CO level API users are allowed to assert a CO ID
+    // for REST operations that meet the following requirements:
+    //
+    // (1) The request does not include a specific ID (eg view by CO, not view by ID)
+    // (2) The requested model directly belongsTo the parent link
+    // (Note Registry v5 implements this as a per-model check instead, but
+    // we don't have the infrastructure for that.)
+    
+    if(empty($request->params['pass'])) {
+      // For historical reasons, the query string keys aren't standard
+      $permittedKeys = array(
+        'GET' => array(
+          'clusterid' => 'Cluster',
+          'codeptid' => 'CoDepartment',
+          'cogroupid' => 'CoGroup',
+          'coid' => 'Co',
+          'copersonid' => 'CoPerson',
+          'copersonroleid' => 'CoPersonRole',
+          'couid' => 'Cou',
+          'orgidentityid' => 'OrgIdentity'
+        ),
+        'POST' => array(
+          'cluster_id' => 'Cluster',
+          'co_department_id' => 'CoDepartment',
+          'co_group_id' => 'CoGroup',
+          'co_id' => 'Co',
+          'co_person_id' => 'CoPerson',
+          'co_person_role_id' => 'CoPersonRole',
+          'cou_id' => 'Cou',
+          'org_identity_id' => 'OrgIdentity'
+        )
+      );
+      
+      // PUT and POST are basically the same
+      $permittedKeys['PUT'] = $permittedKeys['POST'];
+      
+      if(!empty($model->permittedApiFilters)) {
+        // Merge in the plugin's additional permitted key
+        foreach(array('GET', 'POST', 'PUT') as $a) {
+          $permittedKeys[$a] = array_merge($permittedKeys[$a], $model->permittedApiFilters);
+        }
+      }
+      
+      if(!empty($permittedKeys[$request->method()])) {
+        foreach($permittedKeys[$request->method()] as $k => $m) {
+          // For plugins, $m is of the form Plugin.Model, but belongsTo[]
+          // will be keyed only on Model
+          $b = strstr($m, '.');
+          
+          if($b) {
+            $b = ltrim($b, '.');
+          } else {
+            $b = $m;
+          }
+          
+          if(!empty($model->belongsTo[$b])) {
+            if($request->method() == 'GET') {
+              if(!empty($request->query[$k])) {
+                if($k == 'coid') {
+                  $coid = $request->query['coid'];
+                } else {
+                  // For any other key, we need to map it to a CO
+                  
+                  $ParentModel = ClassRegistry::init($m);
+                  
+                  $coid = $ParentModel->findCoForRecord($request->query[$k]);
+                }
+                
+                break;
+              }
+            } else {
+              if(!empty($data[$k])) {
+                if($k == 'co_id') {
+                  $coid = $data['co_id'];
+                } else {
+                  // For any other key, we need to map it to a CO
+                  
+                  $ParentModel = ClassRegistry::init($m);
+                  
+                  $coid = $ParentModel->findCoForRecord($data[$k]);
+                }
+                
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    return $coid;
+  }
+  
+  /**
    * Prepare a REST result HTTP header.
    * - precondition: HTTP headers must not yet have been sent
    * - postcondition: CakeResponse configured with header
@@ -354,7 +485,7 @@ class ApiComponent extends Component {
    * @param  string HTTP result comment
    */
   
-  public function restResultHeader($status, $txt) {
+  public function restResultHeader($status, $txt=null) {
     if(isset($txt)) {
       // We need to update the text associated with $status
       

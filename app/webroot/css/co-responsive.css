@@ -34,6 +34,15 @@
   #notifications {
     margin-right: 4px;
   }
+
+  #user-panel {
+    max-width: 100%;
+  }
+
+  .co-info-topbox {
+    word-wrap: break-word;
+  }
+
 }
 
 /* PHONE LANDSCAPE */
@@ -57,32 +66,46 @@
     line-height: 2em;
   }
   #logout {
-    /*display: block; -- keep hidden for now */
     display: block;
     color: white;
   }
   #user-menu {
     right: 15px;
   }
+  #global-search-box #CoDashboardQ {
+    width: 204px;
+    font-size: 14px;
+  }
+  #global-search-box .mdl-button {
+    position: relative;
+    top: -2px;
+  }
   #user-common-name {
     display: inline;
     position: relative;
     top: -1px;
   }
-  #user-links-cn {
-    display: none;
+  #user-panel {
+    min-width: 400px;
+    max-width: unset;
   }
-  #user-links-id {
-    margin-top: -8px;
+  #user-panel-user-info {
+    border-top: none;
+    margin: 0 80px 0 0;
+    padding-top: 0;
+  }
+  #user-panel-user-info #user-panel-cn {
+  }
+  #logout-in-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
   }
   #notifications li.notification:nth-child(n+4) { /* show all notifications on tablets (and larger) */
     display: block;
   }
   #content {
     padding: 1em;
-  }
-  #dialog-review {
-    height: 500px !important; /* mobile size */
   }
   /* CO PEOPLE */
   #co_people .rolestatus {
@@ -102,6 +125,10 @@
   #co_people .person-admin button {
     display: inline;
   }
+  ul.form-list li.field-flex {
+    display: flex;
+    align-items: center;
+  }
   ul.form-list .field-name {
     display: inline-block;
     min-width: 80px;
@@ -112,6 +139,10 @@
   ul.form-list .field-info {
     display: inline-block;
     width: 65%;
+  }
+  ul.form-list .field-info-flex {
+    display: inline-flex;
+    align-items: center;
   }
   ul.form-list-admin .field-name {
     width: 50%;
@@ -124,6 +155,13 @@
   ul.form-list input[type="number"],
   ul.form-list input[type="password"] {
     width: 97%;
+  }
+  ul.form-list .field-info-flex input[type="text"],
+  ul.form-list .field-info-flex input[type="number"],
+  ul.form-list .field-info-flex input[type="password"],
+  ul.form-list .field-info-flex textarea {
+    width: auto;
+    flex-grow: 1;
   }
   ul.form-list li.field-stack textarea {
     margin: 0.5em 0 0.5em 0.5em;
@@ -139,6 +177,9 @@
   body.view .modelbox .modelbox-data {
     margin-top: 0.5em;
     width: 65%;
+  }
+  #petition .field-name-status {
+    float: left;
   }
   /* PETITION ATTRIBUTES */
   .modelbox .mdl-textfield {
@@ -158,9 +199,6 @@
   .modelbox-data-label {
     width: 120px;
   }
-  #dialog-review {
-    height: auto !important; /* desktop size */
-  }
   #ui-datepicker-div {
     left: 30% !important;
   }
@@ -168,6 +206,11 @@
   .co-info-matchable {
     float: right;
     width: 70%;
+  }
+  /* SEARCH PAGE */
+  #search input#CoDashboardQ {
+    width: 300px;
+    font-size: 14px;
   }
   /* PAGINATION */
   #pagination {
@@ -270,6 +313,7 @@
   #logo {
     width: auto;
     right: 2em;
+    margin-top: 4px;
   }
   #user-menu {
     z-index: 30;
@@ -288,11 +332,9 @@
     display: none;
   }
   #user-defined-links-top  {
-    display: block;
+    display: inline-block;
     background-color: #222;
     color: white;
-    /* min-height: 27px; /* essential */
-
   }
   #user-defined-links-top .custom-links li {
     display: inline-block;
@@ -329,7 +371,8 @@
   }
   .co-grid .co-grid-header {
     display: flex;
-    background-color: #e5e5e5 !important;
+    background-color: #186696 !important;
+    color: #ffffff;
     font-weight: bold;
   }
   .side-search {
@@ -343,12 +386,17 @@
     position: relative;
     left: -120px; /* offset the drawer margin */
   }
+  body.ui-mode-basic #redirect-box {
+    left: unset;
+  }
   /********************************/
   /* My Population - People Index */
   /********************************/
   /* Listing sorter */
   #sorter {
     float: right;
+    margin-top: -1.5em;
+    padding-bottom: 0.5em;
   }
   /* Listing controls */
   .listControl li {
@@ -364,10 +412,25 @@
   .search-field-subgroup:nth-child(1) {
     margin-right: 0.5em;
   }
-  .top-search .clear-button {
+  .top-search #top-search-fields .clear-button {
     float: right;
   }
   /* PEOPLE LISTING */
+  /* Reset table for desktop */
+  #co-people-index thead {
+    display: table-header-group;
+  }
+  #co-people-index th {
+    padding: 0.5em 1em;
+  }
+  #co-people-index td,
+  #co-people-index td.person-name,
+  #co-people-index td.person-role,
+  #co-people-index td.actions {
+    display: table-cell;
+    padding: 0.75em 1em;
+    vertical-align: top;
+  }
   #co_people .person-info-inner {
     float: left;
     width: 200px;
@@ -387,19 +450,69 @@
   body.petitionerAttributes .modelbox {
     margin: 0 0.5em 1.5em 0;
   }
-  /* SERVICE PORTAL */
+  /* DASHBOARDS and WIDGETS */
+  /* Service Portal */
+  .co-services {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-content: flex-start;
+    align-items: stretch;
+  }
   .co-card {
-    float: left;
     margin: 0 1.25em 1.25em 0;
-    padding: 0.75em 1.25em 1.25em 1.25em;
-    min-height: 100px; /* XXX if images and descriptions are added, make this 200px;*/
+    padding: 0.75em 1.25em 4em 1.25em;
     min-width: 0;
-    width: 200px;
+    width: 180px;
+    -webkit-box-shadow: 1px 1px 1px 0px rgba(245,245,245,1);
+    -moz-box-shadow: 1px 1px 1px 0px rgba(245,245,245,1);
+    box-shadow: 1px 1px 1px 0px rgba(245,245,245,1);
+  }
+  .co-dept ul.form-list .field-title {
+    font-weight: normal;
+  }
+  .co-card img {
+    float: right;
+    min-width: 50%;
+    max-width: 50%;
+    margin: 0 0 0.5em 0.5em;
   }
   .co-card .co-card-icons {
     position: absolute;
     bottom: 1em;
     right: 1em;
+    float: none;
+  }
+  .co-card-join-button {
+    position: absolute;
+    bottom: 1em;
+    left: 1em;
+  }
+  /* Announcements Widget */
+  .widget-list li {
+    padding: 1.25em 1.5em;
+    margin: 0 0.25em 1.25em 0;
+    border: 1px solid #eee;
+    -webkit-box-shadow: 1px 1px 1px 0px rgba(245,245,245,1);
+    -moz-box-shadow: 1px 1px 1px 0px rgba(245,245,245,1);
+    box-shadow: 1px 1px 1px 0px rgba(245,245,245,1);
+  }
+  .widget-list .announcement-title {
+    float: left;
+  }
+  .widget-list .announcement-meta {
+    float: right;
+  }
+  .widget-list .announcement-body {
+    clear: both;
+  }
+  .widget-actions {
+    margin: -2.5em 0.5em 1em 0;
+    float: right;
+  }
+  .widget-actions li {
+    margin-left: 1em;
   }
   /* GENERAL */
   .two-col {

@@ -70,12 +70,11 @@
     <div class="field-name">
       <div class="field-title">
         <?php print ($e ? $this->Form->label('description', _txt('fd.desc')) : _txt('fd.desc')); ?>
-        <span class="required">*</span>
       </div>
     </div>
     <div class="field-info">
       <?php print ($e
-                   ? $this->Form->input('description', array('class' => 'focusFirst'))
+                   ? $this->Form->input('description')
         : filter_var($co_services[0]['CoService']['description'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
     </div>
   </li>
@@ -143,6 +142,35 @@
   <li>
     <div class="field-name">
       <div class="field-title">
+        <?php print ($e ? $this->Form->label('cou_id', _txt('fd.cou')) : _txt('fd.cou')); ?>
+      </div>
+      <div class="field-desc"><?php print _txt('fd.svc.cou.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php
+        $attrs = array();
+        $attrs['value'] = (isset($co_services[0]['CoService']['cou_id'])
+                           ? $co_services[0]['CoService']['cou_id']
+                           : '');
+        $attrs['empty'] = true;
+
+        if($e) {
+          print $this->Form->select('cou_id',
+                                    $vv_cous,
+                                    $attrs);
+
+          if($this->Form->isFieldError('cou_id')) {
+            print $this->Form->error('cou_id');
+          }
+        } else {
+          print $vv_cous[ $co_services[0]['CoService']['cou_id'] ];
+        }
+      ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title">
         <?php print ($e ? $this->Form->label('co_group_id', _txt('fd.svc.group')) : _txt('fd.svc.group')); ?>
       </div>
       <div class="field-desc"><?php print _txt('fd.svc.group.desc'); ?></div>
@@ -165,7 +193,102 @@
           }
         } else {
           if(!empty( $co_services[0]['CoService']['co_group_id'])) {
-            print filter_var($vv_co_groups[  $co_services[0]['CoService']['co_group_id'] ],FILTER_SANITIZE_SPECIAL_CHARS);
+            print filter_var($vv_co_groups[ $co_services[0]['CoService']['co_group_id'] ],FILTER_SANITIZE_SPECIAL_CHARS);
+          }
+        }
+      ?>
+    </div>
+  </li>
+  <?php if(!empty($vv_clusters)): ?>
+  <li>
+    <div class="field-name">
+      <div class="field-title">
+        <?php print ($e ? $this->Form->label('cluster_id', _txt('fd.svc.cluster')) : _txt('fd.svc.cluster')); ?>
+      </div>
+      <div class="field-desc"><?php print _txt('fd.svc.cluster.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php
+        $attrs = array();
+        $attrs['value'] = (isset($co_services[0]['CoService']['cluster_id'])
+                           ? $co_services[0]['CoService']['cluster_id']
+                           : 0);
+        $attrs['empty'] = true;
+        
+        if($e) {
+          print $this->Form->select('cluster_id',
+                                    $vv_clusters,
+                                    $attrs);
+          
+          if($this->Form->isFieldError('cluster_id')) {
+            print $this->Form->error('cluster_id');
+          }
+        } else {
+          if(!empty( $co_services[0]['CoService']['cluster_id'])) {
+            print filter_var($vv_clusters[  $co_services[0]['CoService']['cluster_id'] ],FILTER_SANITIZE_SPECIAL_CHARS);
+          }
+        }
+      ?>
+    </div>
+  </li>
+<?php endif; // vv_clusters ?>
+  <li>
+    <div class="field-name">
+      <div class="field-title">
+        <?php print _txt('fd.svc.identifier'); ?>
+      </div>
+      <div class="field-desc"><?php print _txt('fd.svc.identifier.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php
+        $attrs = array();
+        $attrs['value'] = (isset($co_services[0]['CoService']['identifier_type'])
+                           ? $co_services[0]['CoService']['identifier_type']
+                           : null);
+        $attrs['empty'] = true;
+
+        if($e) {
+          print $this->Form->select('identifier_type',
+                                    $vv_identifier_types,
+                                    $attrs);
+
+          if($this->Form->isFieldError('identifier_type')) {
+            print $this->Form->error('identifier_type');
+          }
+        } else {
+          if(!empty($co_services[0]['CoService']['identifier_type'])) {
+            print $vv_identifier_types[ $co_services[0]['CoService']['identifier_type'] ];
+          }
+        }
+      ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title">
+        <?php print ($e ? $this->Form->label('authenticator_id', _txt('fd.svc.authenticator')) : _txt('fd.svc.authenticator')); ?>
+      </div>
+      <div class="field-desc"><?php print _txt('fd.svc.authenticator.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php
+        $attrs = array();
+        $attrs['value'] = (isset($co_services[0]['CoService']['authenticator_id'])
+                           ? $co_services[0]['CoService']['authenticator_id']
+                           : 0);
+        $attrs['empty'] = true;
+        
+        if($e) {
+          print $this->Form->select('authenticator_id',
+                                    $vv_authenticators,
+                                    $attrs);
+          
+          if($this->Form->isFieldError('authenticator_id')) {
+            print $this->Form->error('authenticator_id');
+          }
+        } else {
+          if(!empty( $co_services[0]['CoService']['authenticator_id'])) {
+            print filter_var($vv_authenticators[ $co_services[0]['CoService']['authenticator_id'] ],FILTER_SANITIZE_SPECIAL_CHARS);
           }
         }
       ?>
@@ -182,6 +305,45 @@
       <?php print ($e
                    ? $this->Form->input('service_url')
                    : filter_var($co_services[0]['CoService']['service_url'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title">
+        <?php print ($e ? $this->Form->label('logo_url', _txt('fd.svc.logo_url')) : _txt('fd.svc.logo_url')); ?>
+      </div>
+      <div class="field-desc"><?php print _txt('fd.svc.logo_url.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e
+        ? $this->Form->input('logo_url')
+        : filter_var($co_services[0]['CoService']['logo_url'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title">
+        <?php print ($e ? $this->Form->label('short_label', _txt('fd.svc.label.short')) : _txt('fd.svc.label.short')); ?>
+      </div>
+      <div class="field-desc"><?php print _txt('fd.svc.label.short.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e
+                   ? $this->Form->input('short_label')
+                   : filter_var($co_services[0]['CoService']['short_label'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title">
+        <?php print ($e ? $this->Form->label('service_label', _txt('fd.svc.label')) : _txt('fd.svc.label')); ?>
+      </div>
+      <div class="field-desc"><?php print _txt('fd.svc.label.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e
+                   ? $this->Form->input('service_label')
+                   : filter_var($co_services[0]['CoService']['service_label'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
     </div>
   </li>
   <li>
@@ -216,7 +378,7 @@
         <span class="required"><?php print _txt('fd.req'); ?></span>
       </div>
       <div class="field-info">
-        <?php print $this->Form->submit($submit_label, array('onClick' => 'on_submit()')); ?>
+        <?php print $this->Form->submit($submit_label); ?>
       </div>
     </li>
   <?php endif; ?>

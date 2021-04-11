@@ -53,6 +53,7 @@ class OrgIdentitiesController extends StandardController {
   
   public $edit_contains = array(
     'Address',
+    'AdHocAttribute',
     'Co',
     'CoOrgIdentityLink' => array('CoPerson' => array('Co', 'PrimaryName')),
     'EmailAddress',
@@ -60,11 +61,13 @@ class OrgIdentitiesController extends StandardController {
     'Name',
     'OrgIdentitySourceRecord' => array('OrgIdentitySource'),
     'PrimaryName',
-    'TelephoneNumber'
+    'TelephoneNumber',
+    'Url'
   );
   
   public $view_contains = array(
     'Address',
+    'AdHocAttribute',
     'Co',
     'CoOrgIdentityLink' => array('CoPerson' => array('Co', 'PrimaryName')),
     'EmailAddress',
@@ -75,7 +78,8 @@ class OrgIdentitiesController extends StandardController {
 //    'PipelineCoPersonRole',
     'PipelineCoGroupMember' => array('CoGroup'),
     'PrimaryName',
-    'TelephoneNumber'
+    'TelephoneNumber',
+    'Url'
   );
   
   /**
@@ -148,7 +152,11 @@ class OrgIdentitiesController extends StandardController {
     $args['contain'] = false;
     
     $this->set('vv_org_id_sources', $this->OrgIdentitySource->find('list', $args));
-    
+
+    // Get the affiliations for display in the search filter bar
+    global $cm_lang, $cm_texts;
+    $this->set('vv_affiliations', $cm_texts[ $cm_lang ]['en.org_identity.affiliation']);
+
     // If an OrgIdentity was specified, see if there's an associated pipeline
     
     if(($this->action == 'edit' || $this->action == 'view')
@@ -171,6 +179,15 @@ class OrgIdentitiesController extends StandardController {
       $args['contain'] = false;
       
       $this->set('vv_co_person_roles', $this->OrgIdentity->PipelineCoPersonRole->find('first', $args));
+    }
+    
+    if(!$this->request->is('restful') && !empty($this->cur_co['Co']['id'])) {
+      // Mappings for extended types
+      $this->set('vv_addresses_types', $this->OrgIdentity->Address->types($this->cur_co['Co']['id'], 'type'));
+      $this->set('vv_email_addresses_types', $this->OrgIdentity->EmailAddress->types($this->cur_co['Co']['id'], 'type'));
+      $this->set('vv_identifiers_types', $this->OrgIdentity->Identifier->types($this->cur_co['Co']['id'], 'type'));
+      $this->set('vv_telephone_numbers_types', $this->OrgIdentity->TelephoneNumber->types($this->cur_co['Co']['id'], 'type'));
+      $this->set('vv_urls_types', $this->OrgIdentity->Url->types($this->cur_co['Co']['id'], 'type'));
     }
     
     parent::beforeRender();
@@ -503,6 +520,9 @@ class OrgIdentitiesController extends StandardController {
       $p['index'] = ($roles['cmadmin'] || $roles['admin'] || $roles['subadmin']);
       $p['search'] = $p['index'];
       
+      // View job history? This correlates with CoJobHistoryRecordsController
+      $p['jobhistory'] = ($roles['cmadmin'] || $roles['admin']);
+      
       // Explicit linking of an Org Identity to a CO Person?
       $p['link'] = ($roles['cmadmin'] || $roles['admin']);
       
@@ -533,6 +553,11 @@ class OrgIdentitiesController extends StandardController {
       // Find an Org Identity to add to a CO?
       $p['find'] = ($roles['cmadmin'] || $roles['coadmin'] || $roles['couadmin']);
       
+      // View identifiers? This correlates with IdentifiersController
+      $p['identifiers'] = ($roles['cmadmin']
+                           || $roles['coadmin']
+                           || ($managed && $roles['couadmin']));
+      
       // View history? This correlates with HistoryRecordsController
       $p['history'] = ($roles['cmadmin']
                        || ($managed && ($roles['coadmin'] || $roles['couadmin'])));
@@ -549,6 +574,9 @@ class OrgIdentitiesController extends StandardController {
         $p['edit'] = true;
         $p['view'] = true;
       }
+      
+      // View job history? This correlates with CoJobHistoryRecordsController
+      $p['jobhistory'] = ($roles['cmadmin'] || $roles['admin']);
       
       // Explicit linking of an Org Identity to a CO Person?
       $p['link'] = ($roles['cmadmin'] || $roles['admin']);

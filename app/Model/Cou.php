@@ -48,7 +48,8 @@ class Cou extends AppModel {
       'className' => 'Cou',
       'foreignKey'=>'parent_id'
     ),
-    // We specifically want to delete CO Groups that reference this COU
+    // We specifically want to delete CO Departments and Groups that reference this COU
+    "CoDepartment" => array('dependent' => true),
     "CoGroup" => array('dependent' => true),
     "CoPersonRole",
     "CoPetition",
@@ -177,7 +178,33 @@ class Cou extends AppModel {
     
     return(array());
   }
+  
+  /**
+   * Actions before deleting a model.
+   *
+   * @since  COmanage Registry v0.8
+   * @param  boolean Whether this is a cascading delete
+   * @return true for the actual delete to happen
+   */
 
+  public function beforeDelete($cascade = true) {
+    if(!empty($this->id)) {
+      // Remove the node from the tree before deleting it
+      
+      try {
+        // removeFromTree appears to generate bad SQL when there is only one item
+        // left to remove; for now we just ignore the Exception since it doesn't
+        // actually block us from proceeding.
+        $this->removeFromTree($this->id);
+      }
+      catch(Exception $e) {
+        
+      }
+    }
+    
+    return parent::beforeDelete($cascade);
+  }
+  
   /**
    * Generates dropdown option list for html for a COU.
    *
