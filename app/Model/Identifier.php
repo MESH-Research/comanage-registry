@@ -105,7 +105,7 @@ class Identifier extends AppModel {
                                                  IdentifierEnum::SamlPairwise,
                                                  IdentifierEnum::SamlSubject,
                                                  IdentifierEnum::SORID,
-                                                 wpid',
+                                                 'wpid',
                                                  IdentifierEnum::StudentSOR,
                                                  IdentifierEnum::UID))),
         'required' => true,
