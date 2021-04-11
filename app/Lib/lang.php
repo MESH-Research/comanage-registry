@@ -614,6 +614,7 @@ original notification at
                                  IdentifierEnum::OIDCsub => 'OIDC sub',
                                  IdentifierEnum::OpenID => 'OpenID',
                                  IdentifierEnum::ORCID => 'ORCID iD',
+                                 'wpid' => 'WordPress ID',
                                  IdentifierEnum::ProvisioningTarget => 'Provisioning Target',
                                  IdentifierEnum::Reference => 'Match Reference',
                                  IdentifierEnum::SamlPairwise =>'SAML pairwise-id',
