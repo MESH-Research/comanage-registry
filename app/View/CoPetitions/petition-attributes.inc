@@ -39,14 +39,15 @@
 ?>
   
 <script type="text/javascript">
-  var tandcs = <?php echo json_encode($vv_terms_and_conditions); ?>;
+  var tandcs = <?php print (!empty($vv_terms_and_conditions)) ? json_encode($vv_terms_and_conditions) : json_encode(array()); ?>;
   function updateTermsAndConditions(terms_and_conditions) {
 
-    <?php if($vv_tandc_mode == TAndCEnrollmentModeEnum::ExplicitConsent ||
-                $vv_tandc_mode == TAndCEnrollmentModeEnum::ImpliedConsent): ?>
+    <?php if(!empty($vv_tandc_mode)
+             && ($vv_tandc_mode == TAndCEnrollmentModeEnum::ExplicitConsent
+                 || $vv_tandc_mode == TAndCEnrollmentModeEnum::ImpliedConsent)): ?>
     //first delete the previous t&c
     $("#co_petition_tandc").parent().remove();
-    <?php if($vv_tandc_mode == TAndCEnrollmentModeEnum::ExplicitConsent): ?>
+    <?php if(!empty($vv_tandc_mode) && $vv_tandc_mode == TAndCEnrollmentModeEnum::ExplicitConsent): ?>
     $("input[type=submit]").attr("disabled", true);
     <?php endif;?>
 
@@ -228,7 +229,20 @@
     })
     
     $("#sponsors").autocomplete({
-      source: "<?php print $this->Html->url(array('controller' => 'co_people', 'action' => 'find', 'co' => $cur_co['Co']['id'], 'mode' => PeoplePickerModeEnum::Sponsor)); ?>",
+      source: "<?php
+        // We inject the Petition ID and token into the request in case we need
+        // autocomplete for new enrollees (unregistered users)
+        $sponsorurl = array(
+          'controller' => 'co_people',
+          'action' => 'find',
+          'co' => $cur_co['Co']['id'],
+          'mode' => PeoplePickerModeEnum::Sponsor,
+          'petitionid' => $vv_co_petition_id,
+          'token' => $vv_petition_token
+        );
+        
+        print $this->Html->url($sponsorurl);
+      ?>",
       minLength: 3,
       select: function(event, ui) {
         $("#sponsors").val(ui.item.label);
@@ -703,7 +717,7 @@
     </div><!-- modelbox -->
   <?php endforeach; // foreach ($coea_model as $m => $coe_attributes): ?>
   <?php
-  if(!empty($defaultTermsAndConditions)) {
+  if(!empty($defaultTermsAndConditions) && !empty($vv_terms_and_conditions)) {
     unset($terms_and_conditions);
     if(array_key_exists($defaultTermsAndConditions, $vv_terms_and_conditions) && !empty($vv_terms_and_conditions[$defaultTermsAndConditions])) {
       // Set COU T&C
@@ -773,7 +787,7 @@
   <?php
     // Render conclusion text for new petitions
     if(!empty($vv_conclusion_text)) {
-      print '<div class="modelbox">' . $vv_conclusion_text . "</div>";
+      print '<div class="modelbox d-flex">' . $vv_conclusion_text . "</div>";
     }
   ?>
 

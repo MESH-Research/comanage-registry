@@ -173,6 +173,18 @@ class StandardController extends AppController {
           $this->Api->restResultHeader(500, "Other Error");
         }
       } else {
+        if(!empty($model->validationErrors)) {
+          // Refactor the error messages
+          $model->validationErrors = $model->filterValidationErrors(
+            $model->validate,
+            $model->validationErrors
+          );
+          $errors_list = array_values(Hash::flatten($model->validationErrors));
+          $errors_list = array_unique(array_values($errors_list));
+          foreach($errors_list as $error) {
+            $this->Flash->set($error, array('key' => 'error'));
+          }
+        }
         $this->Flash->set($err ?: _txt('er.fields'), array('key' => 'error'));
         $this->regenerateForm();
       }
@@ -210,8 +222,21 @@ class StandardController extends AppController {
       
       $this->set('vv_servers', $this->Server->find('list', $args));
     }
-    
+
+    // Include Search Block
+    $this->set('vv_search_fields', $this->searchConfig($this->action));
+
     parent::beforeRender();
+  }
+
+  /**
+   * Search Block fields configuration
+   *
+   * @since  COmanage Registry v4.0.0
+   */
+
+  function searchConfig($action) {
+    return array();
   }
 
   /**
@@ -500,6 +525,9 @@ class StandardController extends AppController {
           // Pass them to the view
           $this->set('vv_id', $id);
           $this->set('invalid_fields', $invalidFields);
+        } else {
+          // We don't do this anywhere else, but we should, at least in API v2
+          $this->set('vv_error', $e->getMessage());
         }
         
         $this->Api->restResultHeader($e->getCode(), $e->getMessage());
@@ -651,6 +679,11 @@ class StandardController extends AppController {
         }
       } else {
         if(!empty($model->validationErrors)) {
+          // Refactor the error messages
+          $model->validationErrors = $model->filterValidationErrors(
+            $model->validate,
+            $model->validationErrors
+          );
           $errors_list = array_values(Hash::flatten($model->validationErrors));
           $errors_list = array_unique(array_values($errors_list));
           foreach($errors_list as $error) {
@@ -758,6 +791,7 @@ class StandardController extends AppController {
         $args['joins'][0]['alias'] = 'Identifier';
         $args['joins'][0]['type'] = 'INNER';
         $args['joins'][0]['conditions'][0] = $req . '.id=Identifier.' . $modelid;
+        $args['contain'] = false;
         
         $t = $model->find('all', $args);
         
@@ -1282,7 +1316,15 @@ class StandardController extends AppController {
   
   function search() {
     // the page we will redirect to
-    $url['action'] = 'index';
+    if(isset($this->data['RedirectAction']["select"])) {
+      $url['action'] = 'select';
+    } elseif(isset($this ->data['RedirectAction']["index"])) {
+      $url['action'] = 'index';
+    } else {
+      // XXX We need this for backward compatibility.
+      // XXX Remove as soon as we apply the new Search element across the framework
+      $url['action'] = 'index';
+    }
     
     // CoPeople uses "Search", but should use "search" like CoPetition (CO-906)
     

@@ -313,6 +313,7 @@ original notification at
     ActionEnum::CoPersonAddedPipeline       => 'CO Person Created (Pipeline)',
     ActionEnum::CoPersonDeletedManual       => 'CO Person Deleted (Manual)',
     ActionEnum::CoPersonDeletedPetition     => 'CO Person Deleted (Petition)',
+    ActionEnum::CoPersonEditedApi           => 'CO Person Edited (API)',
     ActionEnum::CoPersonEditedManual        => 'CO Person Edited',
     ActionEnum::CoPersonEditedPetition      => 'CO Person Edited (Petition)',
     ActionEnum::CoPersonEditedPipeline      => 'CO Person Edited (Pipeline)',
@@ -1015,10 +1016,13 @@ original notification at
   'er.et.inuse.ef' => 'The extended type "%1$s" is in use by at least one Enrollment Flow (as an attribute or default value) within this CO and cannot be removed.',
   'er.ev.ver.failed' =>  'Email Verification request failed. Please contact support for further assistance.',
   'er.ev.sent.failed' => 'Email verification request sent to %1$s failed',
+  'er.field.recheck' => 'Please recheck "%1$s"',
   'er.field.req' =>   'This field is required',
   'er.field.hidden.req' => 'A hidden field must have a default value',
   'er.fields' =>      'Please recheck the highlighted fields',
   'er.fields.api' =>  'Invalid fields: %1$s',
+  'er.fields.api.co' => '"%1$s" may not be moved to another CO',
+  'er.fields.api.frozen' => '"%1$s" is frozen and may not be changed',
   'er.file.none' =>   'No file specified',
   'er.file.parse' =>  'Unable to parse "%1$s"',
   'er.file.read' =>   'Unable to open "%1$s" for reading',
@@ -1219,7 +1223,8 @@ original notification at
   'fd.conditions' =>  'Conditions',
   'fd.copy-a' =>      'Copy of %1$s',
   'fd.cou' =>         'COU',
-  'fd.cou.nopar'  =>  'No COUs are available to be assigned parent',  
+  'fd.cou.list' =>    'COU list',
+  'fd.cou.nopar'  =>  'No COUs are available to be assigned parent',
   'fd.cou-a' =>       '%1$s COU',
   'fd.co_group.auto' => 'Automatic',
   'fd.co_group.group_type' => 'Group Type',
@@ -1342,6 +1347,8 @@ original notification at
   'fd.ef.eds.prefer.desc' => 'List of entity Ids to always show ("prefer") via the EDS, one per line, maximum of 3',
   'fd.ef.efn'      => 'From Address For Notifications',
   'fd.ef.efn.desc' => 'Email address notifications will come from',
+  'fd.ef.enable_person_find' => 'Enable People Picker for Self Service',
+  'fd.ef.enable_person_find.desc' => 'Enable people picker for self service enrollments, see <a href"https://spaces.at.internet2.edu/display/COmanage/Sponsors">Sponsors</a> for privacy considerations',
   'fd.ef.env'      => 'Enable Environment Attribute Retrieval',
   'fd.ef.env.desc' => 'Examine the server environment for authoritative organizational identity attributes',
   'fd.ef.epx' =>      'Early Provisioning Executable',
@@ -2090,6 +2097,8 @@ original notification at
   'op.select.select' => 'Please select the CO Person you would like to attach to this Petition by clicking the associated select button.',
   'op.select.empty' => '(select...)',
   'op.select.empty-a' => '%1$s (select...)',
+  'op.select.opt.any'      => 'Any',
+  'op.select.opt.none'     => 'None',
   'op.server.oauth2.token' => 'Obtain New Token',
   'op.skip' =>        'Skip',
   'op.submit' =>      'Submit',
@@ -2365,7 +2374,12 @@ $cm_texts_orig = $cm_texts;
 function _txt($key, $vars=null, $index=null)
 {
   global $cm_lang, $cm_texts;
-
+  
+  if(!isset($cm_texts[$cm_lang][$key])) {
+    // No entry found, just return the key itself (similar to __())
+    return $key;
+  }
+  
   // XXX need to figure out how to pass arbitrary # of args to sprintf
   
   $s = (isset($index) ? $cm_texts[ $cm_lang ][$key][$index] : $cm_texts[ $cm_lang ][$key]);

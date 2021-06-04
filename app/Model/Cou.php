@@ -104,10 +104,13 @@ class Cou extends AppModel {
       'allowEmpty' => true
     ),
     'parent_id' => array(
-      // Strangely, when specified is numeric cake decides to make required = true
-      'rule' => '/[0-9]*/',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        // Strangely, when specified as numeric cake decides to make required = true
+        'rule' => '/[0-9]*/',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'lft' => array(
       'rule' => 'numeric',
@@ -157,8 +160,10 @@ class Cou extends AppModel {
    */
   
   public function allCous($coId, $format="hash") {
+    $args = array();
     $args['conditions']['Cou.co_id'] = $coId;
     $args['order'] = 'Cou.name ASC';
+    $args['contain'] = false;
     
     $cous = $this->find("list", $args);
     
