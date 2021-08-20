@@ -410,7 +410,7 @@ class SalesforceSourceBackend extends OrgIdentitySourceBackend {
       throw new InvalidArgumentException(_txt('er.id.unk-a', array($id)));
     }
     
-    if(($r->UP_Commons_Eligible__c===true)){
+    if(($records->UP_Commons_Eligible__c!==true)){
       throw new InvalidArgumentException(_txt('er.id.unk-a', array($id)));
     }
 
@@ -534,7 +534,7 @@ class SalesforceSourceBackend extends OrgIdentitySourceBackend {
     //          'MiddleName',
       'LastName',
       'Email',
-      'UP_Commons_Eligible__c'
+      'Contact.UP_Commons_Eligible__c'
     );
 
     // We should be able to do this to constrain searches to email addresses,
