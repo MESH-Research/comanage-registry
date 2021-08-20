@@ -1680,6 +1680,9 @@ class AppModel extends Model {
           return true;
         }
         $eval_field_timestamp = strtotime($eval_field);
+      } elseif(empty($this->data[$this->name][$eval_field])
+               && empty($this->data[$this->alias][$eval_field])) {
+        return true;
       } else {
         return _txt('er.unknown', array($eval_field));
       }
