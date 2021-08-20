@@ -610,6 +610,7 @@ original notification at
                                  IdentifierEnum::GuestSOR => 'Guest SoRID',
                                  IdentifierEnum::HRSOR => 'HR SoRID',
                                  IdentifierEnum::Mail => 'Mail',
+                                 IdentifierEnum::MLA => 'MLA',
                                  IdentifierEnum::National => 'National',
                                  IdentifierEnum::Network => 'Network',
                                  IdentifierEnum::OIDCsub => 'OIDC sub',

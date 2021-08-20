@@ -95,6 +95,7 @@ class Identifier extends AppModel {
                                                  IdentifierEnum::GuestSOR,
                                                  IdentifierEnum::HRSOR,
                                                  IdentifierEnum::Mail,
+                                                 IdentifierEnum::MLA,
                                                  IdentifierEnum::National,
                                                  IdentifierEnum::Network,
                                                  IdentifierEnum::OIDCsub,
