@@ -496,17 +496,28 @@ class AppModel extends Model {
         }
       }
       
-      // Finally, render the change string based on the attributes found above.
-      // Notate going to or from NULL only if $newdata or $olddata (as appropriate)
-      // was populated, so as to avoid noise when a related object is added or
-      // deleted.
-      
-      if(isset($newval) && !isset($oldval)) {
-        $changes[] = $ftxt . ": " . (isset($olddata) ? _txt('fd.null') . " > " : "") . $newval;
-      } elseif(!isset($newval) && isset($oldval)) {
-        $changes[] = $ftxt . ": " . $oldval . (isset($newdata) ? " > " . _txt('fd.null') : "");
-      } elseif(isset($newval) && isset($oldval) && ($newval != $oldval)) {
-        $changes[] = $ftxt . ": " . $oldval . " > " . $newval;
+      // As a special case, if the field name is "password" mask the values
+      if($attr == 'password') {
+        if(isset($newval) && !isset($oldval)) {
+          $changes[] = $ftxt . ": " . (isset($olddata) ? _txt('fd.null') . " > " : "") . "(new)";
+        } elseif(!isset($newval) && isset($oldval)) {
+          $changes[] = $ftxt . ": (old)" . (isset($newdata) ? " > " . _txt('fd.null') : "");
+        } elseif(isset($newval) && isset($oldval) && ($newval != $oldval)) {
+          $changes[] = $ftxt . ": (old) > (new)";
+        }
+      } else {
+        // Finally, render the change string based on the attributes found above.
+        // Notate going to or from NULL only if $newdata or $olddata (as appropriate)
+        // was populated, so as to avoid noise when a related object is added or
+        // deleted.
+        
+        if(isset($newval) && !isset($oldval)) {
+          $changes[] = $ftxt . ": " . (isset($olddata) ? _txt('fd.null') . " > " : "") . $newval;
+        } elseif(!isset($newval) && isset($oldval)) {
+          $changes[] = $ftxt . ": " . $oldval . (isset($newdata) ? " > " . _txt('fd.null') : "");
+        } elseif(isset($newval) && isset($oldval) && ($newval != $oldval)) {
+          $changes[] = $ftxt . ": " . $oldval . " > " . $newval;
+        }
       }
     }
     
@@ -909,6 +920,50 @@ class AppModel extends Model {
     }
     
     return $ret;
+  }
+
+  /**
+   * Get MVPA Model attributes for CO/COU Administrators or members
+   *
+   * @param int|null $couid   The ID of the COU
+   * @param bool     $admin   Fetch only the admininstrators data
+   * @return false|array
+   *
+   * @since  COmanage Registry v4.0.0
+   */
+  public function findGroupMembersNAdminsMVPA($coid, $couid=null, $admin=true) {
+    // Get a pointer to our model
+    $mdl_name = $this->name;
+    // Get the available Columns from the Schema
+    $mdl_columns = array_keys($this->schema());
+
+    if(!in_array('co_person_id', $mdl_columns)) {
+      return false;
+    }
+
+    $args = array();
+    $args['joins'][0]['table']         = 'co_group_members';
+    $args['joins'][0]['alias']         = 'CoGroupMember';
+    $args['joins'][0]['type']          = 'INNER';
+    $args['joins'][0]['conditions'][0] = 'CoGroupMember.co_person_id=' . $mdl_name . '.co_person_id';
+    $args['joins'][1]['table']         = 'co_groups';
+    $args['joins'][1]['alias']         = 'CoGroup';
+    $args['joins'][1]['type']          = 'INNER';
+    $args['joins'][1]['conditions'][0] = 'CoGroup.id=CoGroupMember.co_group_id';
+    $args['conditions']['CoGroup.co_id'] = $coid;
+    if(!is_null($couid)) {
+      $args['conditions']['CoGroup.cou_id'] = $couid;
+    }
+    if($admin) {
+      $args['conditions']['CoGroup.group_type'] = GroupEnum::Admins;
+    } else {
+      $args['conditions']['CoGroup.group_type'] = GroupEnum::ActiveMembers;
+    }
+    $args['conditions']['CoGroupMember.member'] = true;
+    $args['conditions']['CoGroup.status'] = SuspendableStatusEnum::Active;
+    $args['contain'] = false;
+
+    return $this->find('all', $args);
   }
   
   /**
@@ -1461,7 +1516,7 @@ class AppModel extends Model {
   }
   
   /**
-   * Determine is a given value is valid for an Attribute Enumeration.
+   * Determine if a given value is valid for an Attribute Enumeration.
    *
    * @since  COmanage Registry v4.0.0
    * @param  integer $coId      CO ID
@@ -1477,6 +1532,49 @@ class AppModel extends Model {
     $AttributeEnumeration->isValid($coId, $attribute, $value);
     
     return true;
+  }
+
+  /**
+   * Try to normalize a given Attribute Enumeration
+   *
+   * @since  COmanage Registry v4.0.0
+   * @param  integer $coId      CO ID
+   * @param  string  $attribute Attribute, in Model.attribute form
+   * @param  string  $value     Value to normalize
+   * @return string             The normalized value
+   */
+
+  public function normalizeEnumeration($coId, $attribute, $value) {
+    // First, see if there is an enumeration defined for $coId + $attribute.
+
+    $args = array();
+    $args['conditions']['AttributeEnumeration.co_id'] = $coId;
+    $args['conditions']['AttributeEnumeration.attribute'] = $attribute;
+    $args['conditions']['AttributeEnumeration.status'] = SuspendableStatusEnum::Active;
+    $args['contain'] = false;
+
+    $AttributeEnumeration = ClassRegistry::init('AttributeEnumeration');
+    $attrEnum = $AttributeEnumeration->find('first', $args);
+
+    if(empty($attrEnum['AttributeEnumeration']['dictionary_id'])) {
+      // If there is no dictionary attached to the Attribute Enumeration
+      // configuration then load the normalizer
+      $this->Behaviors->load('Normalization');
+
+      // We need to restructure the data to fit what Normalizers expect
+      $data = array();
+
+      $a = explode('.', $attribute, 2);
+      $data[ $a[0] ][ $a[1] ] = $value;
+      $newdata = $this->normalize($data, $coId);
+
+      $this->Behaviors->unload('Normalization');
+
+      // Now that we have a result, return it back into the record we want to save
+      return $newdata[ $a[0] ][ $a[1] ];
+    }
+    // Return the initial value
+    return $value;
   }
   
   /**
@@ -1669,18 +1767,40 @@ class AppModel extends Model {
 
       // Check the existence of the evaluation field
       if(isset($this->data[$this->name][$eval_field])) {
-        $eval_field = $this->data[$this->name][$eval_field];
-        if(empty($eval_field)) {
+        $eval_field_value = $this->data[$this->name][$eval_field];
+        if(empty($eval_field_value)) {
           return true;
         }
-        $eval_field_timestamp = strtotime($eval_field);
+        $eval_field_timestamp = strtotime($eval_field_value);
       } elseif(isset($this->data[$this->alias][$eval_field])) {
-        $eval_field = $this->data[$this->alias][$eval_field];
-        if(empty($eval_field)) {
+        $eval_field_value = $this->data[$this->alias][$eval_field];
+        if(empty($eval_field_value)) {
           return true;
         }
-        $eval_field_timestamp = strtotime($eval_field);
-      } elseif(empty($this->data[$this->name][$eval_field])
+        $eval_field_timestamp = strtotime($eval_field_value);
+      } elseif (isset($this->data[$this->alias]['id'])
+                && empty($this->data[$this->alias][$eval_field])) {  // Fix for saveField operation with validateion option enabled
+        $id = $this->data[$this->alias]['id'];
+        $this->id = $id;
+        $eval_field_value = $this->field($eval_field);
+
+        if(empty($eval_field_value)) {
+          return true;
+        }
+
+        $eval_field_timestamp = strtotime($eval_field_value);
+      } elseif (isset($this->data[$this->name]['id'])
+                && empty($this->data[$this->name][$eval_field])) {  // Fix for saveField operation with validateion option enabled
+        $id = $this->data[$this->name]['id'];
+        $this->id = $id;
+        $eval_field_value = $this->field($eval_field);
+
+        if(empty($eval_field_value)) {
+          return true;
+        }
+
+        $eval_field_timestamp = strtotime($eval_field_value);
+      } elseif(empty($this->data[$this->name][$eval_field]) // OrgIdentitySource case were date fields could be absent
                && empty($this->data[$this->alias][$eval_field])) {
         return true;
       } else {
@@ -1726,10 +1846,13 @@ class AppModel extends Model {
         // translated names. Note as of v2.0.0 there may not be "translated"
         // names (ie: for attribute enumerations), in which case we just want
         // the original string.
-        
+
         foreach($this->validate[$field]['content']['rule'][1] as $key) {
           if(isset($this->cm_enum_txt[$field])) {
             $ret[$key] = _txt($this->cm_enum_txt[$field], NULL, $key);
+          } elseif(isset($this->cm_attr_enum_value[$field])) {
+            $mdl->id = $key;
+            $ret[$key] = $mdl->field($this->cm_attr_enum_value[$field]);
           } else {
             $ret[$key] = $key;
           }

@@ -29,8 +29,11 @@ class StandardController extends AppController {
   // Placeholder, will get set by index()
   public $paginate = array();
 
-  // Used for activating tabs on pages; will hold name of tab or NULL
+  // XXX Deprecated. Used for activating tabs on pages; will hold name of tab or NULL
   public $redirectTab = NULL;
+
+  // Used in the performRedirect() function to pass in a specific redirect from a controller
+  public $redirectTarget = NULL;
 
   // Deleting certain records requires forcing a hard delete so that changelog
   // behavior is skipped
@@ -225,6 +228,8 @@ class StandardController extends AppController {
 
     // Include Search Block
     $this->set('vv_search_fields', $this->searchConfig($this->action));
+    // Include alphabet Search bar
+    $this->set('vv_alphabet_search', $this->alphabetSearchConfig($this->action));
 
     parent::beforeRender();
   }
@@ -232,10 +237,49 @@ class StandardController extends AppController {
   /**
    * Search Block fields configuration
    *
+   * @example
+   *    if($action == 'index') {
+   *      return array(
+   *        'search.status' => array(
+   *          'label' => _txt('fd.status'),
+   *          'type' => 'select',
+   *          'empty'   => _txt('op.select.all'),
+   *          'options' => _txt('en.status.pt'),
+   *        ),
+   *        'search.sponsor' => array(
+   *          'label' => _txt('fd.sponsor'),
+   *          'type' => 'text',
+   *        ),
+   *        'qaxsbar' => array(
+   *          'label' => _txt('fd.status') . ":",
+   *          'type' => 'checkbox',
+   *          'enum' => _txt('en.status.pt'),
+   *          'field' => 'status',    // This is multivalue. e.g. search.status[0] = PA,search.status[0] = PC
+   *        ),
+   *      );
+   *    }
    * @since  COmanage Registry v4.0.0
    */
 
   function searchConfig($action) {
+    return array();
+  }
+
+  /**
+   * Alphabet Search Bar configuration
+   *
+   * @example
+   *    if($action == 'index') {
+   *      return array(
+   *        'search.familyNameStart' => array(
+   *          'label' => _txt('me.alpha.label'),
+   *        ),
+   *      );
+   *    }
+   * @since  COmanage Registry v4.0.0
+   */
+
+  function alphabetSearchConfig($action) {
     return array();
   }
 
@@ -251,7 +295,8 @@ class StandardController extends AppController {
     // Apply the rule only when the validateExtendedType function is used as a custom rule
     $model = $this->modelClass;
     if(!empty($this->$model->validate['type']['content']['rule'])
-       && array_search('validateExtendedType', $this->$model->validate['type']['content']['rule'], true) !== null) {
+       && array_search('validateExtendedType', $this->$model->validate['type']['content']['rule'], true) !== null
+       && !empty($this->cur_co['Co']['id'])) {
       $vrule = $this->$model->validate['type']['content']['rule'];
       $vrule[1]['coid'] = $this->cur_co['Co']['id'];
       $this->$model->validator()->getField('type')->getRule('content')->rule = $vrule;
@@ -828,7 +873,12 @@ class StandardController extends AppController {
                // (But we need to fall through to the other logic if copersonid is not specified, hack hack.)
                || ($req == 'CoPersonRole'
                    && !empty($this->params['url']['copersonid']))) {
-        if(!empty($this->params['url']['codeptid'])) {
+        if(isset($this->params['url']['codeptid'])) {
+          if(empty($this->params['url']['codeptid'])) {
+            $this->Api->restResultHeader(400, "CO Department Not Specified");
+            return;
+          }
+          
           $args = array();
           $args['conditions'][$model->name . '.co_department_id'] = $this->params['url']['codeptid'];
           $args['contain'] = false;
@@ -853,7 +903,12 @@ class StandardController extends AppController {
           }
           
           $this->set($modelpl, $this->Api->convertRestResponse($t));
-        } elseif(!empty($this->params['url']['cogroupid'])) {
+        } elseif(isset($this->params['url']['cogroupid'])) {
+          if(empty($this->params['url']['cogroupid'])) {
+            $this->Api->restResultHeader(400, "CO Group Not Specified");
+            return;
+          }
+          
           $args = array();
           $args['conditions'][$model->name . '.co_group_id'] = $this->params['url']['cogroupid'];
           $args['contain'] = false;
@@ -878,7 +933,12 @@ class StandardController extends AppController {
           }
           
           $this->set($modelpl, $this->Api->convertRestResponse($t));
-        } elseif(!empty($this->params['url']['copersonid'])) {
+        } elseif(isset($this->params['url']['copersonid'])) {
+          if(empty($this->params['url']['copersonid'])) {
+            $this->Api->restResultHeader(400, "CO Person Not Specified");
+            return;
+          }
+          
           $args = array();
           $args['conditions'][$model->name . '.co_person_id'] = $this->params['url']['copersonid'];
           $args['contain'] = false;
@@ -903,7 +963,12 @@ class StandardController extends AppController {
           }
           
           $this->set($modelpl, $this->Api->convertRestResponse($t));
-        } elseif(!empty($this->params['url']['copersonroleid'])) {
+        } elseif(isset($this->params['url']['copersonroleid'])) {
+          if(empty($this->params['url']['copersonroleid'])) {
+            $this->Api->restResultHeader(400, "CO Person Role Not Specified");
+            return;
+          }
+          
           $args = array();
           $args['conditions'][$model->name . '.co_person_role_id'] = $this->params['url']['copersonroleid'];
           $args['contain'] = false;
@@ -928,7 +993,12 @@ class StandardController extends AppController {
           }
           
           $this->set($modelpl, $this->Api->convertRestResponse($t));
-        } elseif(!empty($this->params['url']['organizationid'])) {
+        } elseif(isset($this->params['url']['organizationid'])) {
+          if(empty($this->params['url']['organizationid'])) {
+            $this->Api->restResultHeader(400, "Organization Not Specified");
+            return;
+          }
+          
           $args = array();
           $args['conditions'][$model->name . '.organization_id'] = $this->params['url']['organizationid'];
           $args['contain'] = false;
@@ -953,7 +1023,12 @@ class StandardController extends AppController {
           }
           
           $this->set($modelpl, $this->Api->convertRestResponse($t));
-        } elseif(!empty($this->params['url']['orgidentityid'])) {
+        } elseif(isset($this->params['url']['orgidentityid'])) {
+          if(empty($this->params['url']['orgidentityid'])) {
+            $this->Api->restResultHeader(400, "Org Identity Not Specified");
+            return;
+          }
+          
           $args = array();
           $args['conditions'][$model->name . '.org_identity_id'] = $this->params['url']['orgidentityid'];
           $args['contain'] = false;
@@ -1254,6 +1329,9 @@ class StandardController extends AppController {
       
       $this->set('redirect', $redirect);
       $this->redirect($redirect);
+    } elseif(!empty($this->redirectTarget)) {
+      // we are passing in a specific redirect (overriding the default redirect to 'index')
+      $this->redirect($this->redirectTarget);
     } elseif(isset($this->cur_co)) {
       $this->redirect(array('action' => 'index', 'co' => filter_var($this->cur_co['Co']['id'],FILTER_SANITIZE_SPECIAL_CHARS)));
     } else {
@@ -1326,19 +1404,11 @@ class StandardController extends AppController {
       $url['action'] = 'index';
     }
     
-    // CoPeople uses "Search", but should use "search" like CoPetition (CO-906)
-    
     // build a URL will all the search elements in it
     // the resulting URL will be 
-    // example.com/registry/co_people/index/Search.givenName:albert/Search.familyName:einstein
-    if(isset($this->data['Search'])) {
-      foreach ($this->data['Search'] as $field=>$value){
-        if(!empty($value)) {
-          $url['Search.'.$field] = $value; 
-        }
-      }
-    } elseif(isset($this->data['search'])) {
-      foreach ($this->data['search'] as $field=>$value){
+    // example.com/registry/co_people/index/search.givenName:albert/search.familyName:einstein
+    if(isset($this->data['search'])) {
+      foreach ($this->data['search'] as $field => $value){
         if(!empty($value)) {
           $url['search.'.$field] = $value; 
         }

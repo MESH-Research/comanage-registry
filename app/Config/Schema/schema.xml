@@ -526,12 +526,30 @@
     <field name="username" type="C" size="128" />
     <field name="password" type="C" size="80" />
     <field name="sor_label" type="C" size="40" />
-    <field name="is_comanage_match" type="L" />
     <field name="created" type="T" />
     <field name="modified" type="T" />
 
     <index name="match_servers_i1">
       <col>server_id</col>
+    </index>
+  </table>
+  
+  <table name="match_server_attributes">
+    <field name="id" type="I">
+      <key />
+      <autoincrement />
+    </field>
+    <field name="match_server_id" type="I">
+      <constraint>REFERENCES cm_match_servers(id)</constraint>
+    </field>
+    <field name="attribute" type="C" size="80" />
+    <field name="type" type="C" size="32" />
+    <field name="required" type="I" />
+    <field name="created" type="T" />
+    <field name="modified" type="T" />
+
+    <index name="match_server_attributes_i1">
+      <col>match_server_id</col>
     </index>
   </table>
   
@@ -1155,6 +1173,7 @@
       <notnull />
     </field>
     <field name="mail" type="C" size="256" />
+    <field name="skip_invite" type="L" />
     <field name="email_address_id" type="I">
       <constraint>REFERENCES cm_email_addresses(id)</constraint>
     </field>
@@ -1581,9 +1600,18 @@
     <field name="status" type="C" size="2" />
     <field name="created" type="T" />
     <field name="modified" type="T" />
-    
+    <field name="co_expiration_policy_id" type="I">
+      <constraint>REFERENCES cm_co_expiration_policies(id)</constraint>
+    </field>
+    <field name="revision" type="I" />
+    <field name="deleted" type="L" />
+    <field name="actor_identifier" type="C" size="256" />
+
     <index name="co_expiration_policies_i1">
       <col>co_id</col>
+    </index>
+    <index name="co_expiration_policies_i2">
+      <col>co_expiration_policy_id</col>
     </index>
   </table>
   
@@ -1701,6 +1729,7 @@
     <field name="eds_preferred_idps" type="X" size="4000" />
     <field name="eds_hidden_idps" type="X" size="4000" />
     <field name="redirect_on_logout" type="C" size="1024" />
+    <field name="app_base" type="C" size="64" />
     <field name="status" type="C" size="2" />
     <field name="created" type="T" />
     <field name="modified" type="T" />
@@ -2912,6 +2941,7 @@
     <field name="disable_expiration" type="L" />
     <field name="disable_ois_sync" type="L" />
     <field name="group_validity_sync_window" type="I" />
+    <field name="garbage_collection_interval" type="I" />
     <field name="enable_normalization" type="L" />
     <field name="enable_empty_cou" type="L" />
     <field name="invitation_validity" type="I" />
@@ -2932,6 +2962,7 @@
     <field name="co_theme_id" type="I">
       <constraint>REFERENCES cm_co_themes(id)</constraint>
     </field>
+    <field name="global_search_limit" type="I" />
     <field name="created" type="T" />
     <field name="modified" type="T" />
     
@@ -3010,6 +3041,30 @@
     </index>
     <index name="co_provisioning_target_filters_i2">
       <col>data_filter_id</col>
+    </index>
+  </table>
+  
+  <!-- "preferences" may not be 100% correct, but it inflects better than "state" -->
+  <table name="application_preferences">
+    <field name="id" type="I">
+      <key />
+      <autoincrement />
+    </field>
+    <field name="co_person_id" type="I">
+      <notnull />
+      <constraint>REFERENCES cm_co_people(id)</constraint>
+    </field>
+    <!-- we don't use key because it is reserved by mysql -->
+    <field name="tag" type="C" size="128" />
+    <field name="value" type="C" size="256" />
+    <field name="created" type="T" />
+    <field name="modified" type="T" />
+    
+    <index name="application_preferences_i1">
+      <col>co_person_id</col>
+    </index>
+    <index name="application_preferences_i2">
+      <col>application_preferences_id</col>
     </index>
   </table>
 </schema>

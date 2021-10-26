@@ -63,7 +63,6 @@ Router::connect(
 Router::mapResources(array(
 	'ad_hoc_attributes',
   'addresses',
-  'attribute_enumerations',
 	'clusters',
 	'co_departments',
 	'co_email_lists',
@@ -94,6 +93,16 @@ Router::mapResources(array(
 	'urls'
 ));
 Router::parseExtensions();
+
+// ApplicationPreferences uses non-standard REST routes
+Router::connect(
+	'/application_preferences/:tag',
+	array('controller' => 'application_preferences', 'action' => 'retrieve', '[method]' => 'GET')
+);
+Router::connect(
+	'/application_preferences/:tag',
+	array('controller' => 'application_preferences', 'action' => 'store', '[method]' => 'PUT')
+);
 
 /**
  * Load the CakePHP default routes. Remove this if you do not want to use

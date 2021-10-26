@@ -111,7 +111,8 @@ class Co extends AppModel {
     'status' => array(
       'rule' => array('inList', array(TemplateableStatusEnum::Active,
                                       TemplateableStatusEnum::Suspended,
-                                      TemplateableStatusEnum::Template)),
+                                      TemplateableStatusEnum::Template,
+                                      TemplateableStatusEnum::InTrash)),
       'required' => true,
       'message' => 'A valid status must be selected'
     )
@@ -140,6 +141,51 @@ class Co extends AppModel {
     }
     
     return true;
+  }
+  
+  /**
+   * Determine the CO ID for the COmanage CO.
+   *
+   * @since  COmanage Registry v4.0.0
+   * @return int The COmanage CO ID
+   */
+  
+  public function getCOmanageCOID() {
+    return $this->field('id', array('Co.name' => DEF_COMANAGE_CO_NAME));
+  }
+
+  /**
+   * Determine if a CO is read only.
+   *
+   * @since  COmanage Registry v4.0.0
+   * @param  Integer $id CO  ID
+   * @return True if the CO is read only, false otherwise
+   * @throws InvalidArgumentException
+   */
+
+  public function readOnly($id) {
+    // A CO is read only if the status field is 'TR'.
+
+    return (bool)$this->inTrash($id);
+  }
+
+  /**
+   * Determine if a CO is in Trash
+   *
+   * @since  COmanage Registry  v4.0.0
+   * @param  Integer $id    Job ID
+   * @return Boolean True on success
+   * @throws InvalidArgumentException
+   */
+
+  public function inTrash($id) {
+    $curStatus = $this->field('status', array('Co.id' => $id));
+
+    if(!$curStatus) {
+      throw new InvalidArgumentException(_txt('er.notfound', array(_txt('ct.cos.1'), $id)));
+    }
+
+    return ($curStatus == TemplateableStatusEnum::InTrash);
   }
   
   /**
@@ -217,8 +263,9 @@ class Co extends AppModel {
       
       $this->CoGroup->CoGroupMember->updateAll(array('CoGroupMember.co_group_nesting_id' => null),
                                                array('CoGroupMember.co_group_id' => array_keys($groups)));
-      
-      // By skipping callbacks we don't need to disable ChangelogBehavior
+
+      // Disable Changelog behaviors. Skipping callbacks is not enough for a Shell Job
+      $this->CoGroup->Behaviors->unload('Changelog');
       $this->CoGroup->CoGroupNesting->deleteAll(array('CoGroupNesting.co_group_id' => array_keys($groups)));
     }
     
@@ -308,6 +355,7 @@ class Co extends AppModel {
         'CoGroupOisMapping' => 'OrgIdentitySource',
         'CoGroupNesting' => 'CoGroup',
         'HttpServer' => 'Server',
+        'MatchServer' => 'Server',
         'Oauth2Server' => 'Server',
         'SqlServer' => 'Server',
       ) as $m => $parentm) {

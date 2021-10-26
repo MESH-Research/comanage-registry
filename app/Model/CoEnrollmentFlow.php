@@ -183,7 +183,8 @@ class CoEnrollmentFlow extends AppModel {
       'rule' => array('inList',
                       array(VerificationModeEnum::Automatic,
                             VerificationModeEnum::None,
-                            VerificationModeEnum::Review)),
+                            VerificationModeEnum::Review,
+                            VerificationModeEnum::SkipIfVerified)),
       'required' => false,
       'allowEmpty' => true
     ),
@@ -525,6 +526,10 @@ class CoEnrollmentFlow extends AppModel {
     // Optional: Step is not configured, but plugins may elect to execute
     // NotPermitted: Step is not configured and plugins may not run
     
+    // NOTE: A role should always be specified, even if the step is NotPermitted,
+    // since it will be used to determine which token to inject for redirecting
+    // to the next step.
+    
     // The order of the steps in the array will be the order used to generate the
     // steps in the sidebar (enrollmentFlowSteps.ctp)
     
@@ -629,6 +634,15 @@ class CoEnrollmentFlow extends AppModel {
       
       $ret['checkEligibility']['role'] = EnrollmentRole::Petitioner;
     }
+    
+    if(!empty($ef['CoEnrollmentFlow']['t_and_c_mode'])
+       && $ef['CoEnrollmentFlow']['t_and_c_mode'] != TAndCEnrollmentModeEnum::Ignore) {
+      $ret['tandcAgreement']['enabled'] = RequiredEnum::Required;
+    } else {
+      $ret['tandcAgreement']['enabled'] = RequiredEnum::NotPermitted;
+    }
+    
+    $ret['tandcAgreement']['role'] = $ret['checkEligibility']['role'];
     
     $ret['sendConfirmation']['role'] = EnrollmentRole::Petitioner;
     $ret['waitForConfirmation']['role'] = EnrollmentRole::Petitioner;
@@ -813,12 +827,13 @@ class CoEnrollmentFlow extends AppModel {
    * Perform a keyword search.
    *
    * @since  COmanage Registry v3.1.0
-   * @param  Integer $coId CO ID to constrain search to
-   * @param  String  $q    String to search for
+   * @param  integer $coId  CO ID to constrain search to
+   * @param  string  $q     String to search for
+   * @param  integer $limit Search limit
    * @return Array Array of search results, as from find('all)
    */
   
-  public function search($coId, $q) {
+  public function search($coId, $q, $limit) {
     // Tokenize $q on spaces
     $tokens = explode(" ", $q);
     
@@ -832,9 +847,30 @@ class CoEnrollmentFlow extends AppModel {
     }
     $args['conditions']['CoEnrollmentFlow.co_id'] = $coId;
     $args['order'] = array('CoEnrollmentFlow.name');
+    $args['limit'] = $limit;
     $args['contain'] = false;
     
     return $this->find('all', $args);
+  }
+
+  /**
+   * Fetch all Enrollment Flows
+   *
+   * @since  COmanage Registry v4.0.0
+   * @param  Integer $coId CO ID to constrain search to
+   * @return Array Array elements
+   */
+
+  public function enrollmentFlowList($coId) {
+
+    $args = array();
+    $args['conditions']['CoEnrollmentFlow.co_id'] = $coId;
+    $args['conditions']['NOT']['CoEnrollmentFlow.status'] = TemplateableStatusEnum::Template;
+    $args['order'] = array('CoEnrollmentFlow.name');
+    $args['fields'] = array('CoEnrollmentFlow.id', 'CoEnrollmentFlow.name');
+    $args['contain'] = false;
+
+    return $this->find('list', $args);
   }
   
   /**

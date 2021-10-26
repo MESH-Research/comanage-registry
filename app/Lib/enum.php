@@ -425,6 +425,12 @@ class NameEnum
   const Preferred = 'preferred';
 }
 
+class NestedEnum
+{
+  const Direct   = 'D';
+  const Indirect = 'I';
+}
+  
 class NotificationStatusEnum
 {
   const Acknowledged          = 'A';
@@ -500,6 +506,7 @@ class OrgIdentityStatusEnum
 class PeoplePickerModeEnum
 {
   const Sponsor   = 'S';
+  const All       = 'AL';
 }
 
 class PermissionEnum
@@ -780,17 +787,20 @@ class TemplateableStatusEnum
   const Active              = 'A';
   const Suspended           = 'S';
   const Template            = 'T';
-  
+  const InTrash             = 'TR';
+
   public static $from_api = array(
     'Active'    => TemplateableStatusEnum::Active,
     'Suspended' => TemplateableStatusEnum::Suspended,
-    'Template'  => TemplateableStatusEnum::Template
+    'Template'  => TemplateableStatusEnum::Template,
+    'InTrash'   => TemplateableStatusEnum::InTrash
   );
 
   public static $to_api = array(
     TemplateableStatusEnum::Active    => 'Active',
     TemplateableStatusEnum::Suspended => 'Suspended',
-    TemplateableStatusEnum::Template  => 'Template'
+    TemplateableStatusEnum::Template  => 'Template',
+    TemplateableStatusEnum::InTrash   => 'InTrash'
   );
 }
 
@@ -806,9 +816,10 @@ class UrlEnum {
 
 class VerificationModeEnum
 {
-  const Automatic = 'A';
-  const Review    = 'R';
-  const None      = 'X';
+  const Automatic       = 'A';
+  const Review          = 'R';
+  const SkipIfVerified  = 'V';
+  const None            = 'X';
 }
 
 class VisibilityEnum

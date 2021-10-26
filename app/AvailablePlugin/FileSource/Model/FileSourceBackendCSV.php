@@ -251,7 +251,7 @@ class FileSourceBackendCSV extends FileSourceBackendImpl {
     
     // Walk through MVPAs by type
     
-    foreach(array('Name', 'Address', 'EmailAddress', 'TelephoneNumber', 'Url') as $model) {
+    foreach(array('Name', 'Address', 'EmailAddress', 'Identifier', 'TelephoneNumber', 'Url') as $model) {
       $orgdata[$model] = array();
       
       if(!empty($this->fieldCfg[$model])) {
@@ -271,10 +271,6 @@ class FileSourceBackendCSV extends FileSourceBackendImpl {
             if($model == 'EmailAddress' && !isset($n['verified'])) {
               // By default we consider Email Addresses verified
               $n['verified'] = true;
-            }
-            
-            if($model == 'Identifier') {
-              // XXX check for +login
             }
             
             $orgdata[$model][] = $n;
