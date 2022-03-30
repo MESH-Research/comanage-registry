@@ -408,6 +408,7 @@ class IdentifierEnum
   const GuestSOR           = 'sor-guest';
   const HRSOR              = 'sor-hr';
   const Mail               = 'mail';
+  const MLA                = 'mlaid';
   const National           = 'national';
   const Network            = 'network';
   const OIDCsub            = 'oidcsub';
