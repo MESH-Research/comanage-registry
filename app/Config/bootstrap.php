@@ -136,6 +136,7 @@ CakeLog::config('error', array(
 	'engine' => 'FileLog',
 	'types' => array('warning', 'error', 'critical', 'alert', 'emergency'),
 	'file' => 'error',
+        'size' => '100MB',
 ));
 
 // PHP 8 removes FILTER_SANITIZE_MAGIC_QUOTES, which was replaced with FILTER_SANITIZE_ADD_SLASHES
