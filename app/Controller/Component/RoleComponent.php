@@ -354,6 +354,10 @@ class RoleComponent extends Component {
     $args['joins'][0]['conditions'][0] = 'CoPerson.id=CoPersonRole.co_person_id';
     $args['conditions']['CoPerson.id'] = $coPersonId;
     $args['conditions']['CoPerson.co_id'] = $coId;
+    $args['conditions'][] = 'CoPerson.deleted IS NOT true';
+    $args['conditions'][] = 'CoPersonRole.deleted IS NOT true';
+    $args['conditions'][] = 'CoPersonRole.co_person_role_id IS NULL';
+    $args['conditions'][] = 'CoPerson.co_person_id IS NULL';
     if($active) {
       $args['conditions']['CoPerson.status'] = array(StatusEnum::Active, StatusEnum::GracePeriod);
       $args['conditions']['CoPersonRole.status'] = array(StatusEnum::Active, StatusEnum::GracePeriod);
@@ -475,6 +479,19 @@ class RoleComponent extends Component {
     catch(Exception $e) {
       // Not really clear that we should fail here
       //throw new InvalidArgumentException($e->getMessage());
+      
+      if($ret['cmadmin']) {
+        // We're a CMP Admin accessing a CO we're not a member of. Set $coPersonId
+        // to that person's co_person_id from the COmanage CO. This is primarily
+        // for Application Preferences, but it also closes an edge case where
+        // we might have Auth.User.co_person_id set if the Admin first visited
+        // a CO they are a member of.
+        
+        $Co = ClassRegistry::init('Co');
+        
+        // Note we don't want to indicate the user is a member of the CO
+        $this->Session->write('Auth.User.co_person_id', $CoPerson->idForIdentifier($Co->getCOmanageCOID(), $username, null, true));
+      }
     }
     
     // Is this user a member of the current CO?
@@ -765,7 +782,7 @@ class RoleComponent extends Component {
       $args['joins'][0]['alias'] = 'Co';
       $args['joins'][0]['type'] = 'INNER';
       $args['joins'][0]['conditions'][0] = 'CoPerson.co_id=Co.id';
-      $args['conditions']['Co.name'] = 'COmanage';
+      $args['conditions']['Co.name'] = DEF_COMANAGE_CO_NAME;
       $args['conditions']['Co.status'] = TemplateableStatusEnum::Active;
       $args['conditions']['CoPerson.id'] = $coPersonIds;
       $args['contain'] = false;
@@ -1420,12 +1437,20 @@ class RoleComponent extends Component {
           
           return true;
         }
-        
+
+        $cou_id = !empty($not['RecipientCoGroup']['cou_id']) ? $not['RecipientCoGroup']['cou_id'] : null;
+
         // Check the recipient group
         if(!empty($not['CoNotification']['recipient_co_group_id'])) {
-          if($this->cachedGroupCheck($coPersonId, "", "", $not['CoNotification']['recipient_co_group_id'])) {
-          $this->cache['coperson'][$coPersonId]['co_notification'][$coNotificationId][$role] = true;
-          
+          if($this->cachedGroupCheck($coPersonId,
+                                     "",
+                                     "",
+                                     $not['CoNotification']['recipient_co_group_id'],
+                                     false,
+                                     null,
+                                     $cou_id)
+          ) {
+            $this->cache['coperson'][$coPersonId]['co_notification'][$coNotificationId][$role] = true;
             return true;
           }
         }

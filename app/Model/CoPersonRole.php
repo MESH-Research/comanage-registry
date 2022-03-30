@@ -34,19 +34,22 @@ class CoPersonRole extends AppModel {
   
   // Add behaviors
   public $actsAs = array('Containable',
-                         'Normalization' => array('priority' => 4),
+                         'Linkable.Linkable',
+                         // 'Normalization' => array('priority' => 4), // Comment out Normalization in order to address CO-2017
                          'Provisioner',
                          'Changelog' => array('priority' => 5));
   
   // Association rules from this model to other models
   public $belongsTo = array(
-    // A CO Org Person To is attached to one COU
     "Cou",
     "CoPerson"=> array(
       'className' => 'CoPerson',
       'foreignKey' => 'co_person_id'
     ),
-    // A CO Org Person To is attached to one CO Person    
+    "ManagerCoPerson" => array(
+      'className' => 'CoPerson',
+      'foreignKey' => 'manager_co_person_id'
+    ),        // foreign key to manager
     "SponsorCoPerson" => array(
       'className' => 'CoPerson',
       'foreignKey' => 'sponsor_co_person_id'
@@ -86,14 +89,16 @@ class CoPersonRole extends AppModel {
       'content' => array(
         'rule' => array('numeric'),
         'required' => true,
-        'message' => 'A CO Person ID must be provided'
+        'message' => 'A CO Person ID must be provided',
+        'unfreeze' => 'CO'
       )
     ),
     'cou_id' => array(
       'content' => array(
         'rule' => array('numeric'),
         'required' => false,
-        'allowEmpty' => true
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
       )
     ),
     'title' => array(
@@ -169,14 +174,26 @@ class CoPersonRole extends AppModel {
                                         StatusEnum::Pending,
                                         StatusEnum::PendingApproval,
                                         StatusEnum::PendingConfirmation,
-                                        StatusEnum::Suspended))
+                                        StatusEnum::Suspended)),
+        'required' => true,
+        'allowEmpty' => false,
+        'message' => 'A valid status must be selected'
       )
     ),
     'sponsor_co_person_id' => array(
       'content' => array(
         'rule' => array('numeric'),
         'required' => false,
-        'allowEmpty' => true
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
+    ),
+    'manager_co_person_id' => array(
+      'content' => array(
+        'rule' => array('numeric'),
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
       )
     ),
     'source_org_identity_id' => array(
@@ -324,7 +341,7 @@ class CoPersonRole extends AppModel {
 
       $this->cachedData = $this->find('first', $args);
     }
-    
+
     // Verify the Attribute Enumeration values for issuing_authority, if any.
     // Because the logic is more complicated than the Cake 2 validation framework
     // can handle, we do it here where we (generally) have full access to the record.
@@ -343,9 +360,14 @@ class CoPersonRole extends AppModel {
     if($coId) {
       foreach(array('o', 'ou', 'title') as $a) {
         if(!empty($this->data[$this->alias][$a])) {
+          // Validate Enumeration
           $this->validateEnumeration($coId,
                                      'CoPersonRole.'.$a, 
                                      $this->data[$this->alias][$a]);
+          // Normalize Enumeration
+          $this->data[$this->alias][$a] = $this->normalizeEnumeration($coId,
+                                                                      'CoPersonRole.'.$a,
+                                                                      $this->data[$this->alias][$a]);
         }
       }
     }
@@ -372,10 +394,11 @@ class CoPersonRole extends AppModel {
         $this->data[$this->alias]['valid_through'] = strftime("%F %T", $offsetDT->getTimestamp());
       }
     }
-    
+
     // If the validity of the role was changed, change the status appropriately
-    
-    if(!empty($this->data[$this->alias]['status'])) {
+    // Skip calculations as part of CO-2195
+    if(!empty($this->data[$this->alias]['status'])
+       && (!isset($options['trustStatus']) || !$options['trustStatus'])) {
       if(!empty($this->data[$this->alias]['valid_from'])) {
         if(strtotime($this->data[$this->alias]['valid_from']) < time()
            && $this->data[$this->alias]['status'] == StatusEnum::Pending) {
@@ -552,12 +575,13 @@ class CoPersonRole extends AppModel {
    * Perform a keyword search.
    *
    * @since  COmanage Registry v3.1.0
-   * @param  Integer $coId CO ID to constrain search to
-   * @param  String  $q    String to search for
+   * @param  integer $coId  CO ID to constrain search to
+   * @param  string  $q     String to search for
+   * @param  integer $limit Search limit
    * @return Array Array of search results, as from find('all)
    */
   
-  public function search($coId, $q) {
+  public function search($coId, $q, $limit) {
     // Tokenize $q on spaces
     $tokens = explode(" ", $q);
     
@@ -576,8 +600,19 @@ class CoPersonRole extends AppModel {
     
     $args['conditions']['CoPerson.co_id'] = $coId;
     $args['order'] = array('CoPersonRole.title');
-    $args['contain']['CoPerson'] = 'PrimaryName';
+    $args['limit'] = $limit;
+    $args['link']['CoPerson'] = array('Name' => array('conditions' => array('primary_name' => true)));
     
-    return $this->find('all', $args);
+    $ret = $this->find('all', $args);
+    
+    // Since we use linkable instead of containable, Name is nested at the wrong level
+    for($i = 0;$i < count($ret);$i++) {
+      if(isset($ret[$i]['Name'])) {
+        $ret[$i]['CoPerson']['PrimaryName'] = $ret[$i]['Name'];
+        unset($ret[$i]['Name']);
+      }
+    }
+    
+    return $ret;
   }
 }

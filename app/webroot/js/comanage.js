@@ -51,6 +51,19 @@ function generateFlash(text, type) {
   });
 }
 
+// Set an application preference
+// tag     - name of preference to save (string, required)
+// value   - value to save (json in the form of {"value":"something"} or {"value":null} to unset)
+function setApplicationPreference(tag,value) {
+  var apUrl = "/registry/application_preferences/" + tag;
+  var jsonData = value;
+  $.ajax({
+    url: apUrl,
+    type: 'PUT',
+    data: jsonData
+  });
+}
+
 // Generate a loading animation by revealing a persistent hidden div with CSS animation.
 // An element's onclick action will trigger this to appear if it has the class "spin" class on an element.
 // (See View/Elements/javascript.ctp)
@@ -119,13 +132,60 @@ function js_confirm_generic(txt, url, confirmbtxt, cancelbtxt, titletxt, tokenRe
   $("#dialog-text").text(bodyText);
 
   // Set the dialog buttons
-  var dbuttons = {};
-  dbuttons[cxlbutton] = function() { $(this).dialog("close"); };
-  dbuttons[confbutton] = function() { window.location = forwardUrl; };
+  var dbuttons = []
+  // Cancel button
+  dbuttons.push({
+    text: cxlbutton,
+    id: "btn-confirm-generic-cxl",
+    click: function () {$(this).dialog("close");}
+  });
+  // Confirm button
+  dbuttons.push({
+    text: confbutton,
+    id: "btn-confirm-generic-conf",
+    click: function () {
+      // Handle the submit button
+      loadUiDialogSpinner($("#btn-confirm-generic-conf"));
+      // loadButtonSpinner($("#btn-confirm-generic-conf"), confirmbtxt);
+      // Redirect to action
+      window.location = forwardUrl;
+    }
+  });
   $("#dialog").dialog("option", "buttons", dbuttons);
 
   // Open the dialog
   $('#dialog').dialog('open');
+}
+
+// Load button spinner followed by Text
+// elem         - button element (object, required)
+// bodyText     - button text    (string, required)
+function loadButtonSpinner(elem, btnText) {
+  let btn_payload = "<span class='spinner-grow spinner-grow-sm align-middle' role='status' aria-hidden='true'></span><span class='sr-only'>"
+    + btnText
+    + "</span> "
+    + btnText;
+  elem.html(btn_payload);
+  elem.button("disable");
+}
+
+// Load UI Dialog co-loading-mini spinner inline with UI Buttons
+// elem         - button element (object, required)
+function loadUiDialogSpinner(elem) {
+  // debugger;
+  $pane = elem.closest('.ui-dialog-buttonpane');
+  $pane.prepend('<span class="d-inline-flex align-bottom co-loading-mini"><span></span><span></span><span></span></span>');
+  elem.button("disable");
+}
+
+// Turn the loader to visible and disable the submit button
+// This function assumes that the view contains only one submit button
+function showBtnSpinnerLightbox() {
+  var $spinner = $(".btn-submit-with-loader");
+  if($('.lightbox').length > 0) {
+    $spinner.addClass('visible').removeClass('invisible');
+    $spinner.closest("button").attr('disabled', true);
+  }
 }
 
 // Generic goto page form handling for multi-page listings.
@@ -257,17 +317,16 @@ function js_form_generic(txt, url, submitbtxt, cancelbtxt, titletxt, lbltxt, sen
     title: title_txt,
     buttons: [{
       text: submit_btn_txt,
-      "id": "btnSubmit",
+      id: "btn-form-generic-submit",
       click: function () {
         let dialog_input = $(this).find('input[id="form-dialog-text"]').val();
         let $data = {};
         $data.input = dialog_input;
 
         // Handle the submit button
-        $btn = $("#btnSubmit");
-        $btn.html(submit_btn_txt_sending);
-        $btn.prepend("<i class='fa fa-spinner fa-spin'></i> ");
-        $btn.button("disable");
+        // Handle the submit button
+        // loadButtonSpinner($("#btn-form-generic-submit"), submit_btn_txt_sending);
+        loadUiDialogSpinner($("#btn-form-generic-submit"));
 
         let jqxhr = $.ajax({
           cache: false,
@@ -307,7 +366,7 @@ function js_form_generic(txt, url, submitbtxt, cancelbtxt, titletxt, lbltxt, sen
       },
     }, {
       text: cancel_btn_txt,
-      "id": "btnCancel",
+      id: "btn-form-generic-cxl",
       click: function () {
         $(this).dialog('close');
       },
@@ -323,10 +382,16 @@ function js_form_generic(txt, url, submitbtxt, cancelbtxt, titletxt, lbltxt, sen
 // errormsg          - Tooltip Error message  (string, required)
 function validate_date_input(flashmsg, errormsg) {
   $("input[id*='ValidFrom'], input[id*='ValidThrough']").on('change', function () {
-    var $valid_from = $("input[id*='ValidFrom'");
+    var $valid_from = $("input[id*='ValidFrom']");
     let valid_from_date = $valid_from.val();
-    var $valid_through = $("input[id*='ValidThrough'");
+    var $valid_through = $("input[id*='ValidThrough']");
     let valid_through_date = $valid_through.val();
+
+    // In case any of the two is empty return success
+    if((!valid_from_date || valid_from_date.length === 0 )
+        || (!valid_through_date || valid_through_date.length === 0 )) {
+      return;
+    }
 
     let valid_from_tmstmp = new Date(valid_from_date).getTime();
     let valid_through_tmstmp = new Date(valid_through_date).getTime();
@@ -341,4 +406,22 @@ function validate_date_input(flashmsg, errormsg) {
       $("input[type='submit']").prop('disabled', false);
     }
   });
+}
+
+// CO-2263, Format CO Person autocomplete widget items for easier disambiguation
+// Depends on jQuery UI - this function is fed to the _renderItem extension point for the autocomplete widget
+// ul            - list for the jQuery UI autocomplete selection menu                  (DOM element)
+// item          - json item used to construct the autocomplete selection list element (JSON object)
+function formatCoPersonAutoselectItem(ul, item) {
+  var itemMarkup = '<div class="cm-ac-item-wrapper">';
+  itemMarkup += '<div class="cm-ac-name">' + item.label + '</div>';
+  if(item.email != '') {
+    itemMarkup += '<div class="cm-ac-subitem cm-ac-email"><span class="cm-ac-label">' + item.emailLabel + '</span>' + item.email + '</div>';
+  }
+  if(item.identifier != '') {
+    itemMarkup += '<div class="cm-ac-subitem cm-ac-id"><span class="cm-ac-label">' + item.identifierLabel + '</span>' + item.identifier + '</div>';
+  }
+  itemMarkup += '</div>';
+  
+  return $("<li>").append(itemMarkup).appendTo(ul);
 }

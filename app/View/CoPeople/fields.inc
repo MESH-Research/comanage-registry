@@ -307,10 +307,26 @@
         );
       }
       
+      // Inject plugin menus. We intentionally leave expunge as the last option,
+      // pending identity architecture analysis.
+      
+      if(!empty($menuContent['plugins'])) {
+        $pluginLinks = retrieve_plugin_menus($menuContent['plugins'], 'canvas');
+        
+        foreach($pluginLinks as $label => $pcfg) {
+          $sidebarButtons[] = array(
+            'icon'    => $pcfg['icon'],
+            'title'   => $label,
+            'url'     => array_merge($pcfg['url'], array('copersonid' => $co_people[0]['CoPerson']['id']))
+          );
+        }
+      }
+      
       if($permissions['expunge']) {
         $sidebarButtons[] = array(
           'icon'    => 'circle-close',
           'title'   => _txt('op.expunge'),
+          'class'   => 'lightbox',
           'url'     => array(
             'controller' => 'co_people', 
             'action'     => 'expunge', 
@@ -342,7 +358,6 @@
 
 <script type="text/javascript">
   <!-- /* JS specific to these fields */ -->
-  var observer = new Array();
 
   function js_confirm_autogenerate() {
     // Open the dialog to confirm autogeneration of identifiers
@@ -350,54 +365,7 @@
     $('#autogenerate-dialog').dialog('open');
   }
 
-  // Options for the observer (which mutations to observe)
-  let options = {
-    attributes: true,
-    attributeFilter: ['class']
-  };
-
-  function add_observer(element, target_element, modify_class) {
-    observer[element] = new MutationObserver((mutationList) => {
-      // Use traditional 'for loops' for IE 11
-      for(const mutation of mutationList) {
-        if (mutation.type === 'attributes') {
-          bs_dropdown = mutation.target.parentNode;
-          if($(bs_dropdown).hasClass('show')) {
-            if(target_element === 'tr') {
-              $(bs_dropdown).closest(target_element).prev(target_element).addClass(target_element + '-' + modify_class);
-            }
-            $(bs_dropdown).closest(target_element).addClass(modify_class);
-          } else {
-            if(target_element === 'tr') {
-              $(bs_dropdown).closest(target_element).prev(target_element).removeClass(target_element + '-' + modify_class);
-            }
-            $(bs_dropdown).closest(target_element).removeClass(modify_class);
-          }
-        }
-      }
-    });
-    observer[element].observe(element,options);
-  }
-
   $(function() {
-    // Handle action menus
-    $('.field-actions .dropdown-menu').each( (key, elem) => {
-      add_observer(elem, 'li', 'highlight');
-    });
-
-    $('.td-field-actions .dropdown-menu').each( (key, elem) => {
-      add_observer(elem, 'tr', 'highlight');
-    });
-
-    // Handle caret up/down toggle
-    $('li.field-data-container').on('shown.bs.collapse', function () {
-      $(this).find('.field-data > a i').removeClass('fa-caret-down').addClass('fa-caret-up');
-    })
-
-    $('li.field-data-container').on('hidden.bs.collapse', function () {
-      $(this).find('.field-data > a i').removeClass('fa-caret-up').addClass('fa-caret-down');
-    })
-
     // Enable collapse effect on the entire row, except Action fraction
     $('.field-data-container div.field-data').on('click', function() {
       $(this).parent('li.field-data-container').find('.collapse').collapse('toggle');
@@ -449,309 +417,190 @@
   });
 </script>
 
-<div id="<?php print $this->action; ?>_co_person" class="explorerContainer">
-  <div id="coPersonExplorer" class="personExplorer">
-    <ul>
+<?php if($this->action != 'invite'): ?>
 
-      <!-- Names -->
-      <li id="fields-name" class="fieldGroup">
-        <?php if($this->action != 'invite' && $this->Permission->selfService($permissions, $e, 'Name') == PermissionEnum::ReadWrite): ?>
-          <div class="coAddEditButtons">
-            <?php
-            $linktarget = array(
-              'controller' => 'names',
-              'action'     => 'add',
-              'copersonid' => $co_people[0]['CoPerson']['id'],
-              'co'         => $cur_co['Co']['id']
-            );
-            $linkparams = array(
-              'class'  => 'addbutton',
-              //'escape' => false
-            );
+  <div id="<?php print $this->action; ?>_co_person" class="explorerContainer">
+    <div id="coPersonExplorer" class="personExplorer">
+      <ul>
 
-            print $this->Html->link(_txt('op.add'),
-              $linktarget,
-              $linkparams);
-            ?>
-          </div>
-        <?php endif; // invite+permission ?>
-
-        <a href="#tabs-name" class="fieldGroupName">
-          <em class="material-icons">indeterminate_check_box</em>
-          <?php print _txt('fd.name'); ?>
-        </a>
-
-        <ul id="tabs-name" class="fields data-list">
-          <?php if($this->action == 'invite'): ?>
-            <li class="field-data-container">
-              <table>
-                <tr class="line<?php print ($l % 2); $l++; ?>">
-                  <th>
-                    <?php
-                    print _txt('fd.name.honorific');
-
-                    if($e)
-                      print " " . _txt('fd.name.h.desc');
-                    ?>
-                  </th>
-                  <td>
-                    <?php
-                    print $this->Form->hidden('PrimaryName.id');
-                    print $this->Form->hidden('PrimaryName.type', array('default' => NameEnum::Official));
-                    print $this->Form->hidden('PrimaryName.primary_name', array('default' => true));
-                    print ($e ? $this->Form->input('PrimaryName.honorific',
-                      array('default' => $co_people[0]['PrimaryName']['honorific']))
-                      : filter_var($co_people[0]['PrimaryName']['honorific'],FILTER_SANITIZE_SPECIAL_CHARS));
-                    ?>
-                  </td>
-                </tr>
-                <tr class="line<?php print ($l % 2); $l++; ?>">
-                  <th>
-                    <?php print _txt('fd.name.given'); ?><span class="required">*</span>
-                  </th>
-                  <td>
-                    <?php print ($e ? $this->Form->input('PrimaryName.given',
-                      array('default' => $co_people[0]['PrimaryName']['given']))
-                      : filter_var($co_people[0]['PrimaryName']['given'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-                  </td>
-                </tr>
-                <tr class="line<?php print ($l % 2); $l++; ?>">
-                  <th>
-                    <?php print _txt('fd.name.middle'); ?>
-                  </th>
-                  <td>
-                    <?php print ($e ? $this->Form->input('PrimaryName.middle',
-                      array('default' => $co_people[0]['PrimaryName']['middle']))
-                      : filter_var($co_people[0]['PrimaryName']['middle'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-                  </td>
-                </tr>
-                <tr class="line<?php print ($l % 2); $l++; ?>">
-                  <th>
-                    <?php print _txt('fd.name.family'); ?>
-                  </th>
-                  <td>
-                    <?php print ($e ? $this->Form->input('PrimaryName.family',
-                      array('default' => $co_people[0]['PrimaryName']['family']))
-                      : filter_var($co_people[0]['PrimaryName']['family'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-                  </td>
-                </tr>
-                <tr class="line<?php print ($l % 2); $l++; ?>">
-                  <th>
-                    <?php
-                    print _txt('fd.name.suffix');
-                    if($e)
-                      print " " . _txt('fd.name.s.desc');
-                    ?>
-                  </th>
-                  <td>
-                    <?php print ($e ? $this->Form->input('PrimaryName.suffix',
-                      array('default' => $co_people[0]['PrimaryName']['suffix']))
-                      : filter_var($co_people[0]['PrimaryName']['suffix'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-                  </td>
-                </tr>
-                <tr class="line<?php print ($l % 2); $l++; ?>">
-                  <th>
-                    <?php print _txt('fd.type'); ?>
-                  </th>
-                  <td>
-                    <?php // CO-955 nametype official needs to exist, but probably should be configurable ?>
-                    <?php print _txt('en.name.type', null, NameEnum::Official); ?>
-                  </td>
-                </tr>
-                <tr class="line<?php print ($l % 2); $l++; ?>">
-                  <th>
-                    <?php print _txt('fd.language'); ?>
-                  </th>
-                  <td>
-                    <?php
-                    global $cm_lang, $cm_texts;
-
-                    $attrs = array();
-                    $attrs['value'] = (isset($co_people[0]['PrimaryName']['language'])
-                      ? $co_people[0]['PrimaryName']['language']
-                      : getPreferredLanguage());
-                    $attrs['empty'] = true;
-
-                    if($e) {
-                      print $this->Form->select('PrimaryName.language',
-                        $cm_texts[ $cm_lang ]['en.language'],
-                        $attrs);
-
-                      if($this->Form->isFieldError('PrimaryName.language')) {
-                        print $this->Form->error('PrimaryName.language');
-                      }
-                    } else {
-                      if(!empty($co_people[0]['PrimaryName']['language'])) {
-                        print _txt('en.language', null, $co_people[0]['PrimaryName']['language']);
-                      }
-                    }
-                    ?>
-                  </td>
-                </tr>
-                <tr>
-                  <th>
-                    <em><span class="required"><?php print _txt('fd.req'); ?></span></em><br />
-                  </th>
-                  <td>
-                    <?php
-                    if($e) {
-                      print $this->Form->submit($submit_label);
-                    }
-                    ?>
-                  </td>
-                </tr>
-              </table>
-            </li>
-          <?php else: // invite ?>
-          <?php foreach($co_people[0]['Name'] as $n): ?>
-            <li class="field-data-container">
+        <!-- Names -->
+        <li id="fields-name" class="fieldGroup">
+          <?php if($this->Permission->selfService($permissions, $e, 'Name') == PermissionEnum::ReadWrite): ?>
+            <div class="coAddEditButtons">
               <?php
-                $perm = $this->Permission->selfService($permissions, $e, 'Name', (!empty($n['type']) ? $n['type'] : null));
-              ?>
-              <div class="field-data force-wrap <?php if($perm == PermissionEnum::ReadOnly) { print ' field-data-alone'; }; ?>">
-                <?php
-                $primary_name_with_bg = $this->Badge->badgeIt(
-                  _txt('fd.name.primary_name'),
-                  $this->Badge->getBadgeColor('Secondary'),
-                  false,
-                  true
-                );
-                $cn = $n['primary_name'] ? filter_var(generateCn($n),FILTER_SANITIZE_SPECIAL_CHARS) . "&nbsp" . $primary_name_with_bg
-                                         : filter_var(generateCn($n),FILTER_SANITIZE_SPECIAL_CHARS);
-                if($perm == PermissionEnum::ReadWrite) {
-                  print $this->Html->link(
-                    $cn,
-                    array('controller' => 'names',
-                          'action' => 'edit',
-                          $n['id']),
-                    array(
-                      'escape' => false,
-                    ));
-                } elseif($perm == PermissionEnum::ReadOnly) {
-                  print $cn;
-                }
-               ?>
-              </div>
-              <div class="field-data data-label <?php if($perm == PermissionEnum::ReadOnly) { print ' field-data-alone'; }; ?>">
-              <?php
-              $badge_list = array();
-              // OrgIdentitySource
-              if(!empty($n['SourceName']['id']) && !empty($n['SourceName']['OrgIdentity']['OrgIdentitySourceRecord']['OrgIdentitySource']['description'])) {
-                $badge_list[] = array(
-                  'order' => $this->Badge->getBadgeOrder('Source'),
-                  'text' => filter_var($n['SourceName']['OrgIdentity']['OrgIdentitySourceRecord']['OrgIdentitySource']['description'],FILTER_SANITIZE_SPECIAL_CHARS),
-                  'color' => $this->Badge->getBadgeColor('Light'),
-                );
-              }
-              // Name Type
-              $badge_list[] = array(
-                'order' => $this->Badge->getBadgeOrder('Status'),
-                'text' => filter_var($vv_cop_name_types[ $n['type'] ],FILTER_SANITIZE_SPECIAL_CHARS),
-                'color' => $this->Badge->getBadgeColor('Light'),
+              $linktarget = array(
+                'controller' => 'names',
+                'action'     => 'add',
+                'copersonid' => $co_people[0]['CoPerson']['id'],
+                'co'         => $cur_co['Co']['id']
               );
-              // Name Language
-              if(!empty($n['language'])) {
+              $linkparams = array(
+                'class'  => 'addbutton',
+                //'escape' => false
+              );
+
+              print $this->Html->link(_txt('op.add'),
+                $linktarget,
+                $linkparams);
+              ?>
+            </div>
+          <?php endif; // invite+permission ?>
+
+          <a href="#tabs-name" class="fieldGroupName">
+            <em class="material-icons">indeterminate_check_box</em>
+            <?php print _txt('fd.name'); ?>
+          </a>
+
+          <ul id="tabs-name" class="fields data-list">
+
+            <?php foreach($co_people[0]['Name'] as $n): ?>
+              <li class="field-data-container">
+                <?php
+                  $perm = $this->Permission->selfService($permissions, $e, 'Name', (!empty($n['type']) ? $n['type'] : null));
+                ?>
+                <div class="field-data force-wrap <?php if($perm == PermissionEnum::ReadOnly) { print ' field-data-alone'; }; ?>">
+                  <?php
+                  $primary_name_with_bg = $this->Badge->badgeIt(
+                    _txt('fd.name.primary_name'),
+                    $this->Badge->getBadgeColor('Secondary'),
+                    false,
+                    true
+                  );
+                  $cn = $n['primary_name'] ? filter_var(generateCn($n),FILTER_SANITIZE_SPECIAL_CHARS) . "&nbsp" . $primary_name_with_bg
+                                           : filter_var(generateCn($n),FILTER_SANITIZE_SPECIAL_CHARS);
+                  if($perm == PermissionEnum::ReadWrite) {
+                    print $this->Html->link(
+                      $cn,
+                      array('controller' => 'names',
+                            'action' => 'edit',
+                            $n['id']),
+                      array(
+                        'escape' => false,
+                      ));
+                  } elseif($perm == PermissionEnum::ReadOnly) {
+                    print $cn;
+                  }
+                 ?>
+                </div>
+                <div class="field-data data-label <?php if($perm == PermissionEnum::ReadOnly) { print ' field-data-alone'; }; ?>">
+                <?php
+                $badge_list = array();
+                // OrgIdentitySource
+                if(!empty($n['SourceName']['id']) && !empty($n['SourceName']['OrgIdentity']['OrgIdentitySourceRecord']['OrgIdentitySource']['description'])) {
+                  $badge_list[] = array(
+                    'order' => $this->Badge->getBadgeOrder('Source'),
+                    'text' => filter_var($n['SourceName']['OrgIdentity']['OrgIdentitySourceRecord']['OrgIdentitySource']['description'],FILTER_SANITIZE_SPECIAL_CHARS),
+                    'color' => $this->Badge->getBadgeColor('Light'),
+                  );
+                }
+                // Name Type
                 $badge_list[] = array(
-                  'order' => $this->Badge->getBadgeOrder('Other'),
-                  'text' => _txt('en.language', null, $n['language']),
+                  'order' => $this->Badge->getBadgeOrder('Status'),
+                  'text' => filter_var($vv_cop_name_types[ $n['type'] ],FILTER_SANITIZE_SPECIAL_CHARS),
                   'color' => $this->Badge->getBadgeColor('Light'),
                 );
-              }
-
-              if(!empty($badge_list)) {
-                print $this->element('badgeList', array('vv_badge_list' => $badge_list));
-              }
-              ?>
-              </div>
-              <div class="field-actions">
-                <?php
-                $action_args = array();
-                $action_args['vv_attr_mdl'] = "Name";
-                $action_args['vv_attr_id'] = $n['id'];
-                if(!empty($n['SourceName']['id'])) {
-                  // This name came from an OIS and so can't be edited, and for the moment
-                  // can't be made primary (though maybe that'll change with a use case).
-                  // View button
-                  $action_args['vv_actions'][] = array(
-                    'order' => $this->Menu->getMenuOrder('View'),
-                    'icon' => $this->Menu->getMenuIcon('View'),
-                    'url' => $this->Html->url(
-                      array(
-                        'controller' => 'names',
-                        'action' => 'view',
-                        $n['id'],
-                      )
-                    ),
-                    'label' => _txt('op.view'),
+                // Name Language
+                if(!empty($n['language'])) {
+                  $badge_list[] = array(
+                    'order' => $this->Badge->getBadgeOrder('Other'),
+                    'text' => _txt('en.language', null, $n['language']),
+                    'color' => $this->Badge->getBadgeColor('Light'),
                   );
-                  } else {
-                    if ($perm === PermissionEnum::ReadWrite) {
-                      if (!$n['primary_name']) {
-                        // Delete Action button
-                        $dg_url = array(
-                          'controller' => 'names',
-                          'action' => 'delete', $n['id'],
-                          'co' => $cur_co['Co']['id']
-                        );
-                        $action_args['vv_actions'][] = array(
-                          'order' => $this->Menu->getMenuOrder('Delete'),
-                          'icon' => $this->Menu->getMenuIcon('Delete'),
-                          'url' => 'javascript:void(0);',
-                          'label' => _txt('op.delete'),
-                          'onclick' => array(
-                            'dg_bd_txt' => _txt('js.remove'),
-                            'dg_url' => $this->Html->url($dg_url),
-                            'dg_conf_btn' => _txt('op.remove'),
-                            'dg_cancel_btn' => _txt('op.cancel'),
-                            'dg_title' => _txt('op.remove'),
-                            'db_bd_txt_repl_str' => filter_var(_jtxt(generateCn($n)), FILTER_SANITIZE_STRING),
-                          ),
-                        );
+                }
 
-                        // Primary name Action Button
+                if(!empty($badge_list)) {
+                  print $this->element('badgeList', array('vv_badge_list' => $badge_list));
+                }
+                ?>
+                </div>
+                <div class="field-actions">
+                  <?php
+                  $action_args = array();
+                  $action_args['vv_attr_mdl'] = "Name";
+                  $action_args['vv_attr_id'] = $n['id'];
+                  if(!empty($n['SourceName']['id'])) {
+                    // This name came from an OIS and so can't be edited, and for the moment
+                    // can't be made primary (though maybe that'll change with a use case).
+                    // View button
+                    $action_args['vv_actions'][] = array(
+                      'order' => $this->Menu->getMenuOrder('View'),
+                      'icon' => $this->Menu->getMenuIcon('View'),
+                      'lightbox' => true,
+                      'url' => $this->Html->url(
+                        array(
+                          'controller' => 'names',
+                          'action' => 'view',
+                          $n['id'],
+                        )
+                      ),
+                      'label' => _txt('op.view'),
+                    );
+                    } else {
+                      if ($perm === PermissionEnum::ReadWrite) {
+                        if (!$n['primary_name']) {
+                          // Delete Action button
+                          $dg_url = array(
+                            'controller' => 'names',
+                            'action' => 'delete', $n['id'],
+                            'co' => $cur_co['Co']['id']
+                          );
+                          $action_args['vv_actions'][] = array(
+                            'order' => $this->Menu->getMenuOrder('Delete'),
+                            'icon' => $this->Menu->getMenuIcon('Delete'),
+                            'url' => 'javascript:void(0);',
+                            'label' => _txt('op.delete'),
+                            'onclick' => array(
+                              'dg_bd_txt' => _txt('js.remove'),
+                              'dg_url' => $this->Html->url($dg_url),
+                              'dg_conf_btn' => _txt('op.remove'),
+                              'dg_cancel_btn' => _txt('op.cancel'),
+                              'dg_title' => _txt('op.remove'),
+                              'db_bd_txt_repl_str' => filter_var(_jtxt(generateCn($n)), FILTER_SANITIZE_STRING),
+                            ),
+                          );
+
+                          // Primary name Action Button
+                          $action_args['vv_actions'][] = array(
+                            'order' => $this->Menu->getMenuOrder('PrimaryName'),
+                            'icon' => $this->Menu->getMenuIcon('PrimaryName'),
+                            'label' => _txt('op.primary'),
+                            'url' => $this->Html->url(
+                              array(
+                                'controller' => 'names',
+                                'action' => 'primary',
+                                $n['id'],
+                                'copersonid' => $co_people[0]['CoPerson']['id'],
+                              )
+                            ),
+                          );
+                        }
+
+                        // Edit Action button
                         $action_args['vv_actions'][] = array(
-                          'order' => $this->Menu->getMenuOrder('PrimaryName'),
-                          'icon' => $this->Menu->getMenuIcon('PrimaryName'),
-                          'label' => _txt('op.primary'),
+                          'order' => $this->Menu->getMenuOrder('Edit'),
+                          'icon' => $this->Menu->getMenuIcon('Edit'),
                           'url' => $this->Html->url(
                             array(
                               'controller' => 'names',
-                              'action' => 'primary',
+                              'action' => 'edit',
                               $n['id'],
-                              'copersonid' => $co_people[0]['CoPerson']['id'],
-                            )
+                              )
                           ),
+                          'label' => _txt('op.edit'),
                         );
                       }
-
-                      // Edit Action button
-                      $action_args['vv_actions'][] = array(
-                        'order' => $this->Menu->getMenuOrder('Edit'),
-                        'icon' => $this->Menu->getMenuIcon('Edit'),
-                        'url' => $this->Html->url(
-                          array(
-                            'controller' => 'names',
-                            'action' => 'edit',
-                            $n['id'],
-                            )
-                        ),
-                        'label' => _txt('op.edit'),
-                      );
                     }
+                  if(!empty($action_args['vv_actions'])) {
+                    print $this->element('menuAction', $action_args);
                   }
-                if(!empty($action_args['vv_actions'])) {
-                  print $this->element('menuAction', $action_args);
-                }
-                ?>
-              </div>
-            </li>
-            <?php endforeach; ?>
-          <?php endif; // invite ?>
-        </ul><!-- tabs-name -->
-      </li><!-- fields-name -->
+                  ?>
+                </div>
+              </li>
+              <?php endforeach; ?>
+          </ul><!-- tabs-name -->
+        </li><!-- fields-name -->
 
-      <?php
-        if($this->action != "invite") {
+        <?php
           $args = array(
             'edit'         => ($e && !$es),
             'self_service' => false,
@@ -760,26 +609,25 @@
             'mvpa_model'   => 'Identifier',
             'mvpa_field'   => 'identifier'
           );
-          
+
           print $this->element('mvpa', $args);
-          
+
           $args['edit']         = $e;
           $args['self_service'] = true;
           $args['mvpa_model']   = 'EmailAddress';
           $args['mvpa_field']   = 'mail';
-          
+
           print $this->element('mvpa', $args);
-          
+
           $args['edit']         = $e;
           $args['self_service'] = true;
           $args['mvpa_model']   = 'Url';
           $args['mvpa_field']   = 'url';
-          
-          print $this->element('mvpa', $args);
-        }
-      ?>
 
-      <?php if($this->action != "invite"): ?>
+          print $this->element('mvpa', $args);
+        ?>
+
+
         <!-- Groups -->
         <li id="fields-group" class="fieldGroup">
           <?php
@@ -788,7 +636,9 @@
             $linktarget = array(
               'controller' => 'co_groups',
               'action'     => 'select',
-              'copersonid' => $co_people[0]['CoPerson']['id']
+              'copersonid' => $co_people[0]['CoPerson']['id'],
+              'search.member' => '1',
+              'search.owner' => '1'
             );
             $linkparams = array('class' => 'addbutton');
             print $this->Html->link(_txt('op.manage.grm'),
@@ -945,7 +795,7 @@
                 } else {
                   $badge_list = array();
                   $auto_group_format = $this->Badge->systemGroupHFormat($g['CoGroup']['name'], $cur_co);
-                  if($g['member']) {
+                  if($g['member'] && !empty($auto_group_format['badge'])) {
                     // Do not present Auto Groups to non CO and Platform Administrators
                     if(!$permissions['viewautogroups'] && $g['CoGroup']['auto']) {
                       continue;
@@ -1420,7 +1270,20 @@
                     }
                   }
                 }
-                $ident_login = (!empty($identifier)) ? $this->Badge->getBadgeColor('Primary') : $this->Badge->getBadgeColor('Danger');
+                if(!empty($identifier)) {
+                  $badge_list_org[] = array(
+                    'order' => $this->Badge->getBadgeOrder('Status'),
+                    'text' => _txt('op.login'),
+                    'color' => $this->Badge->getBadgeColor('Primary'),
+                  );
+                }
+                if(!empty($link["OrgIdentity"]["affiliation"])) {
+                  $badge_list_org[] = array(
+                    'order' => $this->Badge->getBadgeOrder('Title'),
+                    'text' => ucfirst(filter_var($link["OrgIdentity"]["affiliation"], FILTER_SANITIZE_SPECIAL_CHARS)),
+                    'color' => $this->Badge->getBadgeColor('Light'),
+                  );
+                }
 
                 print '<li class="field-data-container centered">';
                 print '<div class="field-data flex-column">';
@@ -1462,19 +1325,12 @@
                   );
                 }
                 print '</div>';
-                // Status
+                // Status/Affiliation
                 print '<div class="field-data data-label">';
-                print $this->element('badgeList',
-                  array(
-                    'vv_badge_list' =>
-                      array(
-                        array(
-                          'text' => "Login",
-                          'color' => $ident_login,
-                        ),
-                      )
-                  )
-                );
+                if(!empty($badge_list_org)) {
+                  print $this->element('badgeList', array('vv_badge_list' => $badge_list_org));
+                  unset($badge_list_org);
+                }
                 print '</div>';
                 // Actions
 
@@ -1526,12 +1382,7 @@
                 }
 
                 // Delete Action
-                if($permissions['delete']
-                  && count($co_people[0]['CoOrgIdentityLink']) > 1) {
-                  // An Org Identity Link can only be removed if there is at least one other remaining
-                  // XXX Is this still a valid restriction? As of 0.9.1 one can relink an org identity
-                  // away, even if it's the last one attached to the CO Preson.
-
+                if($permissions['delete']) {
                   $unlnk_url = array(
                     'controller' => 'co_org_identity_links',
                     'action' => 'delete',
@@ -1603,12 +1454,133 @@
             ?>
           </ul><!-- tabs-orgid -->
         </li><!-- fields-orgid -->
+      </ul>
+    </div> <!-- personExplorer -->
+    <?php print $this->element("changelog"); ?>
+  </div> <!-- explorerContainer -->
+
+<?php else: // invite ?>
+
+  <div id="tabs-attributes">
+    <div class="fields">
+      <div class="modelbox">
+        <div class="boxtitle"><strong><?php print _txt('fd.name'); ?></strong></div>
+        <div class="modelbox-data">
+          <div class="form-group">
+            <?php
+              print $this->Form->hidden('PrimaryName.id');
+              print $this->Form->hidden('PrimaryName.type', array('default' => NameEnum::Official));
+              print $this->Form->hidden('PrimaryName.primary_name', array('default' => true));
+
+              if($e) {
+                print $this->Form->label('PrimaryName.honorific', _txt('fd.name.honorific') . ' ' . _txt('fd.name.h.desc'));
+                print $this->Form->input('PrimaryName.honorific',
+                  array('default' => $co_people[0]['PrimaryName']['honorific'],'class' => 'form-control focusFirst'));
+              } else {
+                filter_var($co_people[0]['PrimaryName']['honorific'],FILTER_SANITIZE_SPECIAL_CHARS);
+              }
+            ?>
+          </div>
+          <div class="form-group">
+            <?php
+              if($e) {
+                print $this->Form->label('PrimaryName.given', _txt('fd.name.given'));
+                print '<span class="required">*</span>';
+                print $this->Form->input('PrimaryName.given',
+                  array('default' => $co_people[0]['PrimaryName']['given'], 'class' => 'form-control'));
+              } else {
+                print filter_var($co_people[0]['PrimaryName']['given'],FILTER_SANITIZE_SPECIAL_CHARS);
+              }
+            ?>
+          </div>
+          <div class="form-group">
+            <?php
+              if($e) {
+                print $this->Form->label('PrimaryName.middle', _txt('fd.name.middle'));
+                print $this->Form->input('PrimaryName.middle',
+                  array('default' => $co_people[0]['PrimaryName']['middle'], 'class' => 'form-control'));
+              } else {
+                print filter_var($co_people[0]['PrimaryName']['middle'],FILTER_SANITIZE_SPECIAL_CHARS);
+              }
+            ?>
+          </div>
+          <div class="form-group">
+            <?php
+              if($e) {
+                print $this->Form->label('PrimaryName.family', _txt('fd.name.family'));
+                print $this->Form->input('PrimaryName.family',
+                  array('default' => $co_people[0]['PrimaryName']['family'], 'class' => 'form-control'));
+              } else {
+                print filter_var($co_people[0]['PrimaryName']['family'],FILTER_SANITIZE_SPECIAL_CHARS);
+              }
+            ?>
+          </div>
+          <div class="form-group">
+            <?php
+              if($e) {
+                print $this->Form->label('PrimaryName.suffix', _txt('fd.name.suffix') . ' ' . _txt('fd.name.s.desc'));
+                print $this->Form->input('PrimaryName.suffix',
+                  array('default' => $co_people[0]['PrimaryName']['suffix'], 'class' => 'form-control'));
+              } else {
+                print filter_var($co_people[0]['PrimaryName']['suffix'],FILTER_SANITIZE_SPECIAL_CHARS);
+              }
+            ?>
+          </div>
+          <div class="form-group">
+            <?php print _txt('fd.type') . ': '; ?>
+            <?php // CO-955 nametype official needs to exist, but probably should be configurable ?>
+            <?php print _txt('en.name.type', null, NameEnum::Official); ?>
+          </div>
+          <div class="form-group">
+            <?php
+              if($e) {
+                global $cm_lang, $cm_texts;
+
+                $attrs = array();
+                $attrs['value'] = (isset($co_people[0]['PrimaryName']['language'])
+                  ? $co_people[0]['PrimaryName']['language']
+                  : getPreferredLanguage());
+                $attrs['empty'] = true;
+                $attrs['class'] = 'co-selectfield form-control';
+
+                print $this->Form->label('PrimaryName.language', _txt('fd.language'));
+                print $this->Form->select('PrimaryName.language',
+                  $cm_texts[ $cm_lang ]['en.language'],
+                  $attrs);
+
+                if($this->Form->isFieldError('PrimaryName.language')) {
+                  print $this->Form->error('PrimaryName.language');
+                }
+              } else {
+                if(!empty($co_people[0]['PrimaryName']['language'])) {
+                  print _txt('fd.language') . ': ';
+                  print _txt('en.language', null, $co_people[0]['PrimaryName']['language']);
+                }
+              }
+            ?>
+          </div>
+        </div>
+      </div>
+
+      <?php if($e): ?>
+        <div class="submit-box">
+          <div class="required-info">
+            <em><span class="required"><?php print _txt('fd.req'); ?></span></em>
+          </div>
+          <div class="submit-buttons">
+            <div class="submit">
+              <?php
+                print $this->Form->submit($submit_label, array('class' => 'spin submit-button btn btn-primary'));
+              ?>
+            </div>
+          </div>
+        </div>
       <?php endif; ?>
-      
-    </ul>
-  </div> <!-- personExplorer -->
-  <?php print $this->element("changelog"); ?>
-</div> <!-- explorerContainer -->
+
+    </div>
+  </div>
+
+<?php endif; ?>
 
 <div id="autogenerate-dialog" class="co-dialog" title="<?php print _txt('op.id.auto'); ?>">
   <?php print _txt('op.id.auto.confirm'); ?>

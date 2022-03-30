@@ -30,6 +30,19 @@ App::uses("StandardController", "Controller");
 class MVPAController extends StandardController {
   // MVPAs require a Person ID (CO or Org, or Dept as of v3.1.0)
   public $requires_person = true;
+
+  // Use the lightbox layout for view
+  public function view($id) {
+    parent::view($id);
+    if(!isset($this->request->params["named"]["render"])
+       || $this->request->params["named"]["render"] !== 'norm') {
+        $req = $this->modelClass;
+        $model = $this->$req;
+        $modelpl = Inflector::tableize($req);
+        $this->set('title_for_layout', _txt('ct.' . $modelpl . '.1'));
+        $this->layout = 'lightbox';
+    }
+  }
   
   /**
    * Callback before other controller methods are invoked or views are rendered.
@@ -83,39 +96,7 @@ class MVPAController extends StandardController {
       // Provide a hint as to available types for this model
       
       $pid = $this->parsePersonID();
-      
-      if(!empty($pid['orgidentityid'])) {
-        // Org identities use the default model types, and self service does not apply
-        
-        $this->set('vv_available_types', $model->defaultTypes('type'));
-      } else {
-        // When attached to a CO Person or Role, figure out the available extended
-        // types and then filter for self service permissions
-        
-        $availableTypes = $model->types($this->cur_co['Co']['id'], 'type');
-        
-        if(!empty($this->viewVars['permissions']['selfsvc'])
-           && !$this->Role->isCoOrCouAdmin($this->Session->read('Auth.User.co_person_id'),
-                                           $this->cur_co['Co']['id'])) {
-          // For models supporting self service permissions, adjust the available types
-          // in accordance with the configuration (but not if self is an admin)
-          
-          foreach(array_keys($availableTypes) as $k) {
-            // We use edit for the permission even if we're adding or viewing because
-            // add has different semantics for calculatePermission (whether or not the person
-            // can add a new item).
-            if(!$this->Co->CoSelfServicePermission->calculatePermission($this->cur_co['Co']['id'],
-                                                                       $req,
-                                                                       'edit',
-                                                                       $k)) {
-              unset($availableTypes[$k]);
-            }
-          }
-        }
-        
-        $this->set('vv_available_types', $availableTypes);
-      }
-      
+
       // Set the person info for view usage
       $this->set('vv_pid', $pid);
       
@@ -187,8 +168,54 @@ class MVPAController extends StandardController {
     }
     
     parent::beforeRender();
+
+
+    if(!$this->request->is('restful')) {
+      $view_var_keys = array_keys(Hash::flatten($this->viewVars));
+      // Find if any Source var is present
+      $re_source = '/.*\.?(Source\w+)\..*/m';
+      $has_source = (boolean)preg_grep ($re_source, $view_var_keys);
+      if (!empty($pid['orgidentityid'])
+          || ( !empty($pid['copersonid']
+               && $has_source) )
+      ) {
+        // Org identities use the default model types, and self service does not apply
+
+        $this->set('vv_available_types', $model->defaultTypes('type'));
+      } else {
+        // When attached to a CO Person or Role, figure out the available extended
+        // types and then filter for self service permissions
+
+        $availableTypes = $model->types($this->cur_co['Co']['id'], 'type');
+
+        if (!empty($this->viewVars['permissions']['selfsvc'])
+          && !$this->Role->isCoOrCouAdmin(
+            $this->Session->read('Auth.User.co_person_id'),
+            $this->cur_co['Co']['id']
+          )) {
+          // For models supporting self service permissions, adjust the available types
+          // in accordance with the configuration (but not if self is an admin)
+
+          foreach (array_keys($availableTypes) as $k) {
+            // We use edit for the permission even if we're adding or viewing because
+            // add has different semantics for calculatePermission (whether or not the person
+            // can add a new item).
+            if (!$this->Co->CoSelfServicePermission->calculatePermission(
+              $this->cur_co['Co']['id'],
+              $req,
+              'edit',
+              $k
+            )) {
+              unset($availableTypes[$k]);
+            }
+          }
+        }
+
+        $this->set('vv_available_types', $availableTypes);
+      }
+    }
   }
-  
+
   /**
    * Perform any dependency checks required prior to a write (add/edit) operation.
    * This method is intended to be overridden by model-specific controllers.
@@ -260,6 +287,10 @@ class MVPAController extends StandardController {
    */
   
   public function generateHistory($action, $newdata, $olddata) {
+
+    $actorCoPersonId = $this->request->is('restful') ? null : $this->Session->read('Auth.User.co_person_id');
+    $actorApiUserId = $this->request->is('restful') ? $this->Auth->User('id') : null;
+
     $req = $this->modelClass;
     $model = $this->$req;
     $modelpl = Inflector::tableize($req);
@@ -288,17 +319,21 @@ class MVPAController extends StandardController {
           $model->OrgIdentity->HistoryRecord->record(null,
                                                      null,
                                                      $newdata[$req]['org_identity_id'],
-                                                     $this->Session->read('Auth.User.co_person_id'),
+                                                     $actorCoPersonId,
                                                      ActionEnum::OrgIdEditedManual,
-                                                     $cstr);
+                                                     $cstr,
+                                                     null, null, null,
+                                                     $actorApiUserId);
         } elseif(!empty($newdata[$req]['co_group_id'])) {
           $model->CoGroup->HistoryRecord->record(null,
                                                  null,
                                                  null,
-                                                 $this->Session->read('Auth.User.co_person_id'),
+                                                 $actorCoPersonId,
                                                  ActionEnum::CoGroupEdited,
                                                  $cstr,
-                                                 $newdata[$req]['co_group_id']);
+                                                 $newdata[$req]['co_group_id'],
+                                                 null, null,
+                                                 $actorApiUserId);
         } elseif(!empty($newdata[$req]['co_person_role_id'])) {
           // Map CO Person Role to CO Person
           $copid = $model->CoPersonRole->field('co_person_id', array('CoPersonRole.id' => $newdata[$req]['co_person_role_id']));
@@ -306,16 +341,20 @@ class MVPAController extends StandardController {
           $model->CoPersonRole->HistoryRecord->record($copid,
                                                       $newdata[$req]['co_person_role_id'],
                                                       null,
-                                                      $this->Session->read('Auth.User.co_person_id'),
+                                                      $actorCoPersonId,
                                                       ActionEnum::CoPersonEditedManual,
-                                                      $cstr);
+                                                      $cstr,
+                                                      null, null, null,
+                                                      $actorApiUserId);
         } elseif(!empty($newdata[$req]['co_person_id'])) {
           $model->CoPerson->HistoryRecord->record($newdata[$req]['co_person_id'],
                                                   null,
                                                   null,
-                                                  $this->Session->read('Auth.User.co_person_id'),
+                                                  $actorCoPersonId,
                                                   ActionEnum::CoPersonEditedManual,
-                                                  $cstr);
+                                                  $cstr,
+                                                  null, null, null,
+                                                  $actorApiUserId);
         }
         break;
       case 'delete':
@@ -323,17 +362,21 @@ class MVPAController extends StandardController {
           $model->OrgIdentity->HistoryRecord->record(null,
                                                      null,
                                                      $olddata[$req]['org_identity_id'],
-                                                     $this->Session->read('Auth.User.co_person_id'),
+                                                     $actorCoPersonId,
                                                      ActionEnum::OrgIdEditedManual,
-                                                     $cstr);
+                                                     $cstr,
+                                                     null, null, null,
+                                                     $actorApiUserId);
         } elseif(!empty($olddata[$req]['co_group_id'])) {
           $model->CoGroup->HistoryRecord->record(null,
                                                  null,
                                                  null,
-                                                 $this->Session->read('Auth.User.co_person_id'),
+                                                 $actorCoPersonId,
                                                  ActionEnum::CoGroupEdited,
                                                  $cstr,
-                                                 $olddata[$req]['co_group_id']);
+                                                 $olddata[$req]['co_group_id'],
+                                                 null, null,
+                                                 $actorApiUserId);
         } elseif(!empty($olddata[$req]['co_person_role_id'])) {
           // Map CO Person Role to CO Person
           $copid = $model->CoPersonRole->field('co_person_id', array('CoPersonRole.id' => $olddata[$req]['co_person_role_id']));
@@ -341,16 +384,20 @@ class MVPAController extends StandardController {
           $model->CoPersonRole->HistoryRecord->record($copid,
                                                       $olddata[$req]['co_person_role_id'],
                                                       null,
-                                                      $this->Session->read('Auth.User.co_person_id'),
+                                                      $actorCoPersonId,
                                                       ActionEnum::CoPersonEditedManual,
-                                                      $cstr);
+                                                      $cstr,
+                                                      null, null,
+                                                      $actorApiUserId);
         } elseif(!empty($olddata[$req]['co_person_id'])) {
           $model->CoPerson->HistoryRecord->record($olddata[$req]['co_person_id'],
                                                   null,
                                                   null,
-                                                  $this->Session->read('Auth.User.co_person_id'),
+                                                  $actorCoPersonId,
                                                   ActionEnum::CoPersonEditedManual,
-                                                  $cstr);
+                                                  $cstr,
+                                                  null, null,
+                                                  $actorApiUserId);
         }
         break;
     }

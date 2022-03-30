@@ -119,6 +119,9 @@ class SshKeysController extends SAMController {
     $cop = null;
     $act = null;
 
+    $actorCoPersonId = $this->request->is('restful') ? null : $this->Session->read('Auth.User.co_person_id');
+    $actorApiUserId = $this->request->is('restful') ? $this->Auth->User('id') : null;
+
     switch($action) {
       case 'add':
         $cstr = _txt('rs.added-a2', array(_txt('ct.ssh_keys.1'), $newdata['SshKey']['comment']));
@@ -145,9 +148,11 @@ class SshKeysController extends SAMController {
     $this->SshKey->CoPerson->HistoryRecord->record($cop,
                                                    null,
                                                    null,
-                                                   $this->Session->read('Auth.User.co_person_id'),
+                                                   $actorCoPersonId,
                                                    $act,
-                                                   $cstr);
+                                                   $cstr,
+                                                   null, null, null,
+                                                   $actorApiUserId);
 
     return true;
   }
@@ -174,7 +179,11 @@ class SshKeysController extends SAMController {
     
     $p['addKeyFile'] = $p['add'];
     
-    $p['edit'] = false;
+    if(!$this->request->is('restful')) {
+      // We don't allow editing of SSH Keys via the UI, though the REST API
+      // does permit edits
+      $p['edit'] = false;
+    }
     
     $this->set('permissions', $p);
     return($p[$this->action]);

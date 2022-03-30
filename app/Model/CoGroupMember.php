@@ -28,7 +28,12 @@
 class CoGroupMember extends AppModel {
   // Define class name for cake
   public $name = "CoGroupMember";
-  
+
+  // All Nested Membership syncing
+  // CO-1885, using a class parameter as flag, since delete 
+  // function does not accept parameters like the save one
+  public $syncNested = true;
+
   // Current schema version for API
   public $version = "1.0";
   
@@ -235,10 +240,13 @@ class CoGroupMember extends AppModel {
     // CO Group Member update for that group, which will then call afterSave
     // again.)
     
-    if(!empty($this->data['CoGroupMember']['co_group_id'])
-       && !empty($this->data['CoGroupMember']['co_person_id'])) {
+    // Make a copy of $this->data because we'll lose it after the first nested save
+    $groupMember = $this->data['CoGroupMember'];
+    
+    if(!empty($groupMember['co_group_id'])
+       && !empty($groupMember['co_person_id'])) {
       $args = array();
-      $args['conditions']['CoGroupNesting.co_group_id'] = $this->data['CoGroupMember']['co_group_id'];
+      $args['conditions']['CoGroupNesting.co_group_id'] = $groupMember['co_group_id'];
       $args['contain'][] = 'TargetCoGroup';
       
       $nestings = $this->CoGroupNesting->find('all', $args);
@@ -247,8 +255,8 @@ class CoGroupMember extends AppModel {
         foreach($nestings as $n) {
           $this->syncNestedMembership($n['TargetCoGroup'],
                                       $n['CoGroupNesting']['id'],
-                                      $this->data['CoGroupMember']['co_person_id'],
-                                      $this->data['CoGroupMember']['member']);
+                                      $groupMember['co_person_id'],
+                                      $groupMember['member']);
         }
       }
     }
@@ -499,96 +507,146 @@ class CoGroupMember extends AppModel {
   
   /**
    * Reprovision records associated with CoGroupMembers where the validity dates
-   * have recently become effective.
+   * have recently become effective. Also reconcile CO Group Nestings.
    *
    * @since  COmanage Registry 3.2.0
-   * @param  Integer $coId   CO ID
-   * @param  Integer $window Time in minutes to look back for changes (ie: within the last $window minutes)
+   * @param  integer $coId   CO ID
+   * @param  integer $window Time in minutes to look back for changes (ie: within the last $window minutes)
    * @param  integer $coJobId CO Job ID
    */
   
-  public function reprovisionByValidity($coId, $window=DEF_GROUP_SYNC_WINDOW, $coJobId) {
-    // Pull all group memberships with valid_from or valid_through timestamps
-    // in the last $window minutes
+  public function reprovisionByValidity($coId, $window, $coJobId) {
+    // We loop through twice.
     
-    $timeend = time();
-    $timestart = $timeend - ($window * 60);
+    // The first time, we resync nested group memberships for any membership
+    // that just became active or inactive, since otherwise nothing will have
+    // propagated the change through nestings. We pull records where
+    // co_group_nesting_id is NULL, since any memberships with validity dates
+    // as a _result_ of nestings will get recalculated via recursion. Note that
+    // a change in the nesting configuration should have already taken care of
+    // those memberships via the afterSave callback.
     
+    // The second time, we reprovision any record (including the nested
+    // memberships we just recalculated the first time through) with a validity
+    // date that became active or inactive within our window.
+    
+    // For the first loop, we also pull the set of nestings for later reference.
     $args = array();
-    /* JOIN not needed due to contain
-    $args['joins'][0]['table'] = 'co_groups';
-    $args['joins'][0]['alias'] = 'CoGroup';
-    $args['joins'][0]['type'] = 'INNER';
-    $args['joins'][0]['conditions'][0] = 'CoGroup.id=CoGroupMember.co_group_id';
-    */
     $args['conditions']['CoGroup.co_id'] = $coId;
-    $args['conditions']['OR'][] = array(
-      // Membership just became active
-      'AND' => array(
-        'CoGroupMember.valid_from >= ' => date('Y-m-d H:i:s', $timestart),
-        'CoGroupMember.valid_from <= ' => date('Y-m-d H:i:s', $timeend)
-      )
-    );
-    $args['conditions']['OR'][] = array(
-      // Membership just became inactive
-      'AND' => array(
-        'CoGroupMember.valid_through >= ' => date('Y-m-d H:i:s', $timestart),
-        'CoGroupMember.valid_through <= ' => date('Y-m-d H:i:s', $timeend)
-      )
-    );
-    $args['contain'] = array('CoGroup');
+    $args['conditions']['CoGroup.status'] = SuspendableStatusEnum::Active;
+    $args['contain'] = array('CoGroup', 'TargetCoGroup');
     
-    $memberships = $this->find('all', $args);
+    $cachedNestedGroups = $this->CoGroupNesting->find('all', $args);
     
-    $this->CoPerson->Co->CoJob->update($coJobId, null, null, _txt('fd.co_group_member.sync.count', array(count($memberships))));
+    // Walk through the list and rekey on the source co_group_id
+    $sortedNestedGroups = array();
     
-    $cnt = 0;
-    
-    foreach($memberships as $grm) {
-      try {
-        $this->manualProvision(null, 
-                               null,
-                               null,
-                               ProvisioningActionEnum::CoPersonReprovisionRequested,
-                               null,
-                               $grm['CoGroupMember']['id']);
-        
-        $cmt =  _txt('rs.grm.prov.validity', array($grm['CoGroup']['name'],
-                                                   $grm['CoGroupMember']['co_group_id']));
-        
-        $this->CoPerson->HistoryRecord->record($grm['CoGroupMember']['co_person_id'],
-                                               null,
-                                               null,
-                                               null,
-                                               ActionEnum::CoGroupMemberValidityTriggered,
-                                               $cmt,
-                                               $grm['CoGroupMember']['co_group_id']);
-        
-        $this->CoPerson->Co->CoJob->CoJobHistoryRecord->record($coJobId,
-                                                               $grm['CoGroupMember']['id'],
-                                                               $cmt,
-                                                               $grm['CoGroupMember']['co_person_id'],
-                                                               null,
-                                                               JobStatusEnum::Complete);
-        
-        $cnt++;
-      }
-      catch(Exception $e) {
-        $this->CoPerson->Co->CoJob->CoJobHistoryRecord->record($jobId,
-                                                               $grm['CoGroupMember']['id'],
-                                                               $e->getMessage(),
-                                                               $grm['CoGroupMember']['co_person_id'],
-                                                               null,
-                                                               JobStatusEnum::Failed);
-      }
+    foreach($cachedNestedGroups as $ng) {
+      $sortedNestedGroups[ $ng['CoGroupNesting']['co_group_id'] ] = $ng;
     }
     
-    $this->CoPerson->Co->CoJob->CoJobHistoryRecord->record($coJobId,
-                                                           null,
-                                                           _txt('fd.co_group_member.sync.count.done', array($cnt)),
-                                                           null,
-                                                           null,
-                                                           JobStatusEnum::Complete);
+    foreach(array('resync', 'reprovision') as $action) {
+      // Pull all group memberships with valid_from or valid_through timestamps
+      // in the last $window minutes
+      
+      $timeend = time();
+      $timestart = $timeend - ($window * 60);
+      
+      $args = array();
+      /* JOIN not needed due to contain
+      $args['joins'][0]['table'] = 'co_groups';
+      $args['joins'][0]['alias'] = 'CoGroup';
+      $args['joins'][0]['type'] = 'INNER';
+      $args['joins'][0]['conditions'][0] = 'CoGroup.id=CoGroupMember.co_group_id';
+      */
+      $args['conditions']['CoGroup.co_id'] = $coId;
+      $args['conditions']['OR'][] = array(
+        // Membership just became active
+        'AND' => array(
+          'CoGroupMember.valid_from >= ' => date('Y-m-d H:i:s', $timestart),
+          'CoGroupMember.valid_from <= ' => date('Y-m-d H:i:s', $timeend)
+        )
+      );
+      $args['conditions']['OR'][] = array(
+        // Membership just became inactive
+        'AND' => array(
+          'CoGroupMember.valid_through >= ' => date('Y-m-d H:i:s', $timestart),
+          'CoGroupMember.valid_through <= ' => date('Y-m-d H:i:s', $timeend)
+        )
+      );
+      if($action == 'resync') {
+        $args['conditions'][] = 'CoGroupMember.co_group_nesting_id IS NULL';
+      }
+      $args['contain'] = array('CoGroup');
+      
+      $memberships = $this->find('all', $args);
+      
+      $this->CoPerson->Co->CoJob->update($coJobId, null, null, _txt('fd.co_group_member.sync.'.$action.'.count', array(count($memberships))));
+      
+      $cnt = 0;
+      
+      foreach($memberships as $grm) {
+        try {
+          if($action == 'reprovision') {
+            $this->manualProvision(null, 
+                                   null,
+                                   null,
+                                   ProvisioningActionEnum::CoPersonReprovisionRequested,
+                                   null,
+                                   $grm['CoGroupMember']['id']);
+            
+          } elseif($action == 'resync') {
+            // We have a Group Membership. If it is associated with a CO Group
+            // that is a source into a Nesting (as determined by the reference
+            // list obtained above), syncNestedMembership.
+            
+            if(!empty($sortedNestedGroups[ $grm['CoGroupMember']['co_group_id'] ])) {
+              $ng = $sortedNestedGroups[ $grm['CoGroupMember']['co_group_id'] ];
+              
+              $this->syncNestedMembership($ng['TargetCoGroup'],
+                                          $ng['CoGroupNesting']['id'],
+                                          $grm['CoGroupMember']['co_person_id'],
+                                          $grm['CoGroupMember']['member']);
+            }
+          }
+          
+          $cmt =  _txt('rs.grm.'.$action.'.validity', array($grm['CoGroup']['name'],
+                                                            $grm['CoGroupMember']['co_group_id']));
+          
+          $this->CoPerson->HistoryRecord->record($grm['CoGroupMember']['co_person_id'],
+                                                 null,
+                                                 null,
+                                                 null,
+                                                 ActionEnum::CoGroupMemberValidityTriggered,
+                                                 $cmt,
+                                                 $grm['CoGroupMember']['co_group_id']);
+          
+          $this->CoPerson->Co->CoJob->CoJobHistoryRecord->record($coJobId,
+                                                                 $grm['CoGroupMember']['id'],
+                                                                 $cmt,
+                                                                 $grm['CoGroupMember']['co_person_id'],
+                                                                 null,
+                                                                 JobStatusEnum::Complete);
+          
+          $cnt++;
+        }
+        catch(Exception $e) {
+          $this->CoPerson->Co->CoJob->CoJobHistoryRecord->record($jobId,
+                                                                 $grm['CoGroupMember']['id'],
+                                                                 $e->getMessage(),
+                                                                 $grm['CoGroupMember']['co_person_id'],
+                                                                 null,
+                                                                 JobStatusEnum::Failed);
+        }
+      }
+      
+      $this->CoPerson->Co->CoJob->CoJobHistoryRecord->record($coJobId,
+                                                             null,
+                                                             _txt('fd.co_group_member.sync.'.$action.'.count.done', array($cnt)),
+                                                             null,
+                                                             null,
+                                                             JobStatusEnum::Complete);
+    }
   }
   
   /**
@@ -627,11 +685,16 @@ class CoGroupMember extends AppModel {
       throw new InvalidArgumentException(_txt('er.gr.auto.edit'));
     }
     
-    // Or to closed groups where $actorCoPersonId is not an owner or admin
-    
-    if(!$group['CoGroup']['open']
-       && !$Role->isGroupManager($coPersonId, $coGroupId)) {
-      throw new RuntimeException(_txt('er.permission'));
+    if($Role) {
+      // Or to closed groups where $actorCoPersonId is not an owner or admin.
+      // However, if we are not passed RoleComponent we skip this check. This
+      // is primarily intended for CoService use cases, where an authorized user
+      // (who is not necessarily a group manager can set Service eligibility.)
+      
+      if(!$group['CoGroup']['open']
+         && !$Role->isGroupManager($coPersonId, $coGroupId)) {
+        throw new RuntimeException(_txt('er.permission'));
+      }
     }
     
     // See if there is already a row for this group+person, if so update it
@@ -834,7 +897,10 @@ class CoGroupMember extends AppModel {
     //     AND !$sourceMember
     //     AND member of all non-negated source groups for target
     //     AND not a member of any source group for target where Nesting/Negate = true
-    
+    if($this->syncNested === false) {
+      return;
+    }
+
     $shouldBe = false;      // Should $coPerson be a member of $targetGroup?
     $all = false;           // Is $targetGroup configured for nesting all mode?
     $negated = false;       // $coPersonId is ineligible for $targetGroup due to any negative membership

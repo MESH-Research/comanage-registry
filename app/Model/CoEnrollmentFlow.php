@@ -75,7 +75,11 @@ class CoEnrollmentFlow extends AppModel {
       'className' => 'CoMessageTemplate',
       'foreignKey' => 'verification_template_id'
     ),
-    "CoTheme"
+    "CoTheme",
+    "MatchServer" => array(
+      'className' => 'Server',
+      'foreignKey' => 'match_server_id'
+    )
   );
   
   public $hasMany = array(
@@ -99,6 +103,10 @@ class CoEnrollmentFlow extends AppModel {
   // Default ordering for find operations
 // XXX Toss? CO-296
 //  public $order = array("CoEnrollmentFlow.name");
+  
+  // This will populate vv_servers. As long as we only have one server type to
+  // worry about this is sufficient.
+  public $cmServerType = ServerEnum::MatchServer;
   
   // Validation rules for table elements
   public $validate = array(
@@ -124,14 +132,20 @@ class CoEnrollmentFlow extends AppModel {
                             EnrollmentAuthzEnum::None))
     ),
     'authz_cou_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'authz_co_group_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'my_identity_shortcut' => array(
       'rule' => 'boolean'
@@ -139,20 +153,34 @@ class CoEnrollmentFlow extends AppModel {
     'match_policy' => array(
       'rule' => array('inList',
                       array(EnrollmentMatchPolicyEnum::Advisory,
-                            EnrollmentMatchPolicyEnum::Automatic,
+                            EnrollmentMatchPolicyEnum::External,
                             EnrollmentMatchPolicyEnum::None,
                             EnrollmentMatchPolicyEnum::Select,
                             EnrollmentMatchPolicyEnum::Self)),
       'required' => false,
       'allowEmpty' => true
     ),
+    'match_server_id' => array(
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
+    ),
+    'enable_person_find' => array(
+      'rule' => array('boolean')
+    ),
     'approval_required' => array(
       'rule' => array('boolean')
     ),
     'approver_co_group_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'theme_stacking' => array(
       'rule' => array('inList',
@@ -171,7 +199,8 @@ class CoEnrollmentFlow extends AppModel {
       'rule' => array('inList',
                       array(VerificationModeEnum::Automatic,
                             VerificationModeEnum::None,
-                            VerificationModeEnum::Review)),
+                            VerificationModeEnum::Review,
+                            VerificationModeEnum::SkipIfVerified)),
       'required' => false,
       'allowEmpty' => true
     ),
@@ -186,9 +215,12 @@ class CoEnrollmentFlow extends AppModel {
       'allowEmpty' => true
     ),
     'notification_co_group_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'notify_from' => array(
       'rule' => 'email',
@@ -206,17 +238,23 @@ class CoEnrollmentFlow extends AppModel {
       'allowEmpty' => true
     ),
     'verification_template_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'notify_on_approval' => array(
       'rule' => array('boolean')
     ),
     'approval_template_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'approval_subject' => array(
       'rule' => 'notBlank',
@@ -229,17 +267,23 @@ class CoEnrollmentFlow extends AppModel {
       'allowEmpty' => true
     ),
     'denial_template_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'notify_on_finalize' => array(
       'rule' => array('boolean')
     ),
     'finalization_template_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'introduction_text' => array(
       'rule' => 'notBlank',
@@ -366,7 +410,7 @@ class CoEnrollmentFlow extends AppModel {
       
       if(!$this->find('count', $args)) {
         if(!$this->saveAssociated($t)) {
-          throw new RuntimeException('er.db.save');
+          throw new RuntimeException(_txt('er.db.save-a', array('CoEnrollmentFlow::addDefaults')));
         }
       }
     }
@@ -498,6 +542,10 @@ class CoEnrollmentFlow extends AppModel {
     // Optional: Step is not configured, but plugins may elect to execute
     // NotPermitted: Step is not configured and plugins may not run
     
+    // NOTE: A role should always be specified, even if the step is NotPermitted,
+    // since it will be used to determine which token to inject for redirecting
+    // to the next step.
+    
     // The order of the steps in the array will be the order used to generate the
     // steps in the sidebar (enrollmentFlowSteps.ctp)
     
@@ -544,16 +592,25 @@ class CoEnrollmentFlow extends AppModel {
       }
     }
     
-    // If match policy is appropriately set we run the selectEnrollee step.
+    // A match policy of Select or Self triggers selectEnrollee, while External
+    // triggers duplicateCheck (for callout to the match server).
     
-    if(!empty($ef['CoEnrollmentFlow']['match_policy'])
-       && ($ef['CoEnrollmentFlow']['match_policy'] == EnrollmentMatchPolicyEnum::Select
-           || $ef['CoEnrollmentFlow']['match_policy'] == EnrollmentMatchPolicyEnum::Self)) {
-      $ret['selectEnrollee']['enabled'] = RequiredEnum::Required;
-    } else {
-      $ret['selectEnrollee']['enabled'] = RequiredEnum::NotPermitted;
-    }
+    $ret['selectEnrollee']['enabled'] = RequiredEnum::NotPermitted;
+    $ret['duplicateCheck']['enabled'] = RequiredEnum::NotPermitted;
     $ret['selectEnrollee']['role'] = EnrollmentRole::Petitioner;
+    $ret['duplicateCheck']['role'] = EnrollmentRole::Petitioner;
+    
+    if(!empty($ef['CoEnrollmentFlow']['match_policy'])) {
+      switch($ef['CoEnrollmentFlow']['match_policy']) {
+        case EnrollmentMatchPolicyEnum::External:
+          $ret['duplicateCheck']['enabled'] = RequiredEnum::Required;
+          break;
+        case EnrollmentMatchPolicyEnum::Select:
+        case EnrollmentMatchPolicyEnum::Self:
+          $ret['selectEnrollee']['enabled'] = RequiredEnum::Required;
+          break;
+      }
+    }
     
     // If there are no attributes defined, petitionerAttributes becomes optional.
     
@@ -602,6 +659,33 @@ class CoEnrollmentFlow extends AppModel {
       
       $ret['checkEligibility']['role'] = EnrollmentRole::Petitioner;
     }
+    
+    if(!empty($ef['CoEnrollmentFlow']['t_and_c_mode'])
+       && $ef['CoEnrollmentFlow']['t_and_c_mode'] != TAndCEnrollmentModeEnum::Ignore) {
+      // As an interim approach until refactoring enrollment flows for PE,
+      // we render T&C in one of two locations depending on whether we can
+      // determine the flow to be self service or invitation.
+      
+      if(in_array($ef['CoEnrollmentFlow']['authz_level'], 
+                  array(EnrollmentAuthzEnum::None, EnrollmentAuthzEnum::AuthUser))) {
+        // We'll treat this as a self signup flow, and run T&C (if configured)
+        // after petitionerAttributes
+        
+        $ret['tandcPetitioner']['enabled'] = RequiredEnum::Required;
+        $ret['tandcAgreement']['enabled'] = RequiredEnum::NotPermitted;
+      } else {
+        // Run T&C after confirmation to work with invitation flows.
+        
+        $ret['tandcAgreement']['enabled'] = RequiredEnum::Required;
+        $ret['tandcPetitioner']['enabled'] = RequiredEnum::NotPermitted;
+      }
+    } else {
+      $ret['tandcAgreement']['enabled'] = RequiredEnum::NotPermitted;
+      $ret['tandcPetitioner']['enabled'] = RequiredEnum::NotPermitted;
+    }
+    
+    $ret['tandcPetitioner']['role'] = EnrollmentRole::Petitioner;
+    $ret['tandcAgreement']['role'] = $ret['checkEligibility']['role'];
     
     $ret['sendConfirmation']['role'] = EnrollmentRole::Petitioner;
     $ret['waitForConfirmation']['role'] = EnrollmentRole::Petitioner;
@@ -786,12 +870,13 @@ class CoEnrollmentFlow extends AppModel {
    * Perform a keyword search.
    *
    * @since  COmanage Registry v3.1.0
-   * @param  Integer $coId CO ID to constrain search to
-   * @param  String  $q    String to search for
+   * @param  integer $coId  CO ID to constrain search to
+   * @param  string  $q     String to search for
+   * @param  integer $limit Search limit
    * @return Array Array of search results, as from find('all)
    */
   
-  public function search($coId, $q) {
+  public function search($coId, $q, $limit) {
     // Tokenize $q on spaces
     $tokens = explode(" ", $q);
     
@@ -805,9 +890,30 @@ class CoEnrollmentFlow extends AppModel {
     }
     $args['conditions']['CoEnrollmentFlow.co_id'] = $coId;
     $args['order'] = array('CoEnrollmentFlow.name');
+    $args['limit'] = $limit;
     $args['contain'] = false;
     
     return $this->find('all', $args);
+  }
+
+  /**
+   * Fetch all Enrollment Flows
+   *
+   * @since  COmanage Registry v4.0.0
+   * @param  Integer $coId CO ID to constrain search to
+   * @return Array Array elements
+   */
+
+  public function enrollmentFlowList($coId) {
+
+    $args = array();
+    $args['conditions']['CoEnrollmentFlow.co_id'] = $coId;
+    $args['conditions']['NOT']['CoEnrollmentFlow.status'] = TemplateableStatusEnum::Template;
+    $args['order'] = array('CoEnrollmentFlow.name');
+    $args['fields'] = array('CoEnrollmentFlow.id', 'CoEnrollmentFlow.name');
+    $args['contain'] = false;
+
+    return $this->find('list', $args);
   }
   
   /**

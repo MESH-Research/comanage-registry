@@ -52,6 +52,7 @@ class CoPersonRolesController extends StandardController {
     'Address' => array('SourceAddress' => array('OrgIdentity' => array('OrgIdentitySourceRecord' => array('OrgIdentitySource')))),
     'AdHocAttribute' => array('SourceAdHocAttribute' => array('OrgIdentity' => array('OrgIdentitySourceRecord' => array('OrgIdentitySource')))),
     'CoPerson', // Used to check status recalculation on save
+    'ManagerCoPerson' => array('PrimaryName'),
     'SponsorCoPerson' => array('PrimaryName'),
     'TelephoneNumber' => array('SourceTelephoneNumber' => array('OrgIdentity' => array('OrgIdentitySourceRecord' => array('OrgIdentitySource'))))
   );
@@ -61,6 +62,7 @@ class CoPersonRolesController extends StandardController {
     'Address' => array('SourceAddress' => array('OrgIdentity' => array('OrgIdentitySourceRecord' => array('OrgIdentitySource')))),
     'AdHocAttribute' => array('SourceAdHocAttribute' => array('OrgIdentity' => array('OrgIdentitySourceRecord' => array('OrgIdentitySource')))),
     'Cou',
+    'ManagerCoPerson' => array('PrimaryName'),
     'SponsorCoPerson' => array('PrimaryName'),
     'TelephoneNumber' => array('SourceTelephoneNumber' => array('OrgIdentity' => array('OrgIdentitySourceRecord' => array('OrgIdentitySource'))))
   );
@@ -313,7 +315,12 @@ class CoPersonRolesController extends StandardController {
       if($roles['cmadmin'] || $roles['coadmin']) {
         // Note that here we get id => name while in CoPeopleController we just
         // get a list of names. This is to generate the pop-up on the edit form.
-        $cous = $this->CoPersonRole->Cou->find('threaded',array('conditions' => array("Cou.co_id" => $this->cur_co['Co']['id'])));
+        $args = array();
+        $args['conditions']['Cou.co_id'] = $this->cur_co['Co']['id'];
+        $args['contain'] = false;
+        
+        $cous = $this->CoPersonRole->Cou->find('threaded', $args);
+        
         $childCous = array();
         foreach($cous as $cou) {
           $childCous = array_unique($childCous + $this->CoPersonRole->Cou->childCousById($cou['Cou']['id'], true, true));
@@ -535,6 +542,9 @@ class CoPersonRolesController extends StandardController {
    */
   
   public function generateHistory($action, $newdata, $olddata) {
+    $actorCoPersonId = $this->request->is('restful') ? null : $this->Session->read('Auth.User.co_person_id');
+    $actorApiUserId = $this->request->is('restful') ? $this->Auth->User('id') : null;
+
     switch($action) {
       // Because of the way extended attributes are saved in checkWriteFollowups,
       // we ignore generateHistory as requested by StandardController and instead wait
@@ -547,21 +557,25 @@ class CoPersonRolesController extends StandardController {
         $this->CoPersonRole->HistoryRecord->record($newdata['CoPersonRole']['co_person_id'],
                                                    $this->CoPersonRole->id,
                                                    null,
-                                                   $this->Session->read('Auth.User.co_person_id'),
-                                                   ActionEnum::CoPersonRoleAddedManual);
+                                                   $actorCoPersonId,
+                                                   ActionEnum::CoPersonRoleAddedManual,
+                                                   null, null, null, null,
+                                                   $actorApiUserId);
         break;
       case 'delete':
         $this->CoPersonRole->HistoryRecord->record($olddata['CoPersonRole']['co_person_id'],
                                                    $this->CoPersonRole->id,
                                                    null,
-                                                   $this->Session->read('Auth.User.co_person_id'),
-                                                   ActionEnum::CoPersonRoleDeletedManual);
+                                                   $actorCoPersonId,
+                                                   ActionEnum::CoPersonRoleDeletedManual,
+                                                   null, null, null, null,
+                                                   $actorApiUserId);
         break;
       case 'xedit':
         $this->CoPersonRole->HistoryRecord->record($newdata['CoPersonRole']['co_person_id'],
                                                    $this->CoPersonRole->id,
                                                    null,
-                                                   $this->Session->read('Auth.User.co_person_id'),
+                                                   $actorCoPersonId,
                                                    ActionEnum::CoPersonRoleEditedManual,
                                                    _txt('en.action', null, ActionEnum::CoPersonRoleEditedManual)
                                                    . " (" . $this->CoPersonRole->id . "):"
@@ -569,7 +583,9 @@ class CoPersonRolesController extends StandardController {
                                                                                           $olddata,
                                                                                           $this->cur_co['Co']['id'],
                                                                                           array('ExtendedAttribute'),
-                                                                                          $this->extended_attributes));
+                                                                                          $this->extended_attributes),
+                                                   null, null, null,
+                                                   $actorApiUserId);
         break;
     }
     
@@ -620,13 +636,11 @@ class CoPersonRolesController extends StandardController {
     
     // Delete an existing CO Person Role?
     $p['delete'] = ($roles['cmadmin']
-                    || ($managed && ($roles['coadmin'] || $roles['couadmin']))
-                    || ($roles['coadmin'] && $roles['apiuser']));
+                    || $roles['coadmin'] || ($managed && $roles['couadmin']));
     
     // Edit an existing CO Person Role?
     $p['edit'] = ($roles['cmadmin']
-                  || ($managed && ($roles['coadmin'] || $roles['couadmin']))
-                  || ($roles['coadmin'] && $roles['apiuser'])
+                  || $roles['coadmin'] || ($managed && $roles['couadmin'])
                   || $self);
 
     // Are we trying to edit our own record? 
@@ -752,9 +766,9 @@ class CoPersonRolesController extends StandardController {
               
               $this->Flash->set($res, array('key' => 'success'));
               
-              // Update history, once for old and once for new
-              
               try {
+                // Update history, once for old and once for new
+                
                 // Original
                 $this->CoPersonRole->HistoryRecord->record($copr['CoPersonRole']['co_person_id'],
                                                            $copr['CoPersonRole']['id'],
@@ -770,6 +784,12 @@ class CoPersonRolesController extends StandardController {
                                                            $this->Session->read('Auth.User.co_person_id'),
                                                            ActionEnum::CoPersonRoleRelinked,
                                                            $res);
+                
+                // The saveField will recalculate person status for the new
+                // CO Person, but not for the CO Person where the role was moved
+                // from. So we manually recalculate person status here.
+                
+                $this->CoPersonRole->CoPerson->recalculateStatus($copr['CoPersonRole']['co_person_id']);
               }
               catch(Exception $e) {
                 $this->Flash->set($e->getMessage(), array('key' => 'error'));

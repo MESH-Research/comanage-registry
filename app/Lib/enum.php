@@ -61,6 +61,7 @@ class ActionEnum
   const CoPersonAddedPipeline           = 'ACPL';
   const CoPersonDeletedManual           = 'DCPM';
   const CoPersonDeletedPetition         = 'DCPP';
+  const CoPersonEditedApi               = 'ECPA';
   const CoPersonEditedManual            = 'ECPM';
   const CoPersonEditedPetition          = 'ECPP';
   const CoPersonEditedPipeline          = 'ECPL';
@@ -207,8 +208,7 @@ class ContactEnum
 
 class DataFilterContextEnum
 {
-// Not yet implemented
-//  const OrgIdentitySource  = 'OIS';
+  const OrgIdentitySource  = 'OS';
   const ProvisioningTarget = 'PT';
 }
 
@@ -260,7 +260,7 @@ class EnrollmentDupeModeEnum
 
 class EnrollmentMatchPolicyEnum {
   const Advisory  = "A";
-  const Automatic = "M";
+  const External  = "E";
   const None      = "N";
   const Select    = "P";
   const Self      = "S";
@@ -305,6 +305,62 @@ class GroupEnum
   // XXX CO-1100, not yet supported
   const NestedAdmins  = "AN";
   const NestedMembers = "MN";
+}
+
+// XXX [REF]https://httpstatuses.com
+class HttpStatusCodesEnum
+{
+  // [Informational 1xx]
+  const HTTP_CONTINUE                        = 100;
+  const HTTP_SWITCHING_PROTOCOLS             = 101;
+
+  // [Successful 2xx]
+  const HTTP_OK                              = 200;
+  const HTTP_CREATED                         = 201;
+  const HTTP_ACCEPTED                        = 202;
+  const HTTP_NONAUTHORITATIVE_INFORMATION    = 203;
+  const HTTP_NO_CONTENT                      = 204;
+  const HTTP_RESET_CONTENT                   = 205;
+  const HTTP_PARTIAL_CONTENT                 = 206;
+
+  // [Redirection 3xx]
+  const HTTP_MULTIPLE_CHOICES                = 300;
+  const HTTP_MOVED_PERMANENTLY               = 301;
+  const HTTP_FOUND                           = 302;
+  const HTTP_SEE_OTHER                       = 303;
+  const HTTP_NOT_MODIFIED                    = 304;
+  const HTTP_USE_PROXY                       = 305;
+  const HTTP_UNUSED                          = 306;
+  const HTTP_TEMPORARY_REDIRECT              = 307;
+
+  // [Client Error 4xx]
+  const errorCodesBeginAt                    = 400;
+  const HTTP_BAD_REQUEST                     = 400;
+  const HTTP_UNAUTHORIZED                    = 401;
+  const HTTP_PAYMENT_REQUIRED                = 402;
+  const HTTP_FORBIDDEN                       = 403;
+  const HTTP_NOT_FOUND                       = 404;
+  const HTTP_METHOD_NOT_ALLOWED              = 405;
+  const HTTP_NOT_ACCEPTABLE                  = 406;
+  const HTTP_PROXY_AUTHENTICATION_REQUIRED   = 407;
+  const HTTP_REQUEST_TIMEOUT                 = 408;
+  const HTTP_CONFLICT                        = 409;
+  const HTTP_GONE                            = 410;
+  const HTTP_LENGTH_REQUIRED                 = 411;
+  const HTTP_PRECONDITION_FAILED             = 412;
+  const HTTP_REQUEST_ENTITY_TOO_LARGE        = 413;
+  const HTTP_REQUEST_URI_TOO_LONG            = 414;
+  const HTTP_UNSUPPORTED_MEDIA_TYPE          = 415;
+  const HTTP_REQUESTED_RANGE_NOT_SATISFIABLE = 416;
+  const HTTP_EXPECTATION_FAILED              = 417;
+
+  // [Server Error 5xx]
+  const HTTP_INTERNAL_SERVER_ERROR           = 500;
+  const HTTP_NOT_IMPLEMENTED                 = 501;
+  const HTTP_BAD_GATEWAY                     = 502;
+  const HTTP_SERVICE_UNAVAILABLE             = 503;
+  const HTTP_GATEWAY_TIMEOUT                 = 504;
+  const HTTP_VERSION_NOT_SUPPORTED           = 505;
 }
 
 class IdentifierAssignmentEnum
@@ -399,10 +455,12 @@ class MatchStrategyEnum
 
 class MessageTemplateEnum
 {
+  const Authenticator          = 'AU';
   const EnrollmentApproval     = 'EA';
   const EnrollmentFinalization = 'EF';
   const EnrollmentVerification = 'EV';
   const ExpirationNotification = 'XN';
+  const Plugin                 = 'PL';
 }
 
 class MessageFormatEnum
@@ -421,6 +479,12 @@ class NameEnum
   const Preferred = 'preferred';
 }
 
+class NestedEnum
+{
+  const Direct   = 'D';
+  const Indirect = 'I';
+}
+  
 class NotificationStatusEnum
 {
   const Acknowledged          = 'A';
@@ -495,7 +559,9 @@ class OrgIdentityStatusEnum
 
 class PeoplePickerModeEnum
 {
+  const Manager   = 'M';
   const Sponsor   = 'S';
+  const All       = 'AL';
 }
 
 class PermissionEnum
@@ -548,6 +614,7 @@ class PetitionActionEnum
   const InviteConfirmed         = 'IC';
   const InviteSent              = 'IS';
   const InviteViewed            = 'IV';
+  const MatchResult             = 'MR';
   const NotificationSent        = 'NS';
   const OrgIdentitySourced      = 'OC';
   const StatusUpdated           = 'SU';
@@ -626,6 +693,9 @@ class RequiredEnum
 // We use the actual field names here to simplify form rendering
 class RequiredAddressFieldsEnum
 {
+  const CityState                    = "locality,state";
+  const Country                      = "country";
+  const Postal                       = "postal_code";
   const Street                       = "street";
   const StreetCityStatePostal        = "street,locality,state,postal_code";
   const StreetCityStatePostalCountry = "street,locality,state,postal_code,country";
@@ -776,17 +846,20 @@ class TemplateableStatusEnum
   const Active              = 'A';
   const Suspended           = 'S';
   const Template            = 'T';
-  
+  const InTrash             = 'TR';
+
   public static $from_api = array(
     'Active'    => TemplateableStatusEnum::Active,
     'Suspended' => TemplateableStatusEnum::Suspended,
-    'Template'  => TemplateableStatusEnum::Template
+    'Template'  => TemplateableStatusEnum::Template,
+    'InTrash'   => TemplateableStatusEnum::InTrash
   );
 
   public static $to_api = array(
     TemplateableStatusEnum::Active    => 'Active',
     TemplateableStatusEnum::Suspended => 'Suspended',
-    TemplateableStatusEnum::Template  => 'Template'
+    TemplateableStatusEnum::Template  => 'Template',
+    TemplateableStatusEnum::InTrash   => 'InTrash'
   );
 }
 
@@ -802,9 +875,10 @@ class UrlEnum {
 
 class VerificationModeEnum
 {
-  const Automatic = 'A';
-  const Review    = 'R';
-  const None      = 'X';
+  const Automatic       = 'A';
+  const Review          = 'R';
+  const SkipIfVerified  = 'V';
+  const None            = 'X';
 }
 
 class VisibilityEnum

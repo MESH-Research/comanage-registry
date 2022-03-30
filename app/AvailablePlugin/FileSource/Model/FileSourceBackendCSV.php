@@ -233,7 +233,13 @@ class FileSourceBackendCSV extends FileSourceBackendImpl {
     if(!empty($this->fieldCfg['OrgIdentity'])) {
       foreach($this->fieldCfg['OrgIdentity'] as $attr => $col) {
         if(!empty($result[$col])) {
-          $orgdata['OrgIdentity'][$attr] = $result[$col];
+          if($attr == 'valid_from' || $attr == 'valid_through') {
+            // Convert the value to database format
+            $orgdata['OrgIdentity'][$attr] = strftime("%F %T", strtotime($result[$col]));
+          } else {
+            // Just copy the value
+            $orgdata['OrgIdentity'][$attr] = $result[$col];
+          }
         }
       }
     }
@@ -245,7 +251,7 @@ class FileSourceBackendCSV extends FileSourceBackendImpl {
     
     // Walk through MVPAs by type
     
-    foreach(array('Name', 'Address', 'EmailAddress', 'TelephoneNumber', 'Url') as $model) {
+    foreach(array('Name', 'Address', 'EmailAddress', 'Identifier', 'TelephoneNumber', 'Url') as $model) {
       $orgdata[$model] = array();
       
       if(!empty($this->fieldCfg[$model])) {
@@ -268,13 +274,39 @@ class FileSourceBackendCSV extends FileSourceBackendImpl {
             }
             
             if($model == 'Identifier') {
-              // XXX check for +login
+              if(!isset($n['status'])) {
+                // By default set the Identifier to active
+                $n['status'] = SuspendableStatusEnum::Active;
+              }
+              
+              if(strlen($n['type']) > 6) {
+                $p = strpos($n['type'], "+login", -6);
+                
+                if($p) {
+                  $n['login'] = true;
+                  $n['type'] = substr($n['type'], 0, $p);
+                }
+              }
             }
             
             $orgdata[$model][] = $n;
           }
         }
       }
+    }
+    
+    // Make sure we have a Primary Name
+    $primaryNameSet = false;
+    
+    foreach($orgdata['Name'] as $n) {
+      if(isset($n['primary_name']) && $n['primary_name']) {
+        $primaryNameSet = true;
+        break;
+      }
+    }
+    
+    if(!$primaryNameSet) {
+      $orgdata['Name'][0]['primary_name'] = true;
     }
     
     // Process AdHoc Attributes
@@ -429,5 +461,19 @@ class FileSourceBackendCSV extends FileSourceBackendImpl {
     fclose($handle);
     
     return $ret;
+  }
+
+  /**
+   * Set the plugin configuration for this backend.
+   *
+   * @since  COmanage Registry v4.0.2
+   * @param  Array $cfg Array of configuration information, as returned by find()
+   */
+
+  public function setConfig($pluginCfg) {
+    parent::setConfig($pluginCfg);
+    
+    // We also need to reset the field config
+    $this->fieldCfg = null;
   }
 }

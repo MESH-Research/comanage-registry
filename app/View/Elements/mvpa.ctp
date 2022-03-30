@@ -120,7 +120,7 @@
                   $editable = false;
                   $laction = 'view';
                   $lorder = $this->Menu->getMenuOrder('View');
-                  $icon = $this->Menu->getMenuIcon('View');
+                  $action_icon = $this->Menu->getMenuIcon('View');
                   break;
                 default:
                   // No permission, skip this entry entirely
@@ -202,6 +202,7 @@
             
             // If this is an Email Address and is verified, add that to the type string
             if($mvpa_model === 'EmailAddress'
+               && $permissions['edit']
                && isset($m['verified'])
                && !$m['verified']) {
               // Action
@@ -248,7 +249,8 @@
               print $this->Html->link($displaystr,
                                       array('controller' => $lmvpapl,
                                             'action' => $laction,
-                                            $m['id']));
+                                            $m['id']),
+                                      array('class' => ($laction == 'view') ? 'lightbox' : ''));
             }
             print '</div>';
             print '<div class="field-data data-label">';
@@ -268,7 +270,7 @@
                     array(
                       'controller' => 'authentication_events',
                       'action' => 'index',
-                      'identifier' => rawurlencode($m['identifier']),
+                      'identifier' => cmg_urlencode($m['identifier']),
                     )
                   ),
                   'label' => _txt('ct.authentication_events.pl'),
@@ -282,6 +284,7 @@
               $action_args['vv_actions'][] = array(
                 'order' => $lorder,
                 'icon' => $action_icon,
+                'lightbox' => (($laction === "view") ? true : false),
                 'url' => $this->Html->url(
                   array(
                     'controller' => $lmvpapl,

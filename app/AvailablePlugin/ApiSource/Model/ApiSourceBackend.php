@@ -126,6 +126,8 @@ class ApiSourceBackend extends OrgIdentitySourceBackend {
           $n['prefix'] = $name['prefix'];
         if(!empty($attrs['sorAttributes']['names'][0]['given']))
           $n['given'] = $name['given'];
+        if(!empty($attrs['sorAttributes']['names'][0]['middle']))
+          $n['middle'] = $name['middle'];
         if(!empty($attrs['sorAttributes']['names'][0]['family']))
           $n['family'] = $name['family'];
         if(!empty($attrs['sorAttributes']['names'][0]['suffix']))
@@ -229,8 +231,18 @@ class ApiSourceBackend extends OrgIdentitySourceBackend {
       }
     }
     
+    if(!empty($attrs['sorAttributes']['managerIdentifier'])) {
+      // The Pipeline maps this to a CO Person ID
+      $orgdata['OrgIdentity']['manager_identifier'] = $attrs['sorAttributes']['managerIdentifier'];
+    }
+    
     if(!empty($attrs['sorAttributes']['organization'])) {
       $orgdata['OrgIdentity']['o'] = $attrs['sorAttributes']['organization'];
+    }
+    
+    if(!empty($attrs['sorAttributes']['sponsorIdentifier'])) {
+      // The Pipeline maps this to a CO Person ID
+      $orgdata['OrgIdentity']['sponsor_identifier'] = $attrs['sorAttributes']['sponsorIdentifier'];
     }
     
     if(!empty($attrs['sorAttributes']['telephoneNumbers'])) {
@@ -266,6 +278,18 @@ class ApiSourceBackend extends OrgIdentitySourceBackend {
           $orgdata['Url'][] = array(
             'url' => $url['url'],
             'type' => $url['type']
+          );
+        }
+      }
+    }
+    
+    // Note this is an object, not an array
+    if(!empty($attrs['sorAttributes']['adhoc'])) {
+      foreach($attrs['sorAttributes']['adhoc'] as $a) {
+        if(!empty($a['tag']) && isset($a['value'])) {
+          $orgdata['AdHocAttribute'][] = array(
+            'tag'   => $a['tag'],
+            'value' => $a['value']
           );
         }
       }

@@ -78,15 +78,8 @@
 ?>
 
 <script type="text/javascript">
-  var observer = new Array();
-
   $(function() {
     validate_date_input('<?php print _txt('er.validation') ?>', '<?php print _txt('er.validation.date') ?>');
-
-    // Handle action menus
-    $('.field-actions .dropdown-menu').each( (key, elem) => {
-      add_observer(elem, 'li', 'highlight');
-    });
 
     // Explorer menu toggles
     $(".fieldGroupName").click(function(event) {
@@ -101,35 +94,6 @@
     });
 
   });
-
-  // Options for the observer (which mutations to observe)
-  let options = {
-    attributes: true,
-    attributeFilter: ['class']
-  };
-
-  function add_observer(element, target_element, modify_class) {
-    observer[element] = new MutationObserver((mutationList) => {
-      // Use traditional 'for loops' for IE 11
-      for(const mutation of mutationList) {
-        if (mutation.type === 'attributes') {
-          bs_dropdown = mutation.target.parentNode;
-          if($(bs_dropdown).hasClass('show')) {
-            if(target_element === 'tr') {
-              $(bs_dropdown).closest(target_element).prev(target_element).addClass(target_element + '-' + modify_class);
-            }
-            $(bs_dropdown).closest(target_element).addClass(modify_class);
-          } else {
-            if(target_element === 'tr') {
-              $(bs_dropdown).closest(target_element).prev(target_element).removeClass(target_element + '-' + modify_class);
-            }
-            $(bs_dropdown).closest(target_element).removeClass(modify_class);
-          }
-        }
-      }
-    });
-    observer[element].observe(element,options);
-  }
 
   function js_local_onload() {
     enum_update_gadgets(false);
@@ -382,6 +346,7 @@
                         $action_name_args['vv_actions'][] = array(
                           'order' => $this->Menu->getMenuOrder('View'),
                           'icon' => $this->Menu->getMenuIcon('View'),
+                          'lightbox' => true,
                           'url' => $this->Html->url(
                             array(
                               'controller' => 'names',
@@ -460,16 +425,15 @@
             </div>
             <div class="field-info">
               <?php
-                global $cm_lang, $cm_texts;
                 $attrs = array();
                 $attrs['value'] = (isset($org_identities[0]['OrgIdentity']['affiliation'])
                   ? $org_identities[0]['OrgIdentity']['affiliation']
-                  : "M");
+                  : null);
                 $attrs['empty'] = true;
 
                 if($e) {
                   print $this->Form->select('affiliation',
-                    $cm_texts[ $cm_lang ]['en.org_identity.affiliation'],
+                    $vv_affiliation_types,
                     $attrs);
 
                   if($this->Form->isFieldError('affiliation')) {
@@ -477,7 +441,7 @@
                   }
                 } else {
                   if(!empty($org_identities[0]['OrgIdentity']['affiliation'])) {
-                    print $cm_texts[ $cm_lang ]['en.org_identity.affiliation'][ $org_identities[0]['OrgIdentity']['affiliation'] ];
+                    print $vv_affiliation_types[ $org_identities[0]['OrgIdentity']['affiliation'] ];
                   }
                 }
               ?>
@@ -605,6 +569,26 @@
               ?>
             </div>
           </li>
+          <!-- Manager and Sponsor fields are read only because we only support
+               setting these fields in an OIS context. In Registry v5, Org
+               Identities basically become read only to the administrator.
+          -->
+          <li>
+            <div class="field-name">
+              <?php print _txt('fd.manager'); ?>
+            </div>
+            <div class="field-info">
+              <?php print filter_var($org_identities[0]['OrgIdentity']['manager_identifier'], FILTER_SANITIZE_SPECIAL_CHARS); ?>
+            </div>
+          </li>
+          <li>
+            <div class="field-name">
+              <?php print _txt('fd.sponsor'); ?>
+            </div>
+            <div class="field-info">
+              <?php print filter_var($org_identities[0]['OrgIdentity']['sponsor_identifier'], FILTER_SANITIZE_SPECIAL_CHARS); ?>
+            </div>
+          </li>
           <?php if($e): ?>
             <li class="fields-submit">
               <div class="field-name">
@@ -664,23 +648,22 @@
       <?php if($this->action != "add"): ?>       
         <!-- Associated CoPeople listings -->
         <li id="fields-copeople" class="fieldGroup">
-          <?php if($e): ?>
-            <div class="coAddEditButtons">
-              <?php
-                if($permissions['link']) {
-                  foreach($vv_linkable_cos as $lcoid => $lconame) {
-                    print $this->Html->link(_txt('op.link.to.co', array($lconame)),
-                      array('controller'    => 'co_people',
-                        'action'        => 'link',
-                        'orgidentityid' => $org_identities[0]['OrgIdentity']['id'],
-                        'co'            => $lcoid),
-                      array('class'  => 'addbutton'));
+          <div class="coAddEditButtons">
+            <?php
+              if($permissions['link']) {
+                foreach($vv_linkable_cos as $lcoid => $lconame) {
+                  print $this->Html->link(_txt('op.link.to.co', array($lconame)),
+                    array('controller'    => 'co_people',
+                      'action'        => 'link',
+                      'orgidentityid' => $org_identities[0]['OrgIdentity']['id'],
+                      'co'            => $lcoid,
+                      'render'        => 'norm'),
+                    array('class'  => 'addbutton'));
 
-                  }
                 }
-              ?>
-            </div>
-          <?php endif; ?>
+              }
+            ?>
+          </div>
           <a href="#tabs-copeople" class="fieldGroupName">
             <em class="material-icons">indeterminate_check_box</em>
             <?php print _txt('ct.co_people.pl'); ?>

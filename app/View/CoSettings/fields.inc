@@ -448,7 +448,7 @@
         }
       ?>
     </div>
-    <?php if( $cur_co["Co"]["name"] !== 'COmanage'): ?>
+    <?php if( $cur_co["Co"]["name"] !== DEF_COMANAGE_CO_NAME): ?>
     <ul class="field-children">
       <li class="co-theme-stacking">
           <div class="field-name">
@@ -477,6 +477,134 @@
     </ul>
     <?php endif; ?>
   </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print $this->Form->label('global_search_limit',_txt('fd.search.limit.global'),array('class' => 'fieldTitle'));?></div>
+      <div class="field-desc"><?php print _txt('fd.search.limit.global.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e
+                   ? $this->Form->input('global_search_limit',
+                                        array('default' => DEF_GLOBAL_SEARCH_LIMIT))
+                   : filter_var($co_settings[0]['CoSetting']['global_search_limit'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name align-top">
+      <div class="field-title"><?php print _txt('fd.person.picker.display.fields'); ?></div>
+      <div class="field-desc"><?php print _txt('fd.person.picker.display.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <div class="subfield subfield-cols">
+        <div class="field-col">
+          <?php
+          $attrs = array();
+          $attrs['value'] = (isset($co_settings[0]['CoSetting']['person_picker_email_type'])
+                             ? $co_settings[0]['CoSetting']['person_picker_email_type']
+                             : null);
+          $attrs['empty'] = true;
+          $attrs['class'] = 'form-control';
+
+          print $this->Form->label('person_picker_email_type',_txt('fd.email_address.mail'),array('class' => 'subfield-title'));
+          if($e) {
+            print $this->Form->select('person_picker_email_type',
+                                      $vv_person_picker_email_types,
+                                      $attrs);
+
+            if($this->Form->isFieldError('person_picker_email_type')) {
+              print $this->Form->error('person_picker_email_type');
+            }
+          } else {
+            print _txt('en.email_address.type', null, $co_settings[0]['CoSetting']['person_picker_email_type']);
+          }
+          ?>
+        </div>
+        <div class="field-col">
+          <?php
+          $attrs = array();
+          $attrs['value'] = (isset($co_settings[0]['CoSetting']['person_picker_identifier_type'])
+                             ? $co_settings[0]['CoSetting']['person_picker_identifier_type']
+                             : null);
+          $attrs['empty'] = true;
+          $attrs['class'] = 'form-control';
+
+          print $this->Form->label('person_picker_identifier_type',_txt('fd.identifier.identifier'),array('class' => 'subfield-title'));
+          if($e) {
+            print $this->Form->select('person_picker_identifier_type',
+                                      $vv_person_picker_identifier_types,
+                                      $attrs);
+
+            if($this->Form->isFieldError('person_picker_identifier_type')) {
+              print $this->Form->error('person_picker_identifier_type');
+            }
+          } else {
+            print _txt('en.identifier.type', null, $co_settings[0]['CoSetting']['person_picker_identifier_type']);
+          }
+          ?>
+        </div>
+      </div>
+      <div class="checkbox">
+        <?php
+        print ($e
+          ? $this->Form->input('person_picker_display_types')
+          : (isset($co_settings[0]['CoSetting']['person_picker_display_types'])
+          && $co_settings[0]['CoSetting']['person_picker_display_types']
+            ? _txt('fd.yes') : _txt('fd.no')));
+        print ' ' . $this->Form->label('person_picker_display_types',_txt('fd.person.picker.display.types'));
+        ?>
+      </div>
+    </div>
+  </li>
+  <?php if( $cur_co["Co"]["name"] === DEF_COMANAGE_CO_NAME): ?>
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print _txt('fd.garbage.collect');?></div>
+    </div>
+    <div class="field-info">
+      <?php
+      if(!empty($vv_jobs_queued)) {
+        print $this->Html->link(
+          _txt('op.view.job'),
+          array(
+            'controller' => 'co_jobs',
+            'action' => 'view',
+            $vv_jobs_queued[0]["CoJob"]["id"]
+          ),
+          array('class' => 'viewbutton spin')
+        ) . PHP_EOL;
+      } else {
+        // If i have no active Job. If i have provide a link with the Job
+        print $this->Html->link(
+            _txt('op.job.schedule'),
+            array(
+              'controller' => 'co_settings',
+              'action' => 'job',
+              $co_settings[0]['CoSetting']['id'],
+              'co' => $cur_co['Co']['id']
+            ),
+            array('class' => 'schedulebutton spin')
+          ) . PHP_EOL;
+      }
+      ?>
+    </div>
+    <ul class="field-children">
+      <li class="co-job">
+        <div class="field-name">
+          <div class="field-title"><?php print $this->Form->label('garbage_collection_interval',_txt('fd.garbage.collect.interval'),array('class' => 'fieldTitle'));?></div>
+          <div class="field-desc"><?php print _txt('fd.garbage.collect.interval.desc'); ?></div>
+        </div>
+        <div class="field-info">
+          <?php print ($e
+            ? $this->Form->input('garbage_collection_interval', array(
+              'default' => DEF_GARBAGE_COLLECT_INTERVAL,
+              'type' => 'number'
+            ))
+            : filter_var($co_settings[0]['CoSetting']['garbage_collection_interval'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+        </div>
+      </li>
+    </ul>
+  </li>
+<?php endif; // COmanage ?>
   <?php if($e): ?>
     <li class="fields-submit">
       <div class="field-name">

@@ -96,9 +96,12 @@ class CoNotification extends AppModel {
       'allowEmpty' => true
     ),
     'resolver_co_person_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'action' => array(
       'rule' => array('maxLength', 4),
@@ -219,13 +222,15 @@ class CoNotification extends AppModel {
    * @param  integer $id                  CO Notification ID
    * @param  string  $role                One of 'actor', 'recipient', or 'resolver'
    * @param  integer $expungerCoPersonId  CO Person ID of person performing expunge
+   * @param  integer $expungerApiUserId   API User ID performing expunge
    * @return boolean True on success
    * @throws InvalidArgumentException
    */
   
   public function expungeParticipant($id,
                                      $role,
-                                     $expungerCoPersonId) {
+                                     $expungerCoPersonId,
+                                     $expungerApiUserId = null) {
     $this->id = $id;
     
     $subjectCoPersonId = $this->field('subject_co_person_id');
@@ -238,7 +243,11 @@ class CoNotification extends AppModel {
                                                   null,
                                                   $expungerCoPersonId,
                                                   ActionEnum::NotificationParticipantExpunged,
-                                                  _txt('rs.nt.expunge', array($id, $role)));
+                                                  _txt('rs.nt.expunge', array($id, $role)),
+                                                  null,
+                                                  null,
+                                                  null,
+                                                  $expungerApiUserId);
     }
     // else subject can be null if (eg) a group provisioner failed and a notification
     // is sent to the admins. In that case, don't bother with the history record

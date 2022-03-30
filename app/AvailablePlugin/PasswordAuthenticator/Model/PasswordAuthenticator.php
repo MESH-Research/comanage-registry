@@ -33,34 +33,37 @@ class PasswordAuthenticator extends AuthenticatorBackend {
 
   // Required by COmanage Plugins
   public $cmPluginType = "authenticator";
-	
-	// Add behaviors
+
+  // Add behaviors
   public $actsAs = array('Containable');
-	
+
   // Document foreign keys
   public $cmPluginHasMany = array(
-    "CoPerson" => array("Password")
-	);
-	
-	// Association rules from this model to other models
-	public $belongsTo = array(
-		"Authenticator"
-	);
-	
-	public $hasMany = array(
-		"PasswordAuthenticator.Password"
-	);
-	
+    "CoPerson" => array("Password"),
+    "CoMessageTemplate" => array("PasswordAuthenticator")
+  );
+
+  // Association rules from this model to other models
+  public $belongsTo = array(
+    "Authenticator",
+    "CoMessageTemplate"
+  );
+
+  public $hasMany = array(
+    "PasswordAuthenticator.Password",
+    "PasswordAuthenticator.PasswordResetToken"
+  );
+
   // Default display field for cake generated views
-  public $displayField = "description";
-	
+  public $displayField = "password_source";
+
   // Validation rules for table elements
   public $validate = array(
     'authenticator_id' => array(
       'rule' => 'numeric',
       'required' => true,
-			'allowEmpty' => false
-		),
+      'allowEmpty' => false
+    ),
     'password_source' => array(
       'rule' => array('inList', array(PasswordAuthPasswordSourceEnum::AutoGenerate,
                                       PasswordAuthPasswordSourceEnum::External,
@@ -68,16 +71,16 @@ class PasswordAuthenticator extends AuthenticatorBackend {
       'required' => false,
       'allowEmpty' => true
     ),
-		'min_length' => array(
+    'min_length' => array(
       'rule' => 'numeric',
-			'required' => false,
-			'allowEmpty' => true
-		),
-		'max_length' => array(
+      'required' => false,
+      'allowEmpty' => true
+    ),
+    'max_length' => array(
       'rule' => 'numeric',
-			'required' => false,
-			'allowEmpty' => true
-		),
+      'required' => false,
+      'allowEmpty' => true
+    ),
     'format_crypt_php' => array(
       'rule' => array('boolean'),
       'required' => false,
@@ -92,11 +95,33 @@ class PasswordAuthenticator extends AuthenticatorBackend {
       'rule' => array('boolean'),
       'required' => false,
       'allowEmpty' => true
+    ),
+    'enable_ssr' => array(
+      'rule' => array('boolean'),
+      'required' => false,
+      'allowEmpty' => true
+    ),
+    'ssr_validity' => array(
+      'rule' => 'numeric',
+      'required' => true,
+      'allowEmpty' => false
+    ),
+    // XXX This should be required if enable_ssr is true, but for now we don't
+    // have a conditional validation rule
+    'co_message_template_id' => array(
+      'rule' => 'numeric',
+      'required' => false,
+      'allowEmpty' => true
+    ),
+    'redirect_on_success_ssr' => array(
+      'rule' => array('url', true),
+      'required' => false,
+      'allowEmpty' => true
     )
-	);
-	
-	// Do we support multiple authenticators per instantiation?
-	public $multiple = false;
+  );
+
+  // Do we support multiple authenticators per instantiation?
+  public $multiple = false;
   
   /**
    * Expose menu items.
@@ -104,11 +129,11 @@ class PasswordAuthenticator extends AuthenticatorBackend {
    * @ since COmanage Registry v3.1.0
    * @ return Array with menu location type as key and array of labels, controllers, actions as values.
    */
-	
+
   public function cmPluginMenus() {
-  	return array();
+    return array();
   }
-	
+
   /**
    * Actions to take before a save operation is executed.
    *
@@ -126,64 +151,108 @@ class PasswordAuthenticator extends AuthenticatorBackend {
     return true;
   }
   
-	/**
-	 * Manage Authenticator data, as submitted from the view.
-	 *
-	 * @since  COmanage Registry v3.1.0
-	 * @param  Array   $data					  Array of Authenticator data submitted from the view
-	 * @param  integer $actorCoPersonId Actor CO Person ID
-	 * @return string Human readable (localized) result comment
-	 * @throws InvalidArgumentException
-	 * @throws RuntimeException
-	 */
-	
-	public function manage($data, $actorCoPersonId) {
-		$minlen = $this->pluginCfg['PasswordAuthenticator']['min_length'] ?: 8;
-		$maxlen = $this->pluginCfg['PasswordAuthenticator']['max_length'] ?: 64;
-		
+  /**
+   * Manage Authenticator data, as submitted from the view.
+   *
+   * @since  COmanage Registry v3.1.0
+   * @param  Array   $data            Array of Authenticator data submitted from the view
+   * @param  integer $actorCoPersonId Actor CO Person ID
+   * @return string Human readable (localized) result comment
+   * @throws InvalidArgumentException
+   * @throws RuntimeException
+   */
+
+  public function manage($data, $actorCoPersonId, $actorApiUserId=null) {
+    if(!empty($data['Password']['token'])) {
+      // Me're here from a Self Service Password Reset operation (ssr), which
+      // means all we have are the token and the new password. First, we'll need
+      // to pull our own configuration, by looking up the token. We're not
+      // going to validate the token yet, we'll do that later in the transaction
+      // so we can invalidate it.
+      
+      $args = array();
+      $args['conditions']['PasswordResetToken.token'] = $data['Password']['token'];
+      $args['contain'] = array('PasswordAuthenticator' => 'Authenticator');
+      
+      $token = $this->PasswordResetToken->find('first', $args);
+      
+      if(empty($token)) {
+        throw new InvalidArgumentException(_txt('er.passwordauthenticator.token.notfound'));
+      }
+      
+      // We can set our configuration based on $token, though note the containable
+      // result will be a slightly different structure than we normally get so
+      // we have to fix that here.
+      
+      $this->pluginCfg['PasswordAuthenticator'] = $token['PasswordAuthenticator'];
+      $this->pluginCfg['Authenticator'] = $token['PasswordAuthenticator']['Authenticator'];
+      unset($this->pluginCfg['PasswordAuthenticator']['Authenticator']);
+      
+      // We only support SSR for self selected passwords
+      if($this->pluginCfg['PasswordAuthenticator']['password_source'] != PasswordAuthPasswordSourceEnum::SelfSelect) {
+        throw new InvalidArgumentException(_txt('er.passwordauthenticator.ssr.cfg'));
+      }
+      
+      // Stuff additional info we need into $data
+      $data['Password']['co_person_id'] = $token['PasswordResetToken']['co_person_id'];
+      $data['Password']['password_authenticator_id'] = $this->pluginCfg['PasswordAuthenticator']['id'];
+      
+      // Force the $actorCoPersonId to be the CO Person ID associated with the token.
+      $actorCoPersonId = $token['PasswordResetToken']['co_person_id'];
+    }
+    
+    $minlen = $this->pluginCfg['PasswordAuthenticator']['min_length'] ?: 8;
+    $maxlen = $this->pluginCfg['PasswordAuthenticator']['max_length'] ?: 64;
+
     // Perform sanity checks on Self Selected passwords only
     if($this->pluginCfg['PasswordAuthenticator']['password_source'] == PasswordAuthPasswordSourceEnum::SelfSelect) {
-  		// Check minimum length
-  		if(strlen($data['Password']['password']) < $minlen) {
-  			throw new InvalidArgumentException(_txt('er.passwordauthenticator.len.min', array($minlen)));
-  		}
-  		
-  		// Check maximum length
-  		if(strlen($data['Password']['password']) > $maxlen) {
-  			throw new InvalidArgumentException(_txt('er.passwordauthenticator.len.max', array($maxlen)));
-  		}
-  		
-  		// Check that passwords match
-  		if($data['Password']['password'] != $data['Password']['password2']) {
-  			throw new InvalidArgumentException(_txt('er.passwordauthenticator.match'));
-  		}
+      // Check minimum length
+      if(strlen($data['Password']['password']) < $minlen) {
+        throw new InvalidArgumentException(_txt('er.passwordauthenticator.len.min', array($minlen)));
+      }
+
+      // Check maximum length
+      if(strlen($data['Password']['password']) > $maxlen) {
+        throw new InvalidArgumentException(_txt('er.passwordauthenticator.len.max', array($maxlen)));
+      }
+
+      // Check that passwords match
+      if($data['Password']['password'] != $data['Password']['password2']) {
+        throw new InvalidArgumentException(_txt('er.passwordauthenticator.match'));
+      }
     }
     
     // Make sure we have a CO Person ID to operate over
     if(empty($data['Password']['co_person_id'])) {
       throw new InvalidArgumentException(_txt('er.notprov.id', array(_txt('ct.co_people.1'))));
     }
-		
-		// First see if there are any existing records
-		$this->_begin();
-		
-    if($this->pluginCfg['PasswordAuthenticator']['password_source'] == PasswordAuthPasswordSourceEnum::SelfSelect) {
-  		$args = array();
-  		$args['conditions']['Password.password_authenticator_id'] = $data['Password']['password_authenticator_id'];
-  		$args['conditions']['Password.co_person_id'] = $data['Password']['co_person_id'];
-  		$args['conditions']['Password.password_type'] = PasswordEncodingEnum::Crypt;
-  		$args['contain'] = false;
-  		
-  		$currec = $this->Password->find('first', $args);
-  		
-  		if(!empty($currec)
-  			 && $data['Password']['co_person_id'] == $actorCoPersonId) {
-  			// The current password is required for self selected passwords
-  			
-  			if(!password_verify($data['Password']['passwordc'], $currec['Password']['password'])) {
-  				throw new InvalidArgumentException(_txt('er.passwordauthenticator.current'));
-  			}
-  		}
+
+    $this->_begin();
+    
+    if(!empty($data['Password']['token'])) {
+      // If we have a token, validate it before processing anything
+      
+      // This will throw InvalidArgumentException on error
+      $this->PasswordResetToken->validateToken($data['Password']['token'], true);
+    } elseif($this->pluginCfg['PasswordAuthenticator']['password_source'] == PasswordAuthPasswordSourceEnum::SelfSelect) {
+      // If there is an existing password make sure it was provided and matches
+      $args = array();
+      $args['conditions']['Password.password_authenticator_id'] = $data['Password']['password_authenticator_id'];
+      $args['conditions']['Password.co_person_id'] = $data['Password']['co_person_id'];
+      $args['conditions']['Password.password_type'] = PasswordEncodingEnum::Crypt;
+      $args['contain'] = false;
+
+      $currec = $this->Password->find('first', $args);
+
+      if(!empty($currec)
+         && $data['Password']['co_person_id'] == $actorCoPersonId) {
+        // The current password is required for self selected passwords
+
+        if(!password_verify($data['Password']['passwordc'], $currec['Password']['password'])) {
+          $this->_rollback();
+          throw new InvalidArgumentException(_txt('er.passwordauthenticator.current'));
+        }
+      }
     }
     
     // Delete any existing password for the user. We do it this way in case the
@@ -196,14 +265,14 @@ class PasswordAuthenticator extends AuthenticatorBackend {
     );
     
     $this->Password->deleteAll($args);
-		
-		// We'll store one entry per hashing type. We always store CRYPT
-		// so we can use the native php routines (which require PHP 5.5+).
+
+    // We'll store one entry per hashing type. We always store CRYPT
+    // so we can use the native php routines (which require PHP 5.5+).
     // Enabling SSHA requires PHP 7 for random_bytes.
     
     // We could use something like https://multiformats.io/multihash, but the
     // password_type column basically accomplishes the same thing.
-		
+
     $pData = array();
     
     if(true || $this->pluginCfg['PasswordAuthenticator']['format_crypt_php']) {
@@ -212,15 +281,15 @@ class PasswordAuthenticator extends AuthenticatorBackend {
       
       $pData[] = array(
         'password_authenticator_id' => $data['Password']['password_authenticator_id'],
-				'co_person_id'							=> $data['Password']['co_person_id'],
-        'password'									=> password_hash($data['Password']['password'], PASSWORD_DEFAULT),
-        'password_type'							=> PasswordEncodingEnum::Crypt
+        'co_person_id'              => $data['Password']['co_person_id'],
+        'password'                  => password_hash($data['Password']['password'], PASSWORD_DEFAULT),
+        'password_type'             => PasswordEncodingEnum::Crypt
       );
     }
     
     if($this->pluginCfg['PasswordAuthenticator']['format_sha1_ldap']) {
-      // Salted SHA1 isn't really a great algorithm (and our salt generation)
-      // could probably be better, but OpenLDAP doesn't support a better option
+      // Salted SHA1 isn't really a great algorithm (and our salt generation
+      // could probably be better), but OpenLDAP doesn't support a better option
       // out of the box.
       
       $salt = substr(bin2hex(random_bytes(8)),0,4);
@@ -228,9 +297,9 @@ class PasswordAuthenticator extends AuthenticatorBackend {
       
       $pData[] = array(
         'password_authenticator_id' => $data['Password']['password_authenticator_id'],
-				'co_person_id'							=> $data['Password']['co_person_id'],
-        'password'									=> $shapwd,
-        'password_type'							=> PasswordEncodingEnum::SSHA
+        'co_person_id'              => $data['Password']['co_person_id'],
+        'password'                  => $shapwd,
+        'password_type'             => PasswordEncodingEnum::SSHA
       );
     }
     
@@ -240,107 +309,126 @@ class PasswordAuthenticator extends AuthenticatorBackend {
       
       $pData[] = array(
         'password_authenticator_id' => $data['Password']['password_authenticator_id'],
-				'co_person_id'							=> $data['Password']['co_person_id'],
-        'password'									=> $data['Password']['password'],
-        'password_type'							=> PasswordEncodingEnum::Plain
+        'co_person_id'              => $data['Password']['co_person_id'],
+        'password'                  => $data['Password']['password'],
+        'password_type'             => PasswordEncodingEnum::Plain
       );
     }
-		
-		if(!$this->Password->saveMany($pData)) {
-			$this->_rollback();
-			throw new RuntimeException(_txt('er.db.save-a', array('Password')));
-		}
-		
-		$comment = _txt('pl.passwordauthenticator.saved',
-									  array($this->pluginCfg['Authenticator']['description']));
-		
-		$this->Authenticator
-				 ->Co
-				 ->CoPerson
-				 ->HistoryRecord->record($data['Password']['co_person_id'],
-																 null,
-																 null,
-																 $actorCoPersonId,
-																 ActionEnum::AuthenticatorEdited,
-																 $comment);
-		
-		$this->_commit();
-		
-		return $comment;
-	}
-	
-	/**
-	 * Reset Authenticator data for a CO Person.
-	 *
-	 * @since  COmanage Registry v3.1.0
-	 * @param  integer $coPersonId			CO Person ID
-	 * @param  integer $actorCoPersonId Actor CO Person ID
-	 * @return boolean true on success
-	 */
+
+    // saveMany() won't trigger provisioning, but in general the calling code
+    // (SAMController) will (but see more below)
+    if(!$this->Password->saveMany($pData)) {
+      $this->_rollback();
+      throw new RuntimeException(_txt('er.db.save-a', array('Password')));
+    }
+
+    $comment = _txt('pl.passwordauthenticator.saved',
+                    array($this->pluginCfg['Authenticator']['description']));
+
+    $this->Authenticator
+         ->Co
+         ->CoPerson
+         ->HistoryRecord->record($data['Password']['co_person_id'],
+                                 null,
+                                 null,
+                                 $actorCoPersonId,
+                                 ActionEnum::AuthenticatorEdited,
+                                 $comment,
+                                 null, null, null, null,
+                                 $actorApiUserId);
+
+    $this->_commit();
+    
+    // SSR needs to trigger provisioning, but the calling code (PasswordsController)
+    // doesn't have access to the CO Person ID, so we need to figure out that we
+    // need to provision here. We do this after commit to mimic when SAMController
+    // would trigger provisioning.
+    
+    if(!empty($data['Password']['token']) && !empty($data['Password']['co_person_id'])) {
+      $this->Authenticator->provision($data['Password']['co_person_id']);
+    }
+    
+    // We also need to manually trigger notification for much the same reason.
+    $this->notify($data['Password']['co_person_id']);
+
+    return $comment;
+  }
+
+  /**
+   * Reset Authenticator data for a CO Person.
+   *
+   * @since  COmanage Registry v3.1.0
+   * @param  integer $coPersonId      CO Person ID
+   * @param  integer $actorCoPersonId Actor CO Person ID
+   * @param  integer $actorApiUserId  Actor API User ID
+   * @return boolean true on success
+   */
   
-  public function reset($coPersonId, $actorCoPersonId) {
+  public function reset($coPersonId, $actorCoPersonId, $actorApiUserId=null) {
     // Perform the reset. We simply delete any authenticators for the specified CO Person.
-		
-		$args = array();
-		$args['conditions']['Password.password_authenticator_id'] = $this->pluginCfg['PasswordAuthenticator']['id'];
-		$args['conditions']['Password.co_person_id'] = $coPersonId;
-		
-		// Note deleteAll will not trigger callbacks by default
-		$this->Password->deleteAll($args['conditions']);
+
+    $args = array();
+    $args['conditions']['Password.password_authenticator_id'] = $this->pluginCfg['PasswordAuthenticator']['id'];
+    $args['conditions']['Password.co_person_id'] = $coPersonId;
+
+    // Note deleteAll will not trigger callbacks by default
+    $this->Password->deleteAll($args['conditions']);
     
     // And record some history
-		
-		$comment = _txt('pl.passwordauthenticator.reset',
-									  array($this->pluginCfg['Authenticator']['description']));
-		
-		$this->Authenticator
-				 ->Co
-				 ->CoPerson
-				 ->HistoryRecord->record($coPersonId,
-																 null,
-																 null,
-																 $actorCoPersonId,
-																 ActionEnum::AuthenticatorDeleted,
-																 $comment);
-		
-		// We always return true
-		return true;
-	}
-	
-	/**
-	 * Obtain the current Authenticator status for a CO Person.
-	 *
-	 * @since  COmanage Registry v3.1.0
-	 * @param  integer $coPersonId			CO Person ID
-	 * @return Array Array with values
-	 * 							 status: AuthenticatorStatusEnum
-	 * 							 comment: Human readable string, visible to the CO Person
-	 */
-	
-	public function status($coPersonId) {
-		// Is there a password for this person?
-		
-		$args = array();
-		$args['conditions']['Password.password_authenticator_id'] = $this->pluginCfg['PasswordAuthenticator']['id'];
-		$args['conditions']['Password.co_person_id'] = $coPersonId;
-		$args['contain'] = false;
+
+    $comment = _txt('pl.passwordauthenticator.reset',
+                    array($this->pluginCfg['Authenticator']['description']));
+
+    $this->Authenticator
+         ->Co
+         ->CoPerson
+         ->HistoryRecord->record($coPersonId,
+                                 null,
+                                 null,
+                                 $actorCoPersonId,
+                                 ActionEnum::AuthenticatorDeleted,
+                                 $comment,
+                                 null, null, null, null,
+                                 $actorApiUserId);
+
+    // We always return true
+    return true;
+  }
+
+  /**
+   * Obtain the current Authenticator status for a CO Person.
+   *
+   * @since  COmanage Registry v3.1.0
+   * @param  integer $coPersonId   CO Person ID
+   * @return Array Array with values
+   *               status: AuthenticatorStatusEnum
+   *               comment: Human readable string, visible to the CO Person
+   */
+
+  public function status($coPersonId) {
+    // Is there a password for this person?
+
+    $args = array();
+    $args['conditions']['Password.password_authenticator_id'] = $this->pluginCfg['PasswordAuthenticator']['id'];
+    $args['conditions']['Password.co_person_id'] = $coPersonId;
+    $args['contain'] = false;
     
     // We don't know which password_type we have, but they should all have the
     // same mod time
-		
+
     $pwd = $this->Password->find('first', $args);
     
-		if(!empty($pwd['Password']['modified'])) {
-			return array(
-				'status' => AuthenticatorStatusEnum::Active,
-				// Note we don't currently have access to local timezone setting (see OrgIdentity for example)
-				'comment' => _txt('pl.passwordauthenticator.mod', array($pwd['Password']['modified']))
-			);
-		}
-		
-		return array(
-			'status' => AuthenticatorStatusEnum::NotSet,
-			'comment' => _txt('fd.set.not')
-		);
-	}
+    if(!empty($pwd['Password']['modified'])) {
+      return array(
+        'status' => AuthenticatorStatusEnum::Active,
+        // Note we don't currently have access to local timezone setting (see OrgIdentity for example)
+        'comment' => _txt('pl.passwordauthenticator.mod', array($pwd['Password']['modified']))
+      );
+    }
+
+    return array(
+      'status' => AuthenticatorStatusEnum::NotSet,
+      'comment' => _txt('fd.set.not')
+    );
+  }
 }

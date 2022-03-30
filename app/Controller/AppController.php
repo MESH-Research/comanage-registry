@@ -123,18 +123,56 @@ class AppController extends Controller {
     // XXX CO-351 Placeholder
     $this->Session->write('Config.language', 'eng');
     Configure::write('Config.language', $this->Session->read('Config.language'));
+
+    // CSRF token should expire along with the Session. This is the default in CAKEPHP 3.7.x+
+    // https://book.cakephp.org/3/en/controllers/middleware.html#csrf-middleware
+    // https://github.com/cakephp/cakephp/issues/13532
+    // - expiry, How long the CSRF token should last. Defaults to browser session.
+    // XXX CO-2135
+    $this->Security->csrfUseOnce = false;
     
     // Tell the Auth module to call the controller's isAuthorized() function.
     $this->Auth->authorize = array('Controller');
     
     // Set the redirect and error message for auth failures. Note that we can generate
     // a stack trace instead of a redirect by setting unauthorizedRedirect to false.
-    $this->Auth->unauthorizedRedirect = "/";
-    $this->Auth->authError = _txt('er.permission');
-    // Default flash key is 'auth', switch to 'error' so it maps to noty's default type
-    $this->Auth->flash = array('key' => 'error');
+    if($this->request->is('ajax')) {
+      // XXX CO-2135 In case of an ajax request throw an exception and return handling to the front end
+      // If set to false a ForbiddenException exception is thrown instead of redirecting.
+      $this->Auth->unauthorizedRedirect = false;
+    } else {
+      $this->Auth->unauthorizedRedirect = "/";
+      $this->Auth->authError = _txt('er.permission');
+      // Default flash key is 'auth', switch to 'error' so it maps to noty's default type
+      $this->Auth->flash = array('key' => 'error');
+    }
     
     if($this->request->is('restful')) {
+      // Do not allow route fallbacks
+      $rparams = $this->request->params;
+      // Keep only the routes related to the current request
+      $request_related_routes = array_filter(
+        Router::$routes,
+        static function ($route) use ($rparams) {
+          return (strpos($route->template, $rparams['controller']) !== false);
+        }
+      );
+
+      // Map each actions to methods
+      $action_method = array();
+      foreach ($request_related_routes as $idx => $params) {
+        $action_method[ $params->defaults['action'] ][] = $params->defaults['[method]'];
+      }
+
+      if(!array_key_exists($this->request->action, $action_method)
+         || !in_array($this->request->method(), $action_method[$this->request->action])) {
+        $this->Api->restResultHeader(404, "Unknown");
+        // We force an exit here to prevent any views from rendering, but also
+        // to prevent Cake from dumping the default layout
+        $this->response->send();
+        exit;
+      }
+
       // Set up basic auth and attempt to login the API user, unless we're already
       // logged in (ie: via a cookie provided via an AJAX initiated REST call)
       
@@ -272,21 +310,19 @@ class AppController extends Controller {
       // or posted as "Model.co_id".
       
       $coid = $this->parseCOID();
+
+      // Retrieve CO Object.  If this model doesn't have a direct relationship, we'll temporarily bind the model
+
+      $this->Co = ClassRegistry::init('Co');
+      // Load Localizations
+      // If $coid == -1 the Global localizations will be loaded.
+      $this->Co->CoLocalization->load($coid);
       
       if($coid == -1) {
         if($this->requires_co) {
           throw new InvalidArgumentException(_txt('er.co.specify'));
         }
       } else {
-        // Retrieve CO Object.  If this model doesn't have a direct relationship, we'll temporarily bind the model
-        
-        if(!isset($this->Co)) {
-          // There might be a CO object under another object (eg: CoOrgIdentityLink),
-          // but it's easier if we just explicitly load the model
-          
-          $this->loadModel('Co');
-        }
-        
         $args = array();
         $args['conditions']['Co.id'] = $coid;
         $args['contain'] = false;
@@ -295,50 +331,7 @@ class AppController extends Controller {
         
         if(!empty($this->cur_co)) {
           $this->set("cur_co", $this->cur_co);
-          
-          // Load dynamic texts. We do this here because lang.php doesn't have access to models yet.
-          
-          global $cm_texts;
-          global $cm_lang;
-          
-          $this->loadModel('CoLocalization');
 
-          // Load Platform text. Dynamic texts configured in COmanage CO
-          // Continuously we will replace any occurrence of dynamic texts with the global ones
-
-          $args = array();
-          $args['joins'][0]['table'] = 'cos';
-          $args['joins'][0]['alias'] = 'Co';
-          $args['joins'][0]['type'] = 'INNER';
-          $args['joins'][0]['conditions'][0] = 'CoLocalization.co_id=Co.id';
-          $args['conditions']['Co.name'] = 'COmanage';
-          $args['conditions']['Co.status'] = StatusEnum::Active;
-          $args['conditions']['CoLocalization.language'] = $cm_lang;
-          $args['fields'] = array('CoLocalization.lkey', 'CoLocalization.text');
-          $args['contain'] = false;
-
-          $ls_cm = $this->CoLocalization->find('list', $args);
-          unset($args);
-
-          // First load the Platform localization variables
-          if(!empty($ls_cm)) {
-            $cm_texts[$cm_lang] = array_merge($cm_texts[$cm_lang], $ls_cm);
-          }
-          
-          $args = array();
-          $args['conditions']['CoLocalization.co_id'] = $coid;
-          $args['conditions']['CoLocalization.language'] = $cm_lang;
-          $args['fields'] = array('CoLocalization.lkey', 'CoLocalization.text');
-          $args['contain'] = false;
-
-          $ls_co = $this->CoLocalization->find('list', $args);
-
-          // Replace all default texts with the ones configured in CO level
-          if(!empty($ls_co)) {
-            $cm_texts[$cm_lang] = array_merge($cm_texts[$cm_lang], $ls_co);
-          }
-          unset($args);
-          
           // Perform a bit of a sanity check before we get any further
           try {
             $this->verifyRequestedId();
@@ -418,6 +411,7 @@ class AppController extends Controller {
     if(!$this->request->is('restful')) {
       $this->getTheme();
       $this->getUImode();
+      $this->getAppPrefs();
       
       if($this->Session->check('Auth.User.org_identities')) {
         $this->menuAuth();
@@ -974,7 +968,7 @@ class AppController extends Controller {
       $args['joins'][0]['alias'] = 'Co';
       $args['joins'][0]['type'] = 'INNER';
       $args['joins'][0]['conditions'][0] = 'CoSetting.co_id=Co.id';
-      $args['conditions']['Co.name'] = 'COmanage';
+      $args['conditions']['Co.name'] = DEF_COMANAGE_CO_NAME;
       $args['conditions']['Co.status'] = TemplateableStatusEnum::Active;
       $args['contain'][] = 'CoTheme';
 
@@ -1026,6 +1020,25 @@ class AppController extends Controller {
     if(!$this->Session->check('Auth.User.name')) {
       $this->set('vv_ui_mode', EnrollmentFlowUIMode::Basic);
     }
+  }
+
+  /**
+   * Get a user's Application Preferences
+   * - postcondition: Application Preferences variable set
+   * @since  COmanage Registry v4.0.0
+   */
+  protected function getAppPrefs() {
+
+    $appPrefs = null;
+    $coPersonId = $this->Session->read('Auth.User.co_person_id');
+
+    // Get preferences if we have an Auth.User.co_person_id
+    if(!empty($coPersonId)) {
+      $this->loadModel('ApplicationPreference');
+      $appPrefs = $this->ApplicationPreference->retrieveAll($coPersonId);
+    }
+
+    $this->set('vv_app_prefs', $appPrefs);
   }
 
   /**
@@ -1084,9 +1097,10 @@ class AppController extends Controller {
     $p['menu']['coconfig'] = $roles['cmadmin'] || $roles['coadmin'];
     
     // View CO departments?
-    $p['menu']['codepartments'] = $roles['cmadmin'];
+    $p['menu']['codepartments'] = $roles['cmadmin'] || $roles['coadmin'];;
     
     if(!$roles['cmadmin']
+       && !$roles['coadmin']
        && $roles['user']
        && !empty($this->cur_co['Co']['id'])) {
       // Only render departments link for regular users if departments are defined
@@ -1414,8 +1428,8 @@ class AppController extends Controller {
       $coid = -1;
       
       if($this->request->is('restful')) {
-        $coid = $this->Api->requestedCOID($model, $this->request, $data);
-        
+        $coid = $this->Api->requestedCOID($model, $this->request, $this->Api->getData());
+
         if(!$coid) {
           $coid = -1;
         }

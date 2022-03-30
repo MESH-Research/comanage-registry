@@ -29,8 +29,11 @@ class StandardController extends AppController {
   // Placeholder, will get set by index()
   public $paginate = array();
 
-  // Used for activating tabs on pages; will hold name of tab or NULL
+  // XXX Deprecated. Used for activating tabs on pages; will hold name of tab or NULL
   public $redirectTab = NULL;
+
+  // Used in the performRedirect() function to pass in a specific redirect from a controller
+  public $redirectTarget = NULL;
 
   // Deleting certain records requires forcing a hard delete so that changelog
   // behavior is skipped
@@ -60,7 +63,7 @@ class StandardController extends AppController {
       // Validate
       
       try {
-        $this->Api->checkRestPost();
+        $this->Api->checkRestPost($this->cur_co['Co']['id']);
         $data[$req] = $this->Api->getData();
         
         if($this->request->is('restful') && !empty($data[$req]['extended_attributes'])) {
@@ -169,10 +172,28 @@ class StandardController extends AppController {
         if(!empty($fs)) {
           $this->Api->restResultHeader(400, "Invalid Fields");
           $this->set('invalid_fields', $fs);
+        } elseif ($e
+                  && isset(_txt('en.http.status.codes')[$e->getCode()]) )  {
+            $this->Api->restResultHeader($e->getCode(), _txt('en.http.status.codes')[$e->getCode()]);
+            if(!empty($e->getMessage())) {
+              $this->set('vv_error', $e->getMessage());
+            }
         } else {
           $this->Api->restResultHeader(500, "Other Error");
         }
       } else {
+        if(!empty($model->validationErrors)) {
+          // Refactor the error messages
+          $model->validationErrors = $model->filterValidationErrors(
+            $model->validate,
+            $model->validationErrors
+          );
+          $errors_list = array_values(Hash::flatten($model->validationErrors));
+          $errors_list = array_unique(array_values($errors_list));
+          foreach($errors_list as $error) {
+            $this->Flash->set($error, array('key' => 'error'));
+          }
+        }
         $this->Flash->set($err ?: _txt('er.fields'), array('key' => 'error'));
         $this->regenerateForm();
       }
@@ -210,8 +231,64 @@ class StandardController extends AppController {
       
       $this->set('vv_servers', $this->Server->find('list', $args));
     }
-    
+
+    if(!$this->request->is('restful')) {
+      // Include Search Block
+      $this->set('vv_search_fields', $this->searchConfig($this->action));
+      // Include alphabet Search bar
+      $this->set('vv_alphabet_search', $this->alphabetSearchConfig($this->action));
+    }
+
     parent::beforeRender();
+  }
+
+  /**
+   * Search Block fields configuration
+   *
+   * @example
+   *    if($action == 'index') {
+   *      return array(
+   *        'search.status' => array(
+   *          'label' => _txt('fd.status'),
+   *          'type' => 'select',
+   *          'empty'   => _txt('op.select.all'),
+   *          'options' => _txt('en.status.pt'),
+   *        ),
+   *        'search.sponsor' => array(
+   *          'label' => _txt('fd.sponsor'),
+   *          'type' => 'text',
+   *        ),
+   *        'qaxsbar' => array(
+   *          'label' => _txt('fd.status') . ":",
+   *          'type' => 'checkbox',
+   *          'enum' => _txt('en.status.pt'),
+   *          'field' => 'status',    // This is multivalue. e.g. search.status[0] = PA,search.status[0] = PC
+   *        ),
+   *      );
+   *    }
+   * @since  COmanage Registry v4.0.0
+   */
+
+  function searchConfig($action) {
+    return array();
+  }
+
+  /**
+   * Alphabet Search Bar configuration
+   *
+   * @example
+   *    if($action == 'index') {
+   *      return array(
+   *        'search.familyNameStart' => array(
+   *          'label' => _txt('me.alpha.label'),
+   *        ),
+   *      );
+   *    }
+   * @since  COmanage Registry v4.0.0
+   */
+
+  function alphabetSearchConfig($action) {
+    return array();
   }
 
   /**
@@ -226,7 +303,8 @@ class StandardController extends AppController {
     // Apply the rule only when the validateExtendedType function is used as a custom rule
     $model = $this->modelClass;
     if(!empty($this->$model->validate['type']['content']['rule'])
-       && array_search('validateExtendedType', $this->$model->validate['type']['content']['rule'], true) !== null) {
+       && array_search('validateExtendedType', $this->$model->validate['type']['content']['rule'], true) !== null
+       && !empty($this->cur_co['Co']['id'])) {
       $vrule = $this->$model->validate['type']['content']['rule'];
       $vrule[1]['coid'] = $this->cur_co['Co']['id'];
       $this->$model->validator()->getField('type')->getRule('content')->rule = $vrule;
@@ -436,31 +514,13 @@ class StandardController extends AppController {
       return;
     }
 
+    // By default whenever we edit we redirect to the index view. If we decide to stay on the edit view then
+    // title_for_layout will have the old value.
     if(!$this->request->is('restful')) {
       if(!isset($this->viewVars['title_for_layout'])) {
+        $title = $model->calculateTitleForLayout($curdata, $this->requires_person);
         // Set page title if not already set -- note we do similar logic in view()
-        
-        $t = _txt('ct.' . $modelpl . '.1');
-        
-        if(!empty($curdata['PrimaryName'])) {
-          $t = generateCn($curdata['PrimaryName']);
-        } elseif(!empty($curdata['Name'])) {
-          $t = generateCn($curdata['Name']);
-        } elseif(!empty($curdata[$req][ $model->displayField ])) {
-          $t = $curdata[$req][ $model->displayField ];
-        }
-        
-        if($this->requires_person) {
-          if(!empty($curdata[$req]['co_person_id'])) {
-            $t .= " (" . _txt('ct.co_people.1') . ")";
-          } elseif(!empty($curdata[$req]['co_person_role_id'])) {
-            $t .= " (" . _txt('ct.co_person_roles.1') . ")";
-          } elseif(!empty($curdata[$req]['org_identity_id'])) {
-            $t .= " (" . _txt('ct.org_identities.1') . ")";
-          }
-        }
-        
-        $this->set('title_for_layout', _txt('op.edit-a', array($t)));
+        $this->set('title_for_layout', _txt('op.edit-a', array($title)));
       }
     }
     
@@ -468,7 +528,7 @@ class StandardController extends AppController {
       // Validate
       
       try {
-        $this->Api->checkRestPost();
+        $this->Api->checkRestPost($this->cur_co['Co']['id']);
         $data[$req] = $this->Api->getData();
         
         if($this->request->is('restful') && !empty($data[$req]['extended_attributes'])) {
@@ -495,11 +555,14 @@ class StandardController extends AppController {
       catch(InvalidArgumentException $e) {
         // See if we have invalid fields
         $invalidFields = $this->Api->getInvalidFields();
-        
+        $this->set('vv_id', $id);
+
         if($invalidFields) {
           // Pass them to the view
-          $this->set('vv_id', $id);
           $this->set('invalid_fields', $invalidFields);
+        } else {
+          // We don't do this anywhere else, but we should, at least in API v2
+          $this->set('vv_error', $e->getMessage());
         }
         
         $this->Api->restResultHeader($e->getCode(), $e->getMessage());
@@ -616,7 +679,11 @@ class StandardController extends AppController {
         
         $data = $model->read();
       }
-      
+
+      // Calculate the title after a successful save
+      $title = $model->calculateTitleForLayout($data, $this->requires_person);
+      $this->set('title_for_layout', _txt('op.edit-a', array($title)));
+
       // Update the view var in case the controller requires the updated values
       // for performRedirect or some other post-processing.
       
@@ -651,6 +718,11 @@ class StandardController extends AppController {
         }
       } else {
         if(!empty($model->validationErrors)) {
+          // Refactor the error messages
+          $model->validationErrors = $model->filterValidationErrors(
+            $model->validate,
+            $model->validationErrors
+          );
           $errors_list = array_values(Hash::flatten($model->validationErrors));
           $errors_list = array_unique(array_values($errors_list));
           foreach($errors_list as $error) {
@@ -758,7 +830,28 @@ class StandardController extends AppController {
         $args['joins'][0]['alias'] = 'Identifier';
         $args['joins'][0]['type'] = 'INNER';
         $args['joins'][0]['conditions'][0] = $req . '.id=Identifier.' . $modelid;
-        
+        $args['contain'] = false;
+
+        $t = $model->find('all', $args);
+
+        $this->set($modelpl, $this->Api->convertRestResponse($t));
+      } elseif(!empty($this->request->query['search_mail'])) {
+        // XXX another hack (this time for Mail) that should be rewritten
+        // as part of CO-1053
+        $args = array();
+        $args['conditions']['EmailAddress.mail'] = $this->request->query['search_mail'];
+
+        $orgPooled = $this->CmpEnrollmentConfiguration->orgIdentitiesPooled();
+        if(!empty($this->params['url']['coid']) && !$orgPooled) {
+          $args['conditions'][$model->name . '.co_id'] = $this->params['url']['coid'];
+        }
+
+        $args['joins'][0]['table'] = 'email_addresses';
+        $args['joins'][0]['alias'] = 'EmailAddress';
+        $args['joins'][0]['type'] = 'INNER';
+        $args['joins'][0]['conditions'][0] = $req . '.id=EmailAddress.' . $modelid;
+        $args['contain'] = false;
+
         $t = $model->find('all', $args);
         
         $this->set($modelpl, $this->Api->convertRestResponse($t));
@@ -794,7 +887,12 @@ class StandardController extends AppController {
                // (But we need to fall through to the other logic if copersonid is not specified, hack hack.)
                || ($req == 'CoPersonRole'
                    && !empty($this->params['url']['copersonid']))) {
-        if(!empty($this->params['url']['codeptid'])) {
+        if(isset($this->params['url']['codeptid'])) {
+          if(empty($this->params['url']['codeptid'])) {
+            $this->Api->restResultHeader(400, "CO Department Not Specified");
+            return;
+          }
+          
           $args = array();
           $args['conditions'][$model->name . '.co_department_id'] = $this->params['url']['codeptid'];
           $args['contain'] = false;
@@ -819,7 +917,12 @@ class StandardController extends AppController {
           }
           
           $this->set($modelpl, $this->Api->convertRestResponse($t));
-        } elseif(!empty($this->params['url']['cogroupid'])) {
+        } elseif(isset($this->params['url']['cogroupid'])) {
+          if(empty($this->params['url']['cogroupid'])) {
+            $this->Api->restResultHeader(400, "CO Group Not Specified");
+            return;
+          }
+          
           $args = array();
           $args['conditions'][$model->name . '.co_group_id'] = $this->params['url']['cogroupid'];
           $args['contain'] = false;
@@ -844,7 +947,12 @@ class StandardController extends AppController {
           }
           
           $this->set($modelpl, $this->Api->convertRestResponse($t));
-        } elseif(!empty($this->params['url']['copersonid'])) {
+        } elseif(isset($this->params['url']['copersonid'])) {
+          if(empty($this->params['url']['copersonid'])) {
+            $this->Api->restResultHeader(400, "CO Person Not Specified");
+            return;
+          }
+          
           $args = array();
           $args['conditions'][$model->name . '.co_person_id'] = $this->params['url']['copersonid'];
           $args['contain'] = false;
@@ -869,7 +977,12 @@ class StandardController extends AppController {
           }
           
           $this->set($modelpl, $this->Api->convertRestResponse($t));
-        } elseif(!empty($this->params['url']['copersonroleid'])) {
+        } elseif(isset($this->params['url']['copersonroleid'])) {
+          if(empty($this->params['url']['copersonroleid'])) {
+            $this->Api->restResultHeader(400, "CO Person Role Not Specified");
+            return;
+          }
+          
           $args = array();
           $args['conditions'][$model->name . '.co_person_role_id'] = $this->params['url']['copersonroleid'];
           $args['contain'] = false;
@@ -894,7 +1007,12 @@ class StandardController extends AppController {
           }
           
           $this->set($modelpl, $this->Api->convertRestResponse($t));
-        } elseif(!empty($this->params['url']['organizationid'])) {
+        } elseif(isset($this->params['url']['organizationid'])) {
+          if(empty($this->params['url']['organizationid'])) {
+            $this->Api->restResultHeader(400, "Organization Not Specified");
+            return;
+          }
+          
           $args = array();
           $args['conditions'][$model->name . '.organization_id'] = $this->params['url']['organizationid'];
           $args['contain'] = false;
@@ -919,7 +1037,12 @@ class StandardController extends AppController {
           }
           
           $this->set($modelpl, $this->Api->convertRestResponse($t));
-        } elseif(!empty($this->params['url']['orgidentityid'])) {
+        } elseif(isset($this->params['url']['orgidentityid'])) {
+          if(empty($this->params['url']['orgidentityid'])) {
+            $this->Api->restResultHeader(400, "Org Identity Not Specified");
+            return;
+          }
+          
           $args = array();
           $args['conditions'][$model->name . '.org_identity_id'] = $this->params['url']['orgidentityid'];
           $args['contain'] = false;
@@ -1220,6 +1343,9 @@ class StandardController extends AppController {
       
       $this->set('redirect', $redirect);
       $this->redirect($redirect);
+    } elseif(!empty($this->redirectTarget)) {
+      // we are passing in a specific redirect (overriding the default redirect to 'index')
+      $this->redirect($this->redirectTarget);
     } elseif(isset($this->cur_co)) {
       $this->redirect(array('action' => 'index', 'co' => filter_var($this->cur_co['Co']['id'],FILTER_SANITIZE_SPECIAL_CHARS)));
     } else {
@@ -1282,21 +1408,21 @@ class StandardController extends AppController {
   
   function search() {
     // the page we will redirect to
-    $url['action'] = 'index';
-    
-    // CoPeople uses "Search", but should use "search" like CoPetition (CO-906)
+    if(isset($this->data['RedirectAction']["select"])) {
+      $url['action'] = 'select';
+    } elseif(isset($this ->data['RedirectAction']["index"])) {
+      $url['action'] = 'index';
+    } else {
+      // XXX We need this for backward compatibility.
+      // XXX Remove as soon as we apply the new Search element across the framework
+      $url['action'] = 'index';
+    }
     
     // build a URL will all the search elements in it
     // the resulting URL will be 
-    // example.com/registry/co_people/index/Search.givenName:albert/Search.familyName:einstein
-    if(isset($this->data['Search'])) {
-      foreach ($this->data['Search'] as $field=>$value){
-        if(!empty($value)) {
-          $url['Search.'.$field] = $value; 
-        }
-      }
-    } elseif(isset($this->data['search'])) {
-      foreach ($this->data['search'] as $field=>$value){
+    // example.com/registry/co_people/index/search.givenName:albert/search.familyName:einstein
+    if(isset($this->data['search'])) {
+      foreach ($this->data['search'] as $field => $value){
         if(!empty($value)) {
           $url['search.'.$field] = $value; 
         }

@@ -27,16 +27,6 @@
 ?>
 
 <script>
-  function clearSearch(formObj) {
-    for (var i=0; i<formObj.elements.length; i++) {
-      t = formObj.elements[i].type;
-      if(t == "text" || t == "select-one") {
-        formObj.elements[i].value = "";
-      }
-    }
-    formObj.submit();
-  }
-
   $(function() {
     $( ".clearButton").button();
   });
@@ -94,15 +84,15 @@
       $args['label'] = false;
       $args['placeholder'] = $label;
       $args['tabindex'] = $index++;
-      $args['value'] = (!empty($this->request->params['named']['Search.' . $field])
-                        ? filter_var($this->request->params['named']['Search.' . $field],FILTER_SANITIZE_SPECIAL_CHARS) : '');
+      $args['value'] = (!empty($this->request->params['named']['search.' . $field])
+                        ? filter_var($this->request->params['named']['search.' . $field],FILTER_SANITIZE_SPECIAL_CHARS) : '');
       
       print '
     <li>
       <div class="field-name">
         <div class="field-title">' . filter_var($label,FILTER_SANITIZE_SPECIAL_CHARS) . '</div>
       </div>
-      <div class="field-info">'. $this->Form->input('Search.' . $field, $args) . '</div>
+      <div class="field-info">'. $this->Form->input('search.' . $field, $args) . '</div>
     </li>';
     }
 ?>

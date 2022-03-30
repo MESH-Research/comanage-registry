@@ -595,10 +595,23 @@ class ProvisionerBehavior extends ModelBehavior {
       $pAction = ProvisioningActionEnum::CoGroupDeleted;
     }
     
+    // Ideally, we'd have used containable to pull CoProvisioningTargetFilter
+    // with $coProvisionerTarget, but the latter is ChangelogBehavior-enabled
+    // while the former isn't, which results in issues pulling archived records
+    // that shouldn't be pulled. So we check for filters here.
+    
+    $args = array();
+    $args['conditions']['CoProvisioningTargetFilter.co_provisioning_target_id'] = $coProvisioningTarget['CoProvisioningTarget']['id'];
+    $args['order'] = 'CoProvisioningTargetFilter.ordr ASC';
+    $args['contain'] = array('DataFilter');
+    
+    $CPTFilter = ClassRegistry::init('CoProvisioningTargetFilter');
+    $filters = $CPTFilter->find('all', $args);
+    
     // Pass the provisioning data through any configured data filters.
     // The parent call should have ordered the filters already (via containable).
-    if(!empty($coProvisioningTarget['CoProvisioningTargetFilter'])) {
-      foreach($coProvisioningTarget['CoProvisioningTargetFilter'] as $filter) {
+    if(!empty($filters)) {
+      foreach($filters as $filter) {
         if(!empty($filter['DataFilter']) 
            && $filter['DataFilter']['status'] == SuspendableStatusEnum::Active) {
           $pluginModelName = $filter['DataFilter']['plugin'] . "." . $filter['DataFilter']['plugin'];
@@ -795,10 +808,7 @@ class ProvisionerBehavior extends ModelBehavior {
     } else {
       $args['order'] = array('CoProvisioningTarget.ordr ASC');
     }
-    $args['contain'] = array('CoProvisioningTargetFilter' => array(
-      'DataFilter',
-      'order' => 'CoProvisioningTargetFilter.ordr ASC'
-    ));
+    $args['contain'] = false;
     
     $targets = $model->Co->CoProvisioningTarget->find('all', $args);
     
@@ -938,14 +948,7 @@ class ProvisionerBehavior extends ModelBehavior {
       
       $args = array();
       $args['conditions']['CoProvisioningTarget.id'] = $coProvisioningTargetId;
-      // beforeFilter may have bound all the plugins (depending on how we were called),
-      // so this find will pull the related models as well. However, to reduce the number
-      // of database queries should a large number of plugins be installed, we'll use
-      // containable behavior and make a second call for the plugin we want.
-      $args['contain'] = array('CoProvisioningTargetFilter' => array(
-        'DataFilter',
-        'order' => 'CoProvisioningTargetFilter.ordr ASC'
-      ));
+      $args['contain'] = false;
       
       // Currently, CoPerson and CoGroup are the only models that calls manualProvision, so we know
       // how to find CoProvisioningTarget
@@ -1165,108 +1168,29 @@ class ProvisionerBehavior extends ModelBehavior {
       return array();
     }
     
-    // Because Authenticators are handled via plugins (which might not be configured)
-    // we need to handle them specially. Pull the set of authenticators and then
-    // pull their model data. Note we assume FooAuthenticator, where Foo is the
-    // corresponding model.
-    
-    $authplugins = preg_grep('/.*Authenticator$/', CakePlugin::loaded());
-    
-    foreach($authplugins as $authplugin) {
-      // $authplugin = (eg) PasswordAuthenticator
-      // $authmodel = (eg) Password
-      $authmodel = substr($authplugin, 0, -13);
+    if(!in_array($coPersonData['CoPerson']['status'], $this->personStatuses)) {
+      // As per https://spaces.at.internet2.edu/display/COmanage/CO+Person+and+Person+Role+Status
+      // we don't provision data for many statuses. We return a skeletal record
+      // to facilitate deprovisioning.
       
-      // A plugin can be multiply instantiated, so first find those. Note we have
-      // to manually bind the association.
-      $coPersonModel->Co->Authenticator->bindModel(array('hasOne' => array($authplugin.'.'.$authplugin => array('dependent' => true))));
-      
-      $args = array();
-      $args['conditions']['Authenticator.co_id'] = $coPersonData['CoPerson']['co_id'];
-      $args['conditions']['Authenticator.plugin'] = $authplugin;
-      $args['conditions']['Authenticator.status'] = SuspendableStatusEnum::Active;
-      $args['contain'] = $authplugin;
-      
-      $authenticators = $coPersonModel->Co->Authenticator->find('all', $args);
-      
-      // For each instantiation, request the current() data if the authenticator
-      // is not locked
-      
-      foreach($authenticators as $a) {
-        // Is this Authenticator locked? Note this only examines default lock
-        // behavior. Plugins can override this. If they do so and do not write
-        // an AuthenticatorStatus record, then their data will be provisioned
-        // (if returned by current()).
-        $args = array(
-          'AuthenticatorStatus.authenticator_id' => $a['Authenticator']['id'],
-          'AuthenticatorStatus.co_person_id' => $coPersonId
-        );
-        
-        $locked = $coPersonModel->Co->Authenticator->AuthenticatorStatus->field('locked', $args);
-        
-        if(!$locked) {
-          // Ask the plugin for the current data associated with the Authenticator
-          try {
-            $objects = $coPersonModel->Co->Authenticator->$authplugin->current($a['Authenticator']['id'],
-                                                                               $a[$authplugin]['id'],
-                                                                               $coPersonId);
-            
-            if(!empty($objects)) {
-              // We'll have an array of the form 0.Password.data, but we need to
-              // store it as Password.0.data. Note we can have multiple types of
-              // records if the Authenticator supports more than one.
-              
-              foreach($objects as $o) {
-                foreach(array_keys($o) as $k) {
-                  $coPersonData[$k][] = $o[$k];
-                }
-              }
-            }
-          }
-          catch(Exception $e) {
-            // We'll get a RuntimeException if the plugin doesn't implement
-            // current(), but it's not clear what to do with it, so we just
-            // ignore the error and keep trying. In PE, we should log this.
-          }
-        }
-      }
+      return array(
+        'CoPerson' => array(
+          'co_id' => $coPersonData['CoPerson']['co_id'],
+          'id' => $coPersonId,
+          'status' => $coPersonData['CoPerson']['status']
+        )
+      );
     }
     
-    // Pulling Cluster information works similarly, but not identically, to Authenticators
+    // Merge in Authenticator data, obtained via plugins
+    $coPersonData = array_merge($coPersonData, 
+                                $coPersonModel->Co->Authenticator->marshallProvisioningData($coPersonData['CoPerson']['co_id'],
+                                                                                            $coPersonData['CoPerson']['id']));
     
-    $clusterplugins = preg_grep('/.*Cluster$/', CakePlugin::loaded());
-    
-    foreach($clusterplugins as $clusterplugin) {
-      // We use $cmPluginHasMany to determine which models to provision.
-      $clustermodel = $clusterplugin;
-      
-      $Cluster = ClassRegistry::init($clusterplugin.'.'.$clustermodel);
-      
-      if(!empty($Cluster->cmPluginHasMany['CoPerson'])) {
-        foreach($Cluster->cmPluginHasMany['CoPerson'] as $clustersubmodel) {
-          $coPersonModel->bindModel(array('hasMany' => array($clusterplugin.'.'.$clustersubmodel => array('dependent' => true))));
-          
-          $args = array();
-          $args['conditions'][$clustersubmodel.'.co_person_id'] = $coPersonId;
-          $args['conditions'][$clustersubmodel.'.status'] = array(StatusEnum::Active, StatusEnum::GracePeriod);
-          $args['conditions']['AND'][] = array(
-            'OR' => array(
-              $clustersubmodel.'.valid_from IS NULL',
-              $clustersubmodel.'.valid_from < ' => date('Y-m-d H:i:s', time())
-            )
-          );
-          $args['conditions']['AND'][] = array(
-            'OR' => array(
-              $clustersubmodel.'.valid_through IS NULL',
-              $clustersubmodel.'.valid_through > ' => date('Y-m-d H:i:s', time())
-            )
-          );
-          $args['contain'] = array($clustermodel => array('Cluster'));
-          
-          $coPersonData[$clustersubmodel] = $coPersonModel->$clustersubmodel->find('all', $args);
-        }
-      }
-    }
+    // Merge in Cluster data, obtained via plugins
+    $coPersonData = array_merge($coPersonData, 
+                                $coPersonModel->Co->Cluster->marshallProvisioningData($coPersonData['CoPerson']['co_id'],
+                                                                                      $coPersonData['CoPerson']['id']));
     
     // At the moment, if a CO Person is not active we remove their Role Records
     // (even if those are active) and group memberships, but leave the rest of the
@@ -1596,6 +1520,12 @@ class ProvisionerBehavior extends ModelBehavior {
             $paction = ProvisioningActionEnum::CoPersonUnexpired;
           }
         }
+      }
+      
+      if(!in_array($pdata['CoPerson']['status'], $this->personStatuses)) {
+        // Convert to a delete operation in case we're downgrading a record
+        // from a provisioned status to a non-provisioned status
+        $paction = ProvisioningActionEnum::CoPersonDeleted;
       }
       
       // Invoke all provisioning plugins

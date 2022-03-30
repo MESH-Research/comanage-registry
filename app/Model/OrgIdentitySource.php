@@ -53,6 +53,9 @@ class OrgIdentitySource extends AppModel {
     "CoProvisioningTarget" => array(
       'foreignKey' => 'provision_co_group_id'
     ),
+    "OrgIdentitySourceFilter" => array(
+      'dependent' => true
+    ),
     "OrgIdentitySourceRecord" => array(
       'dependent' => true
     )
@@ -135,7 +138,8 @@ class OrgIdentitySource extends AppModel {
       'content' => array(
         'rule' => 'numeric',
         'required' => false,
-        'allowEmpty' => true
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
       )
     ),
     'hash_source_record' => array(
@@ -296,7 +300,7 @@ class OrgIdentitySource extends AppModel {
     $brec = $this->retrieve($id, $sourceKey);
     
     // This will throw an exception if invalid
-    $this->validateOISRecord($brec);
+    $this->validateOISRecord($brec, $coId);
     
     $orgid = $brec['orgidentity'];
     
@@ -576,6 +580,34 @@ class OrgIdentitySource extends AppModel {
       }
     }
     
+    // Apply Data Filters, if any are configured. We specifically don't want to
+    // filter the raw record (whether or not it is used for hashing).
+    
+    $args = array();
+    $args['conditions']['OrgIdentitySourceFilter.org_identity_source_id'] = $id;
+    $args['order'] = 'OrgIdentitySourceFilter.ordr ASC';
+    $args['contain'] = array('DataFilter');
+
+    $OISFilter = ClassRegistry::init('OrgIdentitySourceFilter');
+    $filters = $OISFilter->find('all', $args);
+
+    if(!empty($filters)) {
+      foreach($filters as $filter) {
+        if(!empty($filter['DataFilter'])
+           && $filter['DataFilter']['status'] == SuspendableStatusEnum::Active) {
+          $pluginModelName = $filter['DataFilter']['plugin'] . "." . $filter['DataFilter']['plugin'];
+
+          $pluginModel = ClassRegistry::init($pluginModelName);
+
+          // We let any exception pass up the stack, since presumably we shouldn't
+          // continue processing if the filter fails for some reason.
+          $ret['orgidentity'] = $pluginModel->filter(DataFilterContextEnum::OrgIdentitySource,
+                                                     $filter['DataFilter']['id'],
+                                                     $ret['orgidentity']);
+        }
+      }
+    }
+    
     // Inject a SORID
     $ret['orgidentity']['Identifier'][] = array(
       'identifier' => $key,
@@ -845,7 +877,9 @@ class OrgIdentitySource extends AppModel {
     if($brec) {
       // If we got a record, check that it is valid.
       // This will throw an exception if invalid.
-      $this->validateOISRecord($brec);
+      $coId = $this->findCoForRecord($id);
+      
+      $this->validateOISRecord($brec, $coId);
     }
     
     // Start a transaction
@@ -1800,10 +1834,11 @@ class OrgIdentitySource extends AppModel {
    *
    * @since  COmanage Registry v2.0.0
    * @param  Array   $backendRecord Record from OIS Backend
+   * @param  Integer $coId          CO ID
    * @throws InvalidArgumentException
    */
   
-  public function validateOISRecord($backendRecord) {
+  public function validateOISRecord($backendRecord, $coId) {
     // For now, we just check that a primary (given) name is specified.
     // We could plausibly support more complex validation later.
     
@@ -1826,6 +1861,14 @@ class OrgIdentitySource extends AppModel {
     
     // Manually run validation to report fields that won't save()
     
+    // First, in order to support extended types we need to inject the coid into
+    // the potential associated models
+    $this->Co->OrgIdentity->validate['affiliation']['content']['rule'][1]['coid'] = $coId;
+    
+    foreach(array('Address', 'EmailAddress', 'Identifier', 'Name', 'TelephoneNumber', 'Url') as $m) {
+      $this->Co->OrgIdentity->$m->validate['type']['content']['rule'][1]['coid'] = $coId;
+    }
+    
     if(!$this->Co->OrgIdentity->validateAssociated($backendRecord['orgidentity'])) {
       // We can easily get the field names for invalid entries, but it's a bit harder
       // to get a meaningful error message (we just get "content", and don't have
@@ -1837,7 +1880,7 @@ class OrgIdentitySource extends AppModel {
         // This can be a direct key for an OrgIdentity field, or a nested array
         // for a related model
         
-        if(is_array($content[0])) {
+        if(!empty($content[0]) && is_array($content[0])) {
           foreach($content[0] as $key2 => $content2) {
             $err .= $key1 . ":" . $key2 . ",";
           }

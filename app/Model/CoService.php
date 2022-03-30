@@ -56,9 +56,12 @@ class CoService extends AppModel {
       'allowEmpty' => false
     ),
     'cou_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'name' => array(
       'rule' => array('validateInput'),
@@ -77,14 +80,20 @@ class CoService extends AppModel {
       // XXX this should put up an alphanumeric error message rather than "this field cannot be left blank"
     ),
     'co_group_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'cluster_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'service_url' => array(
       // We can't set this to 'url' because url validation doesn't understand ssh:
@@ -127,9 +136,12 @@ class CoService extends AppModel {
       'allowEmpty' => true
     ),
     'authenticator_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'status' => array(
       'rule' => array('inList', array(SuspendableStatusEnum::Active,
@@ -402,12 +414,13 @@ class CoService extends AppModel {
    * Perform a keyword search.
    *
    * @since  COmanage Registry v3.1.0
-   * @param  Integer $coId CO ID to constrain search to
-   * @param  String  $q    String to search for
+   * @param  integer $coId  CO ID to constrain search to
+   * @param  string  $q     String to search for
+   * @param  integer $limit Search limit
    * @return Array Array of search results, as from find('all)
    */
   
-  public function search($coId, $q) {
+  public function search($coId, $q, $limit) {
     // Tokenize $q on spaces
     $tokens = explode(" ", $q);
     
@@ -421,6 +434,7 @@ class CoService extends AppModel {
     }
     $args['conditions']['CoService.co_id'] = $coId;
     $args['order'] = array('CoService.name');
+    $args['limit'] = $limit;
     $args['contain'] = false;
     
     return $this->find('all', $args);
@@ -434,12 +448,13 @@ class CoService extends AppModel {
    * @param  Integer $coPersonId      CO Person ID to set membership for
    * @param  Integer $actorCoPersonId CO Person ID of requestor
    * @param  String  $action          Action: "join" or "leave"
+   * @param  Boolean $provision       Whether or not to fire provisioning
    * @return Boolean True on success
    * @throws InvalidArgumentException
    * @throws RuntimeException
    */
   
-  public function setServiceGroupMembership($id, $Role, $coPersonId, $actorCoPersonId, $action="join") {
+  public function setServiceGroupMembership($id, $Role, $coPersonId, $actorCoPersonId, $action="join", $provision=true) {
     // First see if there is even a group associated with this service
     
     $coGroupId = $this->field('co_group_id', array('CoService.id' => $id));
@@ -460,8 +475,9 @@ class CoService extends AppModel {
                                         $coPersonId,
                                         $member,
                                         $owner,
-                                        $actorCoPersonId);
-         
+                                        $actorCoPersonId,
+                                        $provision);
+    
     return true;
   }
 }

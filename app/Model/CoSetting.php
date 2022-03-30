@@ -19,7 +19,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * @link          http://www.internet2.edu/comanage COmanage Project
+ * @link          https://www.internet2.edu/comanage COmanage Project
  * @package       registry
  * @since         COmanage Registry v0.9.1
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
@@ -94,6 +94,11 @@ class CoSetting extends AppModel {
       'required' => false,
       'allowEmpty' => true
     ),
+    'garbage_collection_interval' => array(
+      'rule' => 'numeric',
+      'required' => false,
+      'allowEmpty' => true
+    ),
     'permitted_fields_name' => array(
       'rule' => '/.*/',
       'required' => false,
@@ -106,6 +111,21 @@ class CoSetting extends AppModel {
     ),
     'required_fields_name' => array(
       'rule' => '/.*/',
+      'required' => false,
+      'allowEmpty' => true
+    ),
+    'person_picker_email_type' => array(
+      'rule' => '/.*/',
+      'required' => false,
+      'allowEmpty' => true
+    ),
+    'person_picker_identifier_type' => array(
+      'rule' => '/.*/',
+      'required' => false,
+      'allowEmpty' => true
+    ),
+    'person_picker_display_types' => array(
+      'rule' => 'boolean',
       'required' => false,
       'allowEmpty' => true
     ),
@@ -128,14 +148,20 @@ class CoSetting extends AppModel {
       'allowEmpty' => true
     ),
     'sponsor_co_group_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'default_co_pipeline_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'elect_strategy_primary_name' => array(
       'rule' => array('inList',
@@ -151,6 +177,16 @@ class CoSetting extends AppModel {
       'required' => false,
       'allowEmpty' => true
     ),
+    'global_search_limit' => array(
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true
+      ),
+      'value' => array(
+        'rule' => array('comparison', '>', 0)
+      )
+    )
   );
   
   // Default values for each setting
@@ -162,15 +198,20 @@ class CoSetting extends AppModel {
     'enable_nsf_demo'            => false,
     'group_validity_sync_window' => DEF_GROUP_SYNC_WINDOW,
     'invitation_validity'        => DEF_INV_VALIDITY,
+    'garbage_collection_interval'  => DEF_GARBAGE_COLLECT_INTERVAL,
     'permitted_fields_name'      => PermittedNameFieldsEnum::HGMFS,
     'required_fields_addr'       => RequiredAddressFieldsEnum::Street,
     'required_fields_name'       => RequiredNameFieldsEnum::Given,
     'sponsor_co_group_id'        => null,
     'sponsor_eligibility'        => SponsorEligibilityEnum::CoOrCouAdmin,
+    'person_picker_email_type'   => null,
+    'person_picker_identifier_type' => null,
+    'person_picker_display_types' => true,
     't_and_c_login_mode'         => TAndCLoginModeEnum::NotEnforced,
     'enable_empty_cou'           => false,
     'theme_stacking'             => SuspendableStatusEnum::Suspended,
     'co_theme_id'                => null,
+    'global_search_limit'        => DEF_GLOBAL_SEARCH_LIMIT
   );
   
   /**
@@ -202,6 +243,18 @@ class CoSetting extends AppModel {
   }
   
   /**
+   * Determine if Empty COUs are enabled for the specified CO.
+   *
+   * @since  COmanage Registry v3.3.0
+   * @param  integer $coId CO ID
+   * @return boolean True if enabled, false otherwise
+   */
+
+  public function emptyCouEnabled($coId) {
+    return (boolean)$this->lookupValue($coId, 'enable_empty_cou');
+  }
+
+  /**
    * Determine if Expirations are enabled for the specified CO.
    *
    * @since  COmanage Registry v0.9.2
@@ -226,7 +279,31 @@ class CoSetting extends AppModel {
   public function getGroupValiditySyncWindow($coId) {
     return $this->lookupValue($coId, 'group_validity_sync_window');
   }
+
+  /**
+   * Determine the current configuration for CO Garbage Collection time delay window.
+   *
+   * @since  COmanage Registry v4.0.0
+   * @param  integer $coId CO ID
+   * @return integer Garbage Collection delay window in minutes
+   */
+
+  public function getGarbageCollectionWindow($coId) {
+    return $this->lookupValue($coId, 'garbage_collection_interval');
+  }
   
+  /**
+   * Obtain the global search limit.
+   *
+   * @since  COmanage Registry v4.0.0
+   * @param  integer $coId CO ID
+   * @return integer       Global search limit
+   */
+  
+  public function getGlobalSearchLimit($coId) {
+    return $this->lookupValue($coId, 'global_search_limit');
+  }
+
   /**
    * Get the invitation validity for the specified CO.
    *
@@ -318,18 +395,6 @@ class CoSetting extends AppModel {
   }
 
   /**
-   * Get Theme Stacking mode.
-   *
-   * @since  COmanage Registry v4.0.0
-   * @param  integer $coId CO ID
-   * @return SuspendableStatusEnum Theme Stacking Mode
-   */
-
-  public function themeStackingEnabled($coId) {
-    return $this->lookupValue($coId, 'theme_stacking');
-  }
-  
-  /**
    * Get sponsor eligibility group. The results of this call are only valid if
    * sponsor eligibility mode is SponsorEligibilityEnum::CoGroupMember.
    *
@@ -348,6 +413,42 @@ class CoSetting extends AppModel {
     }
     
     return $this->lookupValue($coId, 'sponsor_co_group_id');
+  }
+
+  /**
+   * Get person picker email address type.
+   *
+   * @since  COmanage Registry v4.1.0
+   * @param  integer $coId CO ID
+   * @return CoExtendedType Email Address Type
+   */
+
+  public function getPersonPickerEmailType($coId) {
+    return $this->lookupValue($coId, 'person_picker_email_type');
+  }
+
+  /**
+   * Get person picker identifier type.
+   *
+   * @since  COmanage Registry v4.1.0
+   * @param  integer $coId CO ID
+   * @return CoExtendedType Identifier Type
+   */
+
+  public function getPersonPickerIdentifierType($coId) {
+    return $this->lookupValue($coId, 'person_picker_identifier_type');
+  }
+
+  /**
+   * Get person picker display types.
+   *
+   * @since  COmanage Registry v4.1.0
+   * @param  integer $coId CO ID
+   * @return boolean True if enabled, false otherwise
+   */
+
+  public function getPersonPickerDisplayTypes($coId) {
+    return $this->lookupValue($coId, 'person_picker_display_types');
   }
 
   /**
@@ -439,14 +540,49 @@ class CoSetting extends AppModel {
   }
 
   /**
-   * Determine if Empty COUs are enabled for the specified CO.
+   * Get Theme Stacking mode.
    *
-   * @since  COmanage Registry v3.3.0
+   * @since  COmanage Registry v4.0.0
    * @param  integer $coId CO ID
-   * @return boolean True if enabled, false otherwise
+   * @return SuspendableStatusEnum Theme Stacking Mode
    */
 
-  public function emptyCouEnabled($coId) {
-    return (boolean)$this->lookupValue($coId, 'enable_empty_cou');
+  public function themeStackingEnabled($coId) {
+    return $this->lookupValue($coId, 'theme_stacking');
+  }
+  
+  /**
+   * Perform CoSetting model upgrade steps for version 4.0.0.
+   * This function should only be called by UpgradeVersionShell.
+   *
+   * @since  COmanage Registry v4.0.0
+   */
+
+  public function _ug400() {
+    // Temporarily unbind all relations
+    $this->unbindModel(
+      array(
+        'belongsTo' => array(
+          "Co",
+          "SponsorCoGroup",
+          "CoPipeline",
+          "CoDashboard",
+          "CoTheme"
+        ),
+      )
+    );
+
+    // Update CoSettings Garbage Collector interval
+    
+    // We use updateAll here which doesn't fire callbacks (including ChangelogBehavior).
+    $this->updateAll(
+      array('CoSetting.garbage_collection_interval'=> DEF_GARBAGE_COLLECT_INTERVAL)
+    );
+    
+    // Set a default search limit
+    
+    $this->updateAll(
+      array('CoSetting.global_search_limit'=> DEF_GLOBAL_SEARCH_LIMIT)
+    );
   }
 }

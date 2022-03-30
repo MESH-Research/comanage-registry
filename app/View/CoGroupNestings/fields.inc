@@ -44,6 +44,8 @@
   $args['controller'] = 'co_groups';
   $args['action'] = 'index';
   $args['co'] = $cur_co['Co']['id'];
+  $args['search.auto'] = 'f';
+  $args['search.noadmin'] = '1';
   $this->Html->addCrumb(_txt('ct.co_groups.pl'), $args);
 
   $args = array();
@@ -96,7 +98,7 @@
       <div class="field-title"><?php print _txt('fd.co_group_nesting.negate'); ?></div>
       <div class="field-desc"><?php print _txt('fd.co_group_nesting.negate.desc'); ?></div>
     </div>
-    <div class="field-info">
+    <div class="field-info checkbox">
       <?php 
         print $this->Form->input('negate');
         print $this->Form->label('negate',_txt('fd.co_group_nesting.negate'));

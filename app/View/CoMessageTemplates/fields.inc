@@ -99,9 +99,9 @@
   function enable_disable_sub_btn(value) {
     if (value == undefined
       || value === "") {
-      $('.ui-dialog #btnSubmit').button("disable");
+      $('.ui-dialog #btn-form-generic-submit').button("disable");
     } else {
-      $('.ui-dialog #btnSubmit').button("enable");
+      $('.ui-dialog #btn-form-generic-submit').button("enable");
     }
   }
 
@@ -227,7 +227,7 @@
         // Check if we have data in the database/
         $unconfigured = empty($co_message_templates[0]['CoMessageTemplate']['format']);
 
-        $test_btn =  '<button type="button" class="forwardbutton" title="' . _txt('op.msg.tpl.test')
+        $test_btn =  '<button type="button" class="ml-2 invitebutton" title="' . _txt('op.msg.tpl.test')
           . '" onclick="javascript:js_form_generic(\''
           . _txt('in.tpl.msg.test') . '\',\''        // dialog body text
           . $this->Html->url(                        // dialog confirm URL
@@ -249,7 +249,7 @@
         }
         $test_btn = $test_btn . '>' . _txt('op.msg.tpl.test') . '</button>';
 
-        print '&ensp;' . $test_btn;
+        print $test_btn;
         print '<div id="test-template-btn-info" class="field-desc" style="display:none;"><span class="ui-icon ui-icon-info"></span>' . _txt('fd.mt.test.info') . '</div>';
         ?>
       </div>

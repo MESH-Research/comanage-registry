@@ -208,6 +208,43 @@ class AppModel extends Model {
   }
   
   /**
+   * Calculate the title for the layout
+   *
+   * @since  COmanage Registry v4.0.1
+   * @param  Array   $data    request data
+   * @param  boolean $requires_person  Does the controller require a coperson id
+   * @return String  Title string
+   */
+
+  public function calculateTitleForLayout($data, $requires_person) {
+    $model = get_class($this);
+    $req = Inflector::pluralize($model);
+    $modelpl = Inflector::tableize($req);
+
+    $t = _txt('ct.' . $modelpl . '.1');
+
+    if (!empty($data['PrimaryName'])) {
+      $t = generateCn($data['PrimaryName']);
+    } elseif (!empty($data['Name'])) {
+      $t = generateCn($data['Name']);
+    } elseif (!empty($data[$model][$this->displayField])) {
+      $t = $data[$model][$this->displayField];
+    }
+
+    if ($requires_person) {
+      if (!empty($data[$model]['co_person_id'])) {
+        $t .= " (" . _txt('ct.co_people.1') . ")";
+      } elseif (!empty($data[$model]['co_person_role_id'])) {
+        $t .= " (" . _txt('ct.co_person_roles.1') . ")";
+      } elseif (!empty($data[$model]['org_identity_id'])) {
+        $t .= " (" . _txt('ct.org_identities.1') . ")";
+      }
+    }
+
+    return $t;
+  }
+  
+  /**
    * Compare one model's worth of data and generate a string describing what changed, suitable for
    * including in a history record.
    *
@@ -398,17 +435,28 @@ class AppModel extends Model {
         }
       }
       
-      // Finally, render the change string based on the attributes found above.
-      // Notate going to or from NULL only if $newdata or $olddata (as appropriate)
-      // was populated, so as to avoid noise when a related object is added or
-      // deleted.
-      
-      if(isset($newval) && !isset($oldval)) {
-        $changes[] = $ftxt . ": " . (isset($olddata) ? _txt('fd.null') . " > " : "") . $newval;
-      } elseif(!isset($newval) && isset($oldval)) {
-        $changes[] = $ftxt . ": " . $oldval . (isset($newdata) ? " > " . _txt('fd.null') : "");
-      } elseif(isset($newval) && isset($oldval) && ($newval != $oldval)) {
-        $changes[] = $ftxt . ": " . $oldval . " > " . $newval;
+      // As a special case, if the field name is "password" mask the values
+      if($attr == 'password') {
+        if(isset($newval) && !isset($oldval)) {
+          $changes[] = $ftxt . ": " . (isset($olddata) ? _txt('fd.null') . " > " : "") . "(new)";
+        } elseif(!isset($newval) && isset($oldval)) {
+          $changes[] = $ftxt . ": (old)" . (isset($newdata) ? " > " . _txt('fd.null') : "");
+        } elseif(isset($newval) && isset($oldval) && ($newval != $oldval)) {
+          $changes[] = $ftxt . ": (old) > (new)";
+        }
+      } else {
+        // Finally, render the change string based on the attributes found above.
+        // Notate going to or from NULL only if $newdata or $olddata (as appropriate)
+        // was populated, so as to avoid noise when a related object is added or
+        // deleted.
+        
+        if(isset($newval) && !isset($oldval)) {
+          $changes[] = $ftxt . ": " . (isset($olddata) ? _txt('fd.null') . " > " : "") . $newval;
+        } elseif(!isset($newval) && isset($oldval)) {
+          $changes[] = $ftxt . ": " . $oldval . (isset($newdata) ? " > " . _txt('fd.null') : "");
+        } elseif(isset($newval) && isset($oldval) && ($newval != $oldval)) {
+          $changes[] = $ftxt . ": " . $oldval . " > " . $newval;
+        }
       }
     }
     
@@ -604,7 +652,8 @@ class AppModel extends Model {
                                 $args['joins']);
       
       if(!empty($r)) {
-        throw new OverflowException(_txt('er.ia.exists', array($identifier)));
+        // XXX CO-2372
+        throw new OverflowException(_txt('er.ia.exists', array($identifier)), HttpStatusCodesEnum::HTTP_FORBIDDEN);
       }
     }
     
@@ -658,7 +707,7 @@ class AppModel extends Model {
           }
           catch(OverflowException $e) {
             // In use
-            throw new OverflowException(_txt('er.id.exists-a', array($identifier, $e->getMessage())));
+            throw new OverflowException(_txt('er.id.exists-a', array($identifier, $e->getMessage())), HttpStatusCodesEnum::HTTP_FORBIDDEN);
           }
           catch(RuntimeException $e) {
             throw new RuntimeException($e->getMessage());
@@ -811,6 +860,50 @@ class AppModel extends Model {
     }
     
     return $ret;
+  }
+
+  /**
+   * Get MVPA Model attributes for CO/COU Administrators or members
+   *
+   * @param int|null $couid   The ID of the COU
+   * @param bool     $admin   Fetch only the admininstrators data
+   * @return false|array
+   *
+   * @since  COmanage Registry v4.0.0
+   */
+  public function findGroupMembersNAdminsMVPA($coid, $couid=null, $admin=true) {
+    // Get a pointer to our model
+    $mdl_name = $this->name;
+    // Get the available Columns from the Schema
+    $mdl_columns = array_keys($this->schema());
+
+    if(!in_array('co_person_id', $mdl_columns)) {
+      return false;
+    }
+
+    $args = array();
+    $args['joins'][0]['table']         = 'co_group_members';
+    $args['joins'][0]['alias']         = 'CoGroupMember';
+    $args['joins'][0]['type']          = 'INNER';
+    $args['joins'][0]['conditions'][0] = 'CoGroupMember.co_person_id=' . $mdl_name . '.co_person_id';
+    $args['joins'][1]['table']         = 'co_groups';
+    $args['joins'][1]['alias']         = 'CoGroup';
+    $args['joins'][1]['type']          = 'INNER';
+    $args['joins'][1]['conditions'][0] = 'CoGroup.id=CoGroupMember.co_group_id';
+    $args['conditions']['CoGroup.co_id'] = $coid;
+    if(!is_null($couid)) {
+      $args['conditions']['CoGroup.cou_id'] = $couid;
+    }
+    if($admin) {
+      $args['conditions']['CoGroup.group_type'] = GroupEnum::Admins;
+    } else {
+      $args['conditions']['CoGroup.group_type'] = GroupEnum::ActiveMembers;
+    }
+    $args['conditions']['CoGroupMember.member'] = true;
+    $args['conditions']['CoGroup.status'] = SuspendableStatusEnum::Active;
+    $args['contain'] = false;
+
+    return $this->find('all', $args);
   }
   
   /**
@@ -1317,7 +1410,10 @@ class AppModel extends Model {
     
     $CoExtendedType = ClassRegistry::init('CoExtendedType');
     
-    return $CoExtendedType->active($coId, $this->name . "." . $attribute, 'list');
+    // For OrgIdentity.affiliation we want to use the CoPersonRole values
+    $model = ($this->name == 'OrgIdentity') ? 'CoPersonRole' : $this->name;
+    
+    return $CoExtendedType->active($coId, $model . "." . $attribute, 'list');
   }
   
   /**
@@ -1363,7 +1459,68 @@ class AppModel extends Model {
   }
   
   /**
-   * Determine is a given value is valid for an Attribute Enumeration.
+   * Determine if a record is contained to its CO.
+   *
+   * @since  COmanage Registry v4.0.1
+   * @param  array Array of fields to validate
+   * @param  array Array CO ID, as set by ApiComponent
+   * @return mixed True if all field strings validate, an error message otherwise
+   */
+  
+  public function validateCO($a, $d) {
+    // This validation rule is injected into the model's validation rules by
+    // ApiComponent for RESTful operations, which are less constrained than UI
+    // operations. It addresses CO-2294, and replaces the original fix for CO-2146.
+    
+    if(empty($d['coid'])) {
+      return true;
+    }
+    
+    foreach($a as $field => $value) {
+      if($field == 'co_id') {
+        // Simply compare $value
+        
+        if($value != $d['coid']) {
+          return _txt('er.fields.api.co.refer', array($field));
+        }
+      } else {
+        // Determine the model name from the key
+        $key = substr($field, 0, strlen($field)-3);
+        $model = Inflector::classify($key);
+        
+        if(!isset($this->$model)) {
+          // We have an aliased foreign key (eg: notification_co_group_id)
+          // that we need to map via $belongsTo.
+          
+          if(!empty($this->belongsTo)) {
+            // We need to walk the array to find the foreign key
+            
+            foreach($this->belongsTo as $label => $config) {
+              if(!empty($config['foreignKey'])
+                 && $config['foreignKey'] == $field) {
+                $model = $label;
+              }
+            }
+          }
+          
+          // If we fail to find the key, $this->$model will be null and
+          // we'll throw a stack trace below. Not ideal, but it's a
+          // programmer error to not have the relation properly defined.
+        }
+        
+        $targetCo = $this->$model->findCoForRecord($value);
+        
+        if($targetCo != $d['coid']) {
+          return _txt('er.fields.api.co', array($field));
+        }
+      }
+    }
+    
+    return true;
+  }
+
+  /**
+   * Determine if a given value is valid for an Attribute Enumeration.
    *
    * @since  COmanage Registry v4.0.0
    * @param  integer $coId      CO ID
@@ -1379,6 +1536,49 @@ class AppModel extends Model {
     $AttributeEnumeration->isValid($coId, $attribute, $value);
     
     return true;
+  }
+  
+  /**
+   * Try to normalize a given Attribute Enumeration
+   *
+   * @since  COmanage Registry v4.0.0
+   * @param  integer $coId      CO ID
+   * @param  string  $attribute Attribute, in Model.attribute form
+   * @param  string  $value     Value to normalize
+   * @return string             The normalized value
+   */
+
+  public function normalizeEnumeration($coId, $attribute, $value) {
+    // First, see if there is an enumeration defined for $coId + $attribute.
+
+    $args = array();
+    $args['conditions']['AttributeEnumeration.co_id'] = $coId;
+    $args['conditions']['AttributeEnumeration.attribute'] = $attribute;
+    $args['conditions']['AttributeEnumeration.status'] = SuspendableStatusEnum::Active;
+    $args['contain'] = false;
+
+    $AttributeEnumeration = ClassRegistry::init('AttributeEnumeration');
+    $attrEnum = $AttributeEnumeration->find('first', $args);
+
+    if(empty($attrEnum['AttributeEnumeration']['dictionary_id'])) {
+      // If there is no dictionary attached to the Attribute Enumeration
+      // configuration then load the normalizer
+      $this->Behaviors->load('Normalization');
+
+      // We need to restructure the data to fit what Normalizers expect
+      $data = array();
+
+      $a = explode('.', $attribute, 2);
+      $data[ $a[0] ][ $a[1] ] = $value;
+      $newdata = $this->normalize($data, $coId);
+
+      $this->Behaviors->unload('Normalization');
+
+      // Now that we have a result, return it back into the record we want to save
+      return $newdata[ $a[0] ][ $a[1] ];
+    }
+    // Return the initial value
+    return $value;
   }
   
   /**
@@ -1488,14 +1688,23 @@ class AppModel extends Model {
           // Mismatch, implying bad input
           return _txt('er.input.invalid');
         }
+
+        // We require at least one non-whitespace character (CO-1551)
+        if(!preg_match('/\S/', $v)) {
+          return _txt('er.input.blank');
+        }
+
+        // Has the value an acceptable length (CO-2058)
+        if(!empty($this->_schema[$k]['type']) && $this->_schema[$k]['type'] == 'string') {
+          if(strlen($v) > (int)$this->_schema[$k]['length']) {
+            return _txt('er.input.len', array($this->_schema[$k]['length']));
+          }
+        }
       }
     }
-    
-    // We require at least one non-whitespace character (CO-1551)
-    if(!preg_match('/\S/', $v)) {
-      return _txt('er.input.blank');
-    }
-    
+
+
+
     return true;
   }
   
@@ -1550,7 +1759,7 @@ class AppModel extends Model {
    * @param string $oper Comparison operator
    *
    * @since  COmanage Registry v4.0.0
-   * @return bool True if the comparison evaluates to True. False otherwise
+   * @return bool True if the comparison evaluates to True OR the field is empty. False otherwise
    */
   public function validateTimestampRange($check=array(), $eval_field=null, $oper=null) {
     if(empty($check)
@@ -1560,6 +1769,10 @@ class AppModel extends Model {
     }
 
     foreach($check as $date) {
+      // Empty fields represent infinity. Always validate to true
+      if(empty($date)) {
+        return true;
+      }
       $check_timestamp = strtotime($date);
       if($check_timestamp === false) {
         return _txt('er.validation');
@@ -1567,9 +1780,42 @@ class AppModel extends Model {
 
       // Check the existence of the evaluation field
       if(isset($this->data[$this->name][$eval_field])) {
-        $eval_field_timestamp = strtotime($this->data[$this->name][$eval_field]);
+        $eval_field_value = $this->data[$this->name][$eval_field];
+        if(empty($eval_field_value)) {
+          return true;
+        }
+        $eval_field_timestamp = strtotime($eval_field_value);
       } elseif(isset($this->data[$this->alias][$eval_field])) {
-        $eval_field_timestamp = strtotime($this->data[$this->alias][$eval_field]);
+        $eval_field_value = $this->data[$this->alias][$eval_field];
+        if(empty($eval_field_value)) {
+          return true;
+        }
+        $eval_field_timestamp = strtotime($eval_field_value);
+      } elseif (isset($this->data[$this->alias]['id'])
+                && empty($this->data[$this->alias][$eval_field])) {  // Fix for saveField operation with validateion option enabled
+        $id = $this->data[$this->alias]['id'];
+        $this->id = $id;
+        $eval_field_value = $this->field($eval_field);
+
+        if(empty($eval_field_value)) {
+          return true;
+        }
+
+        $eval_field_timestamp = strtotime($eval_field_value);
+      } elseif (isset($this->data[$this->name]['id'])
+                && empty($this->data[$this->name][$eval_field])) {  // Fix for saveField operation with validateion option enabled
+        $id = $this->data[$this->name]['id'];
+        $this->id = $id;
+        $eval_field_value = $this->field($eval_field);
+
+        if(empty($eval_field_value)) {
+          return true;
+        }
+
+        $eval_field_timestamp = strtotime($eval_field_value);
+      } elseif(empty($this->data[$this->name][$eval_field]) // OrgIdentitySource case were date fields could be absent
+               && empty($this->data[$this->alias][$eval_field])) {
+        return true;
       } else {
         return _txt('er.unknown', array($eval_field));
       }
@@ -1613,10 +1859,13 @@ class AppModel extends Model {
         // translated names. Note as of v2.0.0 there may not be "translated"
         // names (ie: for attribute enumerations), in which case we just want
         // the original string.
-        
+
         foreach($this->validate[$field]['content']['rule'][1] as $key) {
           if(isset($this->cm_enum_txt[$field])) {
             $ret[$key] = _txt($this->cm_enum_txt[$field], NULL, $key);
+          } elseif(isset($this->cm_attr_enum_value[$field])) {
+            $mdl->id = $key;
+            $ret[$key] = $mdl->field($this->cm_attr_enum_value[$field]);
           } else {
             $ret[$key] = $key;
           }
@@ -1645,4 +1894,33 @@ class AppModel extends Model {
     }
     return $status;
   }
+
+  /**
+   * Refactor the validationErrors table by changing the "rule name" messages to the default er.field.recheck.
+   *
+   * @since COmanage Registry v4.0.0
+   * @param array $validate           Model's validate array
+   * @param array $validation_errors  Model's validationErrors
+   * @return array                    Model's validationErrors refactored
+   */
+  public function filterValidationErrors($validate, $validation_errors) {
+    $failed_fields = array_keys($validation_errors);
+    foreach($failed_fields as $field) {
+      if(empty($validate[$field])) {
+        continue;
+      }
+      $field_validate_rule_names = array_keys($validate[$field]);
+      foreach($field_validate_rule_names as $rule_name) {
+        $found_key = array_search($rule_name, $validation_errors[$field]);
+        if($found_key !== false) {
+          $validation_errors[$field][$found_key] = _txt('er.field.recheck', array($field));
+        }
+      }
+    }
+
+    $validation_errors = array_filter($validation_errors);
+
+    return $validation_errors;
+  }
+
 }

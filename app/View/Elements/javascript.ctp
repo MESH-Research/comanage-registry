@@ -29,6 +29,73 @@
 
 <script type="text/javascript">
   $(function() {
+    // Restore fields
+    $("input[id*='ValidFrom'], input[id*='ValidThrough']").focusin(function() {
+      var $valid_from = $("input[id*='ValidFrom'");
+      var $valid_through = $("input[id*='ValidThrough'");
+
+      $valid_through.get(0).setCustomValidity("");
+      $valid_from.get(0).setCustomValidity("");
+      $("input[type='submit']").prop('disabled', false);
+    });
+
+    // Lightbox
+    $('a.lightbox').magnificPopup({
+      type:'ajax',
+      preloader: true,
+      showCloseBtn: true,
+      enableEscapeKey: true,
+      closeOnBgClick: false,
+      tLoading: '',
+      callbacks: {
+        open: function() {
+          // Will fire when this exact popup is opened
+          // this - is Magnific Popup object
+          displaySpinner();
+        },
+        close: function() {
+        },
+        updateStatus: function(data) {
+          // console.log('Status changed', data);
+          // "data" is an object that has two properties:
+          // "data.status" - current status type, can be "loading", "error", "ready"
+          // "data.text" - text that will be displayed (e.g. "Loading...")
+          // you may modify this properties to change current status or its text dynamically
+          if(data.status !== 'loading') {
+            stopSpinner();
+          }
+          if(data.status == 'error') {
+            // discard and show noty
+            this.close();
+            generateFlash(data.text, data.status);
+          }
+        }
+      },
+      ajax: {
+        settings: {
+          cache: false
+        },
+        tError: 'Permission Denied' //  Error message, can contain %curr% and %total% tags if gallery is enabled
+        // tError: '<a href="%url%">View</a> load failed.' //  Error message, can contain %curr% and %total% tags if gallery is enabled
+      }
+    });
+
+    // Handle Action Menu Observers
+    $('.field-actions .dropdown-menu').each( (key, elem) => {
+      add_observer(elem, 'li', 'highlight');
+    });
+    $('.td-field-actions .dropdown-menu').each( (key, elem) => {
+      add_observer(elem, 'tr', 'highlight');
+    });
+
+    // Handle caret up/down toggle
+    $('li.field-data-container').on('shown.bs.collapse', function () {
+      $(this).find('.field-data > a i').removeClass('fa-caret-down').addClass('fa-caret-up');
+    })
+    $('li.field-data-container').on('hidden.bs.collapse', function () {
+      $(this).find('.field-data > a i').removeClass('fa-caret-up').addClass('fa-caret-down');
+    })
+
     $('#user-panel-toggle,#user-notifications,#global-search').on('click', function() {
       if($(window).width() < 768) {
         if ($('#navigation-drawer').is(':visible')) {
@@ -44,41 +111,27 @@
     $('.focusFirst').focus();
 
     // DESKTOP MENU DRAWER BEHAVIOR
-    // Check the drawer half-closed cookie on first load and set the drawer state appropriately
-    if (Cookies.get("desktop-drawer-state") == "half-closed") {
-      $("#navigation-drawer,#footer-drawer").addClass("half-closed");
-      $("#main").addClass("drawer-half-closed");
-    } else {
-      // Preserve the state of the most recently selected menu item if it is expandable (a "menuTop" item)
-      // (we only use this behavior when the the drawer is fully-open)
-      var mainMenuSelectedParentId = Cookies.get("main-menu-selected-parent-id");
-      if(mainMenuSelectedParentId != undefined && mainMenuSelectedParentId != "") {
-        $("#" + mainMenuSelectedParentId).addClass("active");
-        $("#" + mainMenuSelectedParentId + " > a.menuTop").attr("aria-expanded","true");
-        $("#" + mainMenuSelectedParentId + " > ul").addClass("in");
-      }
-    }
 
     // Hamburger menu-drawer toggle
     $('#co-hamburger').click(function () {
       if($(window).width() < 768) {
         // Mobile mode
-        $("#navigation-drawer,#footer-drawer").removeClass("half-closed").toggle();
+        $("#navigation-drawer").removeClass("half-closed").toggle();
       } else {
         // Desktop mode
         if ($("#navigation-drawer").hasClass("half-closed")) {
-          $("#navigation-drawer,#footer-drawer").removeClass("half-closed");
+          $("#navigation-drawer").removeClass("half-closed");
           $("#main").removeClass("drawer-half-closed");
-          // set a cookie to hold drawer half-open state between requests
-          Cookies.set("desktop-drawer-state", "open");
+          // save user's application preference for drawer state
+          setApplicationPreference("uiDrawerState",{"value":"open"});
         } else {
-          $("#navigation-drawer,#footer-drawer").addClass("half-closed");
+          $("#navigation-drawer").addClass("half-closed");
           $("#main").addClass("drawer-half-closed");
           // ensure all the sub-menus collapse when half-closing the menu
           $("#navigation .metismenu li ul").removeClass("in");
           $("#navigation .metismenu li").removeClass("active");
-          // set a cookie to hold drawer half-open state between requests
-          Cookies.set("desktop-drawer-state", "half-closed");
+          // save user's application preference for drawer state
+          setApplicationPreference("uiDrawerState",{"value":"half-closed"});
         }
       }
     });
@@ -95,16 +148,22 @@
 
     // Desktop half-closed drawer behavior & expandable menu items
     $('#navigation-drawer a.menuTop').click(function () {
-      if (Cookies.get("desktop-drawer-state") == "half-closed") {
-        $("#navigation-drawer").toggleClass("half-closed");
+      // widen the menu while a.menuTop is expanded so we can see the menu items
+      if ($("#navigation-drawer").hasClass("half-closed")) {
+        $("#navigation-drawer").removeClass("half-closed").addClass("intermediate-open");
+      } else {
+        // close it back down if we're in the intermediate state and we close a.menuTop
+        if ($("#navigation-drawer").hasClass("intermediate-open")) {
+          $("#navigation-drawer").removeClass("intermediate-open").addClass("half-closed");
+        }
       }
 
-      // Save the ID of the most recently expanded menuTop item for use on reload
+      // Save the ID of the most recently expanded menuTop item in an Application Preference
       if ($(this).attr("aria-expanded") == "true") {
         var parentId = $(this).parent().attr("id");
-        Cookies.set("main-menu-selected-parent-id", parentId);
+        setApplicationPreference("uiMainMenuSelectedParentId",{"value":parentId});
       } else {
-        Cookies.set("main-menu-selected-parent-id", "");
+        setApplicationPreference("uiMainMenuSelectedParentId",{"value":null});
       }
     });
 
@@ -157,6 +216,7 @@
         $(".cm-inline-editable-field").removeClass('active');
       }
     });
+    // END USER MENU BEHAVIOR
 
     // Toggle the top search filter box
     $("#top-search-toggle, #top-search-toggle button.cm-toggle").click(function(e) {
@@ -174,7 +234,7 @@
     });
 
     // Clear a specific top search filter by clicking the filter button
-    $("#top-search-toggle .top-search-active-filter").click(function(e) {
+    $("#top-search-toggle button.top-search-active-filter").click(function(e) {
       e.preventDefault();
       e.stopPropagation();
       $(this).hide();
@@ -209,6 +269,7 @@
     $(".accordion").accordion();
 
     // Add classes to all submit buttons
+    // NOTE: This is not working for the lightbox
     $("input:submit").addClass("spin submit-button btn btn-primary");
 
     // Other buttons (jQuery)
@@ -282,6 +343,13 @@
       text: true
     });
 
+    $(".trashbutton").button({
+      icons: {
+        primary: 'ui-icon-trash'
+      },
+      text: true
+    });
+
     $(".editbutton").button(
       {  classes: {
       "ui-button": "highlight"
@@ -330,6 +398,13 @@
     $(".lockbutton").button({
       icons: {
         primary: 'ui-icon-locked'
+      },
+      text: true
+    });
+
+    $(".schedulebutton").button({
+      icons: {
+        primary: ' ui-icon-clock'
       },
       text: true
     });
@@ -442,6 +517,13 @@
       text: true
     });
 
+    $(".restorebutton").button({
+      icons: {
+        primary: 'ui-icon-arrowrefresh-1-e'
+      },
+      text: true
+    });
+
     // Datepickers
 
     <?php /* For all calls to datepicker, wrap the calling date field in a
@@ -520,8 +602,13 @@
     // or when any item with a "spin" class is clicked.
     // XXX we might consider applying this to all anchors except for those marked for exclusion
     $("input[type='submit'], .spin").click(function() {
-
       displaySpinner();
+
+      // XXX This is a workaround. Currently the sidebar actions in CO Person Canvas
+      //     are part of the form. As a result the spinner is dismissed immediately after
+      if($(this).hasClass('ignore-invalid')) {
+        return;
+      }
 
       // Test for invalid fields (HTML5) and turn off spinner explicitly if found
       if(document.querySelectorAll(":invalid").length) {
@@ -538,9 +625,43 @@
     ?>
   });
 
+  // Observers list
+  var observer = new Array();
+  // Options for the Dropdown Action Menu Observer
+  const cmActionMenuOptions = {
+    attributes: true,
+    attributeFilter: ['class']
+  };
+
+  // Mutation observer handler for Dropdown action menus
+  // element              - Parent element containing target     (string, required)
+  // target_element       - DOM element to observe               (string, required)
+  // modify_class         - Class name apended to targte_element (string, required)
+  function add_observer(element, target_element, modify_class) {
+    observer[element] = new MutationObserver((mutationList) => {
+      // Use traditional 'for loops' for IE 11
+      for(const mutation of mutationList) {
+        if (mutation.type === 'attributes') {
+          bs_dropdown = mutation.target.parentNode;
+          if($(bs_dropdown).hasClass('show')) {
+            if(target_element === 'tr') {
+              $(bs_dropdown).closest(target_element).prev(target_element).addClass(target_element + '-' + modify_class);
+            }
+            $(bs_dropdown).closest(target_element).addClass(modify_class);
+          } else {
+            if(target_element === 'tr') {
+              $(bs_dropdown).closest(target_element).prev(target_element).removeClass(target_element + '-' + modify_class);
+            }
+            $(bs_dropdown).closest(target_element).removeClass(modify_class);
+          }
+        }
+      }
+    });
+    observer[element].observe(element,cmActionMenuOptions);
+  }
+
   // Define default text for confirm dialog
   var defaultConfirmOk = "<?php print _txt('op.ok'); ?>";
   var defaultConfirmCancel = "<?php print _txt('op.cancel'); ?>";
   var defaultConfirmTitle = "<?php print _txt('op.confirm'); ?>";
-
 </script>

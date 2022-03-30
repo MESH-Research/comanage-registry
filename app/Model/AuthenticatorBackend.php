@@ -134,6 +134,108 @@ abstract class AuthenticatorBackend extends AppModel {
   }
   
   /**
+   * Generate a password change notification, if configured.
+   *
+   * @since  COmanage Registry v4.0.0
+   * @param  int  $coPersonId CO Person ID
+   * @return bool             True on success
+   * @throws InvalidArgumentException
+   */
+  
+  public function notify($coPersonId) {
+    // $authplugin = (eg) PasswordAuthenticator
+    // $authmodel = (eg) Password
+    $authplugin = $this->alias;
+    $authmodel = substr($authplugin, 0, -13);
+    
+    // If there is no message template, then there is nothing to do
+    if(empty($this->pluginCfg['Authenticator']['co_message_template_id'])) {
+      return true;
+    }
+    
+    // Pull the Message Template
+    
+    $args = array();
+    $args['conditions']['CoMessageTemplate.id'] = $this->pluginCfg['Authenticator']['co_message_template_id'];
+    $args['conditions']['CoMessageTemplate.status'] = SuspendableStatusEnum::Active;
+    $args['contain'] = false;
+    
+    $mt = $this->$authmodel->CoPerson->Co->CoMessageTemplate->find('first', $args);
+
+    if(empty($mt)) {
+      throw new InvalidArgumentException(_txt('er.notfound', array(_txt('ct.co_message_templates.1'), $this->pluginCfg['Authenticator']['co_message_template_id'])));
+    }
+    
+    // and the CO Person Name and Email
+    
+    $args = array();
+    $args['conditions']['CoPerson.id'] = $coPersonId;
+    $args['contain'] = array('PrimaryName', 'EmailAddress');
+    
+    $cop = $this->$authmodel->CoPerson->find('first', $args);
+    
+    // For now, we just use the first email address we find
+    $recipients = array();
+    
+    if(!empty($cop['EmailAddress'][0]['mail'])) {
+      $recipients[] = $cop['EmailAddress'][0]['mail'];
+    }
+    
+    // Create the message subject and body based on the templates.
+
+    $substitutions = array(
+      'AUTHENTICATOR' => $this->pluginCfg['Authenticator']['description'],
+      'CO_PERSON'     => generateCn($cop['PrimaryName'])
+    );
+
+    // Construct subject and body
+
+    $msgSubject = processTemplate($mt['CoMessageTemplate']['message_subject'], $substitutions);
+    $format = $mt['CoMessageTemplate']['format'];
+
+    // We don't try/catch, but instead let any exceptions bubble up.
+    $email = new CakeEmail('default');
+
+      // If a from address was provided, use it
+/*
+      if($fromAddress) {
+        $email->from($fromAddress);
+      }*/
+
+    // Add cc and bcc if specified
+    if($mt['CoMessageTemplate']['cc']) {
+      $email->cc(explode(',', $mt['CoMessageTemplate']['cc']));
+    }
+
+    if($mt['CoMessageTemplate']['bcc']) {
+      $email->bcc(explode(',', $mt['CoMessageTemplate']['bcc']));
+    }
+    
+    $msgBody = array();
+    
+    if($format != MessageFormatEnum::Plaintext
+       && !empty($mt['CoMessageTemplate']['message_body_html'])) {
+      $msgBody[MessageFormatEnum::HTML] = processTemplate($mt['CoMessageTemplate']['message_body_html'], $substitutions);
+    }
+    if($format != MessageFormatEnum::HTML
+       && !empty($mt['CoMessageTemplate']['message_body'])) {
+      $msgBody[MessageFormatEnum::Plaintext] = processTemplate($mt['CoMessageTemplate']['message_body'], $substitutions);
+    }
+    if(empty($msgBody[MessageFormatEnum::Plaintext])) {
+      $msgBody[MessageFormatEnum::Plaintext] = "unknown message";
+    }
+    
+    $email->template('custom', 'basic')
+      ->emailFormat($format)
+      ->to($recipients)
+      ->viewVars($msgBody)
+      ->subject($msgSubject);
+    $email->send();
+    
+    return true;
+  }
+  
+  /**
    * Reset Authenticator data for a CO Person.
    *
    * @since  COmanage Registry v3.1.0

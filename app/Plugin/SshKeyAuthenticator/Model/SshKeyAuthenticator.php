@@ -52,7 +52,7 @@ class SshKeyAuthenticator extends AuthenticatorBackend {
   );
   
   // Default display field for cake generated views
-  public $displayField = "description";
+  public $displayField = "authenticator_id";
   
   // Validation rules for table elements
   public $validate = array(
@@ -75,21 +75,6 @@ class SshKeyAuthenticator extends AuthenticatorBackend {
   
   public function cmPluginMenus() {
     return array();
-  }
-  
-  /**
-   * Obtain current data suitable for passing to manage().
-   *
-   * @since  COmanage Registry v3.3.0
-   * @param  integer $id         Authenticator ID
-   * @param  integer $backendId  Authenticator Backend ID
-   * @param  integer $coPersonId CO Person ID
-   * @return Array As returned by find
-   * @throws RuntimeException
-   */
-  
-  public function current($id, $backendId, $coPersonId) {
-    throw new RuntimeException('NOT IMPLEMENTED');
   }
   
   /**

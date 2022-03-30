@@ -54,6 +54,8 @@ class CoPerson extends AppModel {
   );
   
   public $hasMany = array(
+    "ApplicationPreference",
+    "AuthenticatorStatus",
     // A person can have one or more groups
     "CoGroupMember" => array('dependent' => true),
     // It's OK to delete notifications where this Person is the subject, but that's it.
@@ -162,6 +164,7 @@ class CoPerson extends AppModel {
                                         StatusEnum::PendingConfirmation,
                                         StatusEnum::Suspended)),
         'required' => true,
+        'allowEmpty' => false,
         'message' => 'A valid status must be selected'
       )
     ),
@@ -319,6 +322,9 @@ class CoPerson extends AppModel {
               'conditions' => array('id' => $record[$Model->alias][$Model->primaryKey])
             ));
             if (isset(current($currentRecord)['deleted']) && current($currentRecord)['deleted'] != true) {
+              if(isset($Model->syncNested)) {
+                $Model->syncNested = false;
+              }
               $Model->delete($record[$Model->alias][$Model->primaryKey]);
             }
 					}
@@ -338,13 +344,14 @@ class CoPerson extends AppModel {
    * has a role beyond subject.
    *
    * @since  COmanage Registry v0.8.5
-   * @param  integer Identifier of CO Person
-   * @param  integer Identifier of CO Person performing expunge
+   * @param  integer CO Person ID getting expunged
+   * @param  integer CO Person ID performing expunge
+   * @param  integer API User ID performing expunge
    * @return boolean True on success
    * @throws InvalidArgumentException
    */
   
-  public function expunge($coPersonId, $expungerCoPersonId) {
+  public function expunge($coPersonId, $expungerCoPersonId, $expungerApiUserId = null) {
     $coperson = $this->findForExpunge($coPersonId);
     
     if(!$coperson) {
@@ -390,15 +397,24 @@ class CoPerson extends AppModel {
     // Rewrite any Notification where this person is an actor, recipient, or resolver
     
     foreach($coperson['CoNotificationActor'] as $n) {
-      $this->CoNotificationActor->expungeParticipant($n['id'], 'actor', $expungerCoPersonId);
+      $this->CoNotificationActor->expungeParticipant($n['id'],
+                                                     'actor',
+                                                     $expungerCoPersonId,
+                                                     $expungerApiUserId);
     }
     
     foreach($coperson['CoNotificationRecipient'] as $n) {
-      $this->CoNotificationActor->expungeParticipant($n['id'], 'recipient', $expungerCoPersonId);
+      $this->CoNotificationActor->expungeParticipant($n['id'],
+                                                     'recipient',
+                                                     $expungerCoPersonId,
+                                                     $expungerApiUserId);
     }
     
     foreach($coperson['CoNotificationResolver'] as $n) {
-      $this->CoNotificationActor->expungeParticipant($n['id'], 'resolver', $expungerCoPersonId);
+      $this->CoNotificationActor->expungeParticipant($n['id'],
+                                                     'resolver',
+                                                     $expungerCoPersonId,
+                                                     $expungerApiUserId);
     }
     
     // Rewrite any History Records where this person is an actor but not a recipient
@@ -406,7 +422,9 @@ class CoPerson extends AppModel {
     
     foreach($coperson['HistoryRecordActor'] as $h) {
       if($h['co_person_id'] != $coPersonId) {
-        $this->HistoryRecord->expungeActor($h['id'], $expungerCoPersonId);
+        $this->HistoryRecord->expungeActor($h['id'],
+                                           $expungerCoPersonId,
+                                           $expungerApiUserId);
       }
     }
     
@@ -486,10 +504,21 @@ class CoPerson extends AppModel {
         }
       }
       $args['conditions']['CoPerson.id'] = $coPersonIds;
-      $args['contain'] = array('PrimaryName', 'Identifier', 'EmailAddress');
-      $args['order'] = array('PrimaryName.family ASC', 'PrimaryName.given ASC');
+      $args['contain'] = array(
+        // We can't contain PrimaryName because it results in
+        // redundant results and does not filter on primary_name
+        'Name' => array('conditions' => array('Name.primary_name' => true)),
+        'Identifier',
+        'EmailAddress'
+      );
       
       $ret = $this->find('all', $args);
+
+      if(!empty($ret)) {
+        // This appears to maybe maintain a given name sort within the family name?
+        $ret = Hash::sort($ret, '{n}.Name.0.given', 'asc');
+        $ret = Hash::sort($ret, '{n}.Name.0.family', 'asc');
+      }
     }
     
     return $ret;
@@ -725,6 +754,7 @@ class CoPerson extends AppModel {
 
     if(!empty($args)) {
       $args['conditions']['CoPerson.co_id'] = $coId;
+      $args['conditions']['PrimaryName.primary_name'] = true;
       $args['contain'][] = 'PrimaryName';
       $args['contain'][] = 'CoPersonRole';
     } else {
@@ -833,7 +863,7 @@ class CoPerson extends AppModel {
     $newStatus = null;
     
     // We rank status by "preference". More "preferred" statuses rank higher.
-    // To faciliate comparison, we'll convert this to an integer value and store
+    // To facilitate comparison, we'll convert this to an integer value and store
     // it in a hash. Most preferred numbers are larger so we can say things like
     // Active > Expired. Possibly this should go somewhere else, if useful. (CO-1360)
     
