@@ -37,9 +37,28 @@ session_start();
 // Set the user
 
 if(empty($_SERVER['REMOTE_USER'])) {
-  print	"ERROR: REMOTE_USER is empty. Please check your configuration.";
-  exit;
+
+    $query_string = 'target=/registry/auth/login/';
+
+    $forced_reauth_cookie_name = 'registry_forced_reauth_requested';
+    if(isset($_COOKIE[$forced_reauth_cookie_name])) {
+      if($_COOKIE[$forced_reauth_cookie_name] == '1') {
+        $query_string = $query_string . '&forceAuthn=1';
+
+        // Unset the cookie since we have consumed it.
+        setcookie($forced_reauth_cookie_name, '', time()-3600, '/', $_SERVER['HTTP_HOST'], true, true);
+      }
+    }
+
+    $path = '/Shibboleth.sso/Login';
+    $location = $path . '?' . $query_string;
+    $header = 'Location: ' . $location;
+
+    header($header);
+
+    exit;
 }
+
 // XXX if we define no redirect path, e.g. to an internal path: co_dashboards/configuration/co:2 then CAKEPHP thinks that should come back here
 // XXX as a result adds to the SESSION auth/login as the redirect path after login. This causes the login to happen twice for the case we are
 // XXX visiting the COmanage homepage
