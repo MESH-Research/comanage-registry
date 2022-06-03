@@ -217,6 +217,12 @@ $cm_texts['en_US'] = array(
   'ct.urls.1' =>                'URL',
   'ct.urls.pl' =>               'URLs',
   
+  'ct.vetting_requests.1' =>    'Vetting Request',
+  'ct.vetting_requests.pl' =>   'Vetting Requests',
+  'ct.vetting_results.1' =>     'Vetting Result',
+  'ct.vetting_results.pl' =>    'Vetting Results',
+  'ct.vetting_steps.1' =>       'Vetting Step',
+  'ct.vetting_steps.pl' =>      'Vetting Steps',
   // Embedded Discovery Service
   
   'eds.layout.preamble' =>      'Please enter the name of your organization in the box or click to choose from a list.',
@@ -236,6 +242,7 @@ $cm_texts['en_US'] = array(
   // This one isn't really a step
   'ef.step.provision.notify'         => 'Provision & Notify',
   'ef.step.redirectOnConfirm'        => 'Process Confirmation',
+  'ef.step.requestVetting'           => 'Request Vetting',
   'ef.step.selectEnrollee'           => 'Select Person',
   'ef.step.selectOrgIdentity'        => 'Select Org Identity',
   'ef.step.sendApprovalNotification' => 'Approval Notification',
@@ -285,6 +292,13 @@ has been resolved by (@ACTOR_NAME). For more information, see the
 original notification at
 
 (@NOTIFICATION_URL)',
+  
+  'em.vetting.subject'        => 'Vetting Request Requires Review',
+  'em.vetting.body'           => 'A Vetting Request requires manual review.
+  
+The request may be viewed at
+
+(@SOURCE_URL)',
 
   // Enumerations, corresponding to enum.php
   // Default history comments
@@ -376,6 +390,10 @@ original notification at
     ActionEnum::ProvisionerAction           => 'Provisioner Action',
     ActionEnum::ProvisionerFailed           => 'Provisioner Failed',
     ActionEnum::ReferenceIdentifierObtained => 'Reference Identifier Obtained From Match Server',
+    ActionEnum::VettingRequestCanceled      => 'Vetting Request Canceled',
+    ActionEnum::VettingRequestCompleted     => 'Vetting Request Completed',
+    ActionEnum::VettingRequestRegistered    => 'Vetting Request Registered',
+    ActionEnum::VettingRequestRequeued      => 'Vetting Request Requeued',
   ),
   
   'en.action.petition' => array(
@@ -401,7 +419,9 @@ original notification at
     PetitionActionEnum::OrgIdentitySourced  => 'Org Identity Created From Source',
     PetitionActionEnum::StepFailed          => 'Step Failed',
     PetitionActionEnum::TCExplicitAgreement => 'Terms and Conditions Explicit Agreement',
-    PetitionActionEnum::TCImpliedAgreement  => 'Terms and Conditions Implied Agreement'
+    PetitionActionEnum::TCImpliedAgreement  => 'Terms and Conditions Implied Agreement',
+    PetitionActionEnum::VettingCompleted    => 'Vetting Request Completed',
+    PetitionActionEnum::VettingRequested    => 'Registered Vetting Request'
   ),
 
   // Extended type, key must be en.model.attribute
@@ -634,7 +654,8 @@ original notification at
     GroupEnum::NestedMembers => 'Nested Members'
   ),
   
-  'en.ia.algorithm' => array(IdentifierAssignmentEnum::Random => 'Random',
+  'en.ia.algorithm' => array(IdentifierAssignmentEnum::Plugin => 'Plugin',
+                             IdentifierAssignmentEnum::Random => 'Random',
                              IdentifierAssignmentEnum::Sequential => 'Sequential'),
   
   'en.ia.context' => array(
@@ -843,6 +864,12 @@ original notification at
     ServerEnum::Oauth2Server => 'OAuth2',
     ServerEnum::SqlServer    => 'SQL'
   ),
+  
+  'en.server.http.auth_type' => array(
+    HttpServerAuthType::Basic   => 'Basic',
+    HttpServerAuthType::Bearer  => 'Bearer',
+    HttpServerAuthType::None    => 'None'
+  ),
 
   'en.server.oauth2.grant' => array(
     Oauth2GrantEnum::AuthorizationCode => 'Authorization Code',
@@ -875,6 +902,7 @@ original notification at
                             StatusEnum::Pending             => 'Pending',
                             StatusEnum::PendingApproval     => 'Pending Approval',
                             StatusEnum::PendingConfirmation => 'Pending Confirmation',
+                            StatusEnum::PendingVetting      => 'Pending Vetting',
                             StatusEnum::Suspended           => 'Suspended'),
   
   'en.status.authr' => array(
@@ -945,7 +973,8 @@ original notification at
     PetitionStatusEnum::Duplicate           => 'Duplicate',
     PetitionStatusEnum::Finalized           => 'Finalized',
     PetitionStatusEnum::PendingApproval     => 'Pending Approval',
-    PetitionStatusEnum::PendingConfirmation => 'Pending Confirmation'
+    PetitionStatusEnum::PendingConfirmation => 'Pending Confirmation',
+    PetitionStatusEnum::PendingVetting      => 'Pending Vetting'
   ),
   
   'en.status.susp' => array(
@@ -964,6 +993,16 @@ original notification at
     TemplateableStatusEnum::Suspended           => 'Suspended',
     TemplateableStatusEnum::Template            => 'Template',
     TemplateableStatusEnum::InTrash             => 'Pending Removal'
+  ),
+
+  'en.status.vet' => array(
+    VettingStatusEnum::Canceled             => 'Canceled',
+    VettingStatusEnum::Error                => 'Error',
+    VettingStatusEnum::Failed               => 'Failed',
+    VettingStatusEnum::Passed               => 'Passed',
+    VettingStatusEnum::PendingManual        => 'Pending Manual Resolution',
+    VettingStatusEnum::PendingResult        => 'Pending Result',
+    VettingStatusEnum::Requested            => 'Requested'
   ),
   
   'en.sync.action' => array(
@@ -1137,9 +1176,11 @@ original notification at
   'er.ia.exists' =>   'The identifier "%1$s" is already in use',
   'er.ia.failed' =>   'Failed to find a unique identifier to assign',
   'er.ia.gr.auto' =>  'Cannot assign identifiers for automatic groups',
-  'er.ia.none' =>     'No identifier assignments configured',
   'er.ia.id.type' =>  'No identifier of type "%1$s" found',
   'er.ia.id.type.none' =>  'No identifier type specified',
+  'er.ia.none' =>     'No identifier assignments configured',
+  'er.ia.plugin' =>   'A plugin must be specified',
+  'er.ia.plugin.none' => 'No Identifier Assigner plugins are available',
   'er.id.exists-a' => 'The identifier "%1$s" is already in use (%2$s)',
   'er.id.format-a' => 'The identifier "%1$s" does not meet the required format (%2$s)',
   'er.id.unk' =>      'Unknown Identifier',
@@ -1247,6 +1288,12 @@ original notification at
   'er.validation' =>  'Validation failed',
   'er.validation.date' =>  '"Valid From" date MUST precede "Valid Through" date',
 
+  'er.vetting.cxl' => 'Vetting Request already canceled or completed',
+  'er.vetting.dupe' => 'Vetting Request %1$s is already queued for this CO Person',
+  'er.vetting.ef' =>  'Enrollment Flow %1$s does not require approval, cannot reenter flow for CO Petition %2$s',
+  'er.vetting.plugin' => 'Unexpected response received from plugin',
+  'er.vetting.status' => 'Vetting Request %1$s is not in Requested status (%2$s)',
+  
   'et.default' =>     'There are no Extended Types currently defined for this attribute. The default types are currently in use. When you create a new Extended Type, the default types will automatically be added to this list.',
 
   // Fields. Field names should match data model names to facilitate various auto-rendering.
@@ -1499,6 +1546,8 @@ original notification at
   'fd.ef.tandc.desc' => 'How to handle Terms and Conditions at enrollment, if any are defined. See <a href="https://spaces.at.internet2.edu/display/COmanage/Registry+Terms+and+Conditions">Terms and Conditions</a>',
   'fd.ef.vbody' =>    'Verification Email Body',
   'fd.ef.vbody.desc' => 'Body for email message sent as part of verification step. Max 4000 characters.',
+  'fd.ef.vet' =>      'Request Vetting',
+  'fd.ef.vet.desc' => 'Petitions must pass all defined Vetting Steps before approval',
   'fd.ef.vmt' =>      'Verification Email Message Template',
   'fd.ef.vmt.desc' => 'Message template used for email sent as part of verification step',
   'fd.ef.vsub' =>     'Subject For Verification Email',
@@ -1576,6 +1625,7 @@ original notification at
   'fd.ia.type.email.desc' => 'For Identifier Assignments applied to Type <i>Mail</i>, an Email Address (instead of an Identifier) will be created with this type (if not blank)',
   // fd.id.seq should be used only for database internal column IDs
   'fd.id.seq' =>      'ID',
+  'fd.id.val' =>      'ID: %1$s',
   // The next set must be named fd.model.validation-field
   'fd.identifier.description' => 'Description',
   'fd.identifier.identifier' => 'Identifier',
@@ -1804,6 +1854,8 @@ original notification at
   'fd.server.oauth2.redirect' => 'Redirect URI',
   'fd.server.oauth2.scope' => 'Scope',
   'fd.server.sql.database' => 'Database',
+  'fd.server.http.auth_type' => 'HTTP Authentication Type',
+  'fd.server.http.password' => 'Password or Token',
   'fd.server.http.ssl_verify_peer'       => 'Require certificate verification',
   'fd.server.http.ssl_verify_peer.desc'  => 'Enable certificate verification (should normally be true, but may need to be disabled for self-signed certificates)',
   'fd.server.http.ssl_verify_host'       => 'Require name verification',
@@ -1879,7 +1931,7 @@ original notification at
   'fd.th.css' =>      'CSS',
   'fd.th.footer' =>   'Footer',
   'fd.th.header' =>   'Header',
-  'fd.th.hide_title' => 'Hide Title',
+  'fd.th.hide_title' => 'Hide Title Banner',
   'fd.th.hide_footer_logo' => 'Hide Footer Logo',
   'fd.theme' =>       'Theme',
   'fd.theme.stacking_status' => 'Inheritance/Stacking',
@@ -1911,6 +1963,12 @@ original notification at
   'fd.valid_through.desc' => 'Leave blank for indefinite validity',
   'fd.valid_through.tz' => 'Valid Through (%1$s)',
   'fd.value' =>       'Value',
+  'fd.vet.group' =>   'Vetting Group',
+  'fd.vet.group.desc' => 'If this Vetting Step requires manual review, members of the Vetting Group are authorized to perform the review',
+  'fd.vet.raw' =>     'Raw Result',
+  'fd.vet.review_on_result' => 'Require Manual Review on Result',
+  'fd.vet.subject' => 'Vetting Subject',
+  'fd.vet.vetter' =>  'Vetter',
   'fd.visibility' =>  'Visibility',
   'fd.xp.actions' =>  'All of the following <b>actions</b> will be taken when the specified conditions match:',
   'fd.xp.conditions' => 'All of the following <b>conditions</b> must be met for this Expiration Policy to take effect:',
@@ -1984,6 +2042,7 @@ original notification at
   'in.pagination.format' =>  'Page {:page} of {:pages}, Viewing {:start}-{:end} of {:count}',
   'in.pl.noconfig'     => 'This plugin has no configurable options',
   'in.tpl.msg.test'    => 'Provide a valid email to forward a preview of the template.',
+  'in.vet.review'      => 'Please review the pending request and approve or deny it',
   'in.widgets.none'    => 'No widgets have been created for this dashboard yet.',
   
   // Menu
@@ -2183,6 +2242,7 @@ original notification at
   'op.mt.test.wait' => 'Sending...',
   'op.next' =>        'Next',
   'op.ois.conf.gr' => 'Configure Group Mapping',
+  'op.ois.toggle.format' => 'Toggle formatting',
   'op.ois.inventory' => 'View %1$s Inventory',
   'op.ok' =>          'OK',
   'op.order-a' =>     'Reorder %1$s',
@@ -2214,6 +2274,7 @@ original notification at
   'op.prov.confirm' => 'Are you sure you wish to (re)provision this record?',
   'op.prov.view' =>   'Provisioned Services',
   'op.prov.wait' =>   'Requesting provisioning, please wait...',
+  'op.register-a' =>  'Register %1$s',
   'op.relink' =>      'Relink',
   'op.relink.confirm' => 'Relinking will remove the association of this Organizational Identity from the current CO Person. Are you sure you wish to proceed?',
   'op.relink.info' => 'Relinking will move the Organizational Identity %1$s from the CO Person record for %2$s to the CO Person record for %3$s.',
@@ -2231,6 +2292,7 @@ original notification at
   'op.restore' =>     'Restore',
   'op.restore.ef' =>  'Add/Restore Default Templates',
   'op.restore.types' => 'Add/Restore Default Types',
+  'op.review' =>      'Review',
   'op.run' =>         'Run',
   'op.save' =>        'Save',
   'op.search' =>      'Search',
@@ -2348,7 +2410,7 @@ original notification at
   'rs.nt.delivered.email' => 'Notification delivered to %1$s: "%2$s"',
   'rs.nt.expunge' =>  'Notification %1$s %2$s removed as part of CO Person expunge',
   'rs.nt.resd-a' =>   'Notification resolved: "%1$s"',
-  'rs.nt.sent' =>     'Approval notification sent to %1$s',
+  'rs.nt.sent' =>     'Petition Resolution notification sent to %1$s',
   'rs.ois.sync.login' => 'Org Identity resynced on login',
   'rs.org.src.link' => 'CO Person and Org Identity Linked via Org Identity Source "%1$s" (%2$s)',
   'rs.org.src.new' => 'Org Identity created from Source "%1$s" (%2$s)',
@@ -2416,6 +2478,16 @@ original notification at
   'rs.updated-a2' =>  '%1$s "%2$s" Updated',
   'rs.updated-a3' =>  '%1$s Updated',
   'rs.uploaded-a2' => '%1$s "%2$s" Uploaded',
+  'rs.vetting.canceled' => 'Canceled Vetting Request %1$s',
+  'rs.vetting.completed' => 'Completed Vetting Request %1$s, %2$s step(s) completed',
+  'rs.vetting.ef' =>  'Re-entered Enrollment Flow %1$s for CO Petition %2$s',
+  'rs.vetting.ef.deny' => 'Denied CO Petition %1$s due to failed Vetting',
+  'rs.vetting.failed' => 'Vetting Request %1$s failed (%2$s) on step %3$s (%4$s)',
+  'rs.vetting.manual' => 'Vetting Request flagged for manual review based on vetting step %1$s result (%2$s)',
+  'rs.vetting.pending' => 'Vetting Request %1$s pending (%2$s) on step %3$s (%4$s)',
+  'rs.vetting.registered' => 'Registered Vetting Request %1$s',
+  'rs.vetting.replayed' => 'Result from step %1$s (%2$s) already recorded',
+  'rs.vetting.requeued' => 'Requeued Vetting Request %1$s',
   'rs.xp.action' =>   'Expiration Policy "%1$s" (%2$s): %3$s',
   'rs.xp.match' =>    'Expiration Policy "%1$s" (%2$s) conditions matched',
   'rs.xp.role' =>     'Role Expired',
@@ -2516,7 +2588,8 @@ original notification at
   'sh.ug.400.messagetemplate.format' => 'Updating CoMessageTemplate format',
   'sh.ug.400.org' =>      'Instantiating default Organization Extended Types',
   'sh.ug.410.envsource' => 'Adding default duplicate_mode for EnvSource',
-  'sh.ug.410.datafilter' => 'Adding default context for DataFilters'
+  'sh.ug.410.datafilter' => 'Adding default context for DataFilters',
+  'sh.ug.410.httpserver' => 'Adding default auth_type for HttpServers'
 );
 
 // Make a copy of the original texts, since CoLocalizations can override them

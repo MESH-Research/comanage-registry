@@ -29,7 +29,8 @@ class ServiceEligibilitySetting extends AppModel {
   // Document foreign keys
   
   // Add behaviors
-  public $actsAs = array('Containable'); //, 'Changelog' => array('priority' => 5));
+  public $actsAs = array('Containable',
+                         'Changelog' => array('priority' => 5));
   
   // Association rules from this model to other models
   public $belongsTo = array("Co");

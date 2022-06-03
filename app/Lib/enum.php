@@ -124,6 +124,10 @@ class ActionEnum
   const ProvisionerAction               = 'PRVA';
   const ProvisionerFailed               = 'PRVX';
   const ReferenceIdentifierObtained     = 'OIDR';
+  const VettingRequestCanceled          = 'VETX';
+  const VettingRequestCompleted         = 'VETD';
+  const VettingRequestRegistered        = 'VETC';
+  const VettingRequestRequeued          = 'VETQ';
 }
 
 class AdministratorEnum
@@ -307,6 +311,13 @@ class GroupEnum
   const NestedMembers = "MN";
 }
 
+class HttpServerAuthType
+{
+  const Basic         = "BA";
+  const Bearer        = "BE";
+  const None          = "X";
+}
+
 // XXX [REF]https://httpstatuses.com
 class HttpStatusCodesEnum
 {
@@ -365,6 +376,7 @@ class HttpStatusCodesEnum
 
 class IdentifierAssignmentEnum
 {
+  const Plugin     = 'P';
   const Random     = 'R';
   const Sequential = 'S';
 }
@@ -622,6 +634,8 @@ class PetitionActionEnum
   const StepFailed              = 'SX';
   const TCExplicitAgreement     = 'TE';
   const TCImpliedAgreement      = 'TI';
+  const VettingCompleted        = 'VC';
+  const VettingRequested        = 'VR';
 }
 
 class PetitionStatusEnum
@@ -636,6 +650,7 @@ class PetitionStatusEnum
   const Finalized           = 'F';
   const PendingApproval     = 'PA';
   const PendingConfirmation = 'PC';
+  const PendingVetting      = 'PV';
 }
 
 class ProvisionerModeEnum
@@ -752,6 +767,7 @@ class StatusEnum
   const Pending             = 'P';
   const PendingApproval     = 'PA';
   const PendingConfirmation = 'PC';
+  const PendingVetting      = 'PV';
   const Suspended           = 'S';
   const Declined            = 'X';
 
@@ -769,6 +785,7 @@ class StatusEnum
     'Pending'             => StatusEnum::Pending,
     'PendingApproval'     => StatusEnum::PendingApproval,
     'PendingConfirmation' => StatusEnum::PendingConfirmation,
+    'PendingVetting'      => StatusEnum::PendingVetting,
     'Suspended'           => StatusEnum::Suspended,
     'Declined'            => StatusEnum::Declined
   );
@@ -787,6 +804,7 @@ class StatusEnum
     StatusEnum::Pending             => 'Pending',
     StatusEnum::PendingApproval     => 'PendingApproval',
     StatusEnum::PendingConfirmation => 'PendingConfirmation',
+    StatusEnum::PendingVetting      => 'PendingVetting',
     StatusEnum::Suspended           => 'Suspended',
     StatusEnum::Declined            => 'Declined'
   );
@@ -880,6 +898,17 @@ class VerificationModeEnum
   const Review          = 'R';
   const SkipIfVerified  = 'V';
   const None            = 'X';
+}
+
+class VettingStatusEnum
+{
+  const Canceled      = 'X';    // Admin canceled vetting request
+  const Error         = 'ER';   // Plugin returned error
+  const Failed        = 'N';    // Plugin returned failure
+  const Passed        = 'Y';    // Plugin returned success
+  const PendingManual = 'PM';   // Plugin determined manual review is required
+  const PendingResult = 'PR';   // Plugin submitted request to API/etc and is awaiting reply
+  const Requested     = 'R';    // Vetting requested, but not complete
 }
 
 class VisibilityEnum

@@ -96,13 +96,24 @@ class ServiceEligibilityListener implements CakeEventListener {
         // The CoPersonRole id is $subjectId.
         
         $ServiceEligibility->removeByRoleId($subjectId);
-      } elseif(!empty($subjectData['CoPersonRole'])) {
+      } elseif(!empty($subjectData['CoPersonRole']['id'])) {
         // We have a CoPersonRole object in $subjectData. Note we might get here
         // with $subjectData['EnrolleeCoPersonRole'] via an Enrollment Flow, but
         // we can ignore that since there's no role yet to remove an eligibilty
         // from.
         
-        if(in_array($subjectData['CoPersonRole']['status'],
+        $status = null;
+        
+        if(!empty($subjectData['CoPersonRole']['status'])) {
+          $status = $subjectData['CoPersonRole']['status'];
+        } else {
+          // We got here via saveField, pull the status
+          
+          $CoPersonRole = ClassRegistry::init('CoPersonRole');
+          $status = $CoPersonRole->field('status', array('CoPersonRole.id' => $subjectData['CoPersonRole']['id']));
+        }
+        
+        if(in_array($status,
                     array(
                       StatusEnum::Declined,
                       StatusEnum::Deleted,
