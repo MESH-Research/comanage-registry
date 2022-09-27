@@ -80,7 +80,26 @@ class Identifier extends AppModel {
       // See also Identifier Self Service (CO-1255).
       'filter' => array(
         'rule' => array('validateInput')
-      )
+      ),
+//    XXX We (currently) don't enforce duplicate checking for CoDepartment
+//        or OrgIdentity. Uncomment the rule below in order to change this.
+//      'unique' => array(
+//        'rule' => array(
+//          'isUniqueChangelog',
+//          array(
+//            'identifier',
+//            'type',
+//            'co_person_id',
+//            'co_group_id',
+//            'org_identity_id',
+//            'organization_id',
+//            'co_department_id',
+//            'source_identifier_id'
+//            ),
+//          false),
+//        'message' => array('The Identifier is already in use.'),
+//        'last' => 'true'
+//      ),
     ),
     'type' => array(
       'content' => array(
@@ -268,6 +287,10 @@ class Identifier extends AppModel {
         catch(OverflowException $e) {
           // An identifier already exists of this type for this CO Person/CO Group
           $ret[ $ia['CoIdentifierAssignment']['identifier_type'] ] = 2;
+        }
+        catch(UnderflowException $e) {
+          // The CO Person is not a member of the configured CO Group
+          $ret[ $ia['CoIdentifierAssignment']['identifier_type'] ] = 3;
         }
         catch(Exception $e) {
           $ret[ $ia['CoIdentifierAssignment']['identifier_type'] ] = $e->getMessage();

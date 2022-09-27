@@ -452,6 +452,7 @@ class CoGroupMember extends AppModel {
     $args['conditions']['CoGroup.status'] = StatusEnum::Active;
     $args['conditions']['CoGroupMember.co_group_id'] = $coGroupId;
     $args['conditions']['CoGroupMember.co_person_id'] = $coPersonId;
+    $args['conditions']['CoGroupMember.member'] = true;
     $args['conditions']['AND'][] = array(
       'OR' => array(
         'CoGroupMember.valid_from IS NULL',
@@ -930,17 +931,13 @@ class CoGroupMember extends AppModel {
     foreach($nestings as $n) {
       if($n['CoGroupNesting']['negate']) {
         // If this is the current nesting we don't need to look anything up
-        if((($n['CoGroupNesting']['id'] == $coGroupNestingId) && $sourceMember)
-           ||
-           $this->isMember($n['CoGroupNesting']['co_group_id'], $coPersonId)) {
+        if($this->isMember($n['CoGroupNesting']['co_group_id'], $coPersonId)) {
           $negated = true;
         }
       } else {
         $pAvail++;
         
-        if((($n['CoGroupNesting']['id'] == $coGroupNestingId) && $sourceMember)
-           ||
-           $this->isMember($n['CoGroupNesting']['co_group_id'], $coPersonId)) {
+        if($this->isMember($n['CoGroupNesting']['co_group_id'], $coPersonId)) {
           $isAny = true;
           $pCount++;
         }

@@ -67,7 +67,7 @@ if(!empty($vv_app_prefs['uiMainMenuSelectedParentId']) && $drawerState != 'half-
         print '<a class="menuTop" title="' . _txt('me.people') . '" aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '" href="#">';
         print '<em class="material-icons" aria-hidden="true">person</em>';
         print '<span class="menuTitle">' . _txt('me.people') . '</span>';
-        print '<span class="fa arrow fa-fw"></span>';
+        print '<em class="material-icons arrow" aria-hidden="true">chevron_left</em>';
         print '</a>';
         print '<ul aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '" class="collapse' . ($selectedMenu == $currentMenu ? " in" : "") . '">';
         print '<li>';
@@ -204,7 +204,7 @@ if(!empty($vv_app_prefs['uiMainMenuSelectedParentId']) && $drawerState != 'half-
         print '<a class="menuTop" title="' . _txt('ct.co_groups.pl') . '" aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '" href="#">';
         print '<em class="material-icons" aria-hidden="true">group</em>';
         print '<span class="menuTitle">' . _txt('ct.co_groups.pl') . '</span>';
-        print '<span class="fa arrow fa-fw"></span>';
+        print '<em class="material-icons arrow" aria-hidden="true">chevron_left</em>';
         print '</a>';
 
         print '<ul aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '" class="collapse' . ($selectedMenu == $currentMenu ? " in" : "") . '">';
@@ -242,7 +242,7 @@ if(!empty($vv_app_prefs['uiMainMenuSelectedParentId']) && $drawerState != 'half-
         print $this->Html->link(_txt('ct.co_all_groups'), $args, array('class' => 'spin'));
         print "</li>";
 
-        // Display My Groups and My Memberships only to members with an active status in the CO and at
+        // Display My Groups, My Memberships, and Open Groups only to members with an active status in the CO and at
         // least one CoPersonRole. Determine this by investigating the $menuContent. This is identical 
         // to the constraints placed on menuUser for "My Profile" and "My Group Memberships" links.
         if(isset($cur_co)) {
@@ -271,18 +271,29 @@ if(!empty($vv_app_prefs['uiMainMenuSelectedParentId']) && $drawerState != 'half-
                 $args['plugin'] = null;
                 $args['controller'] = 'co_groups';
                 $args['action'] = 'select';
-                $args['copersonid'] = $this->Session->read('Auth.User.co_person_id');;
+                $args['copersonid'] = $this->Session->read('Auth.User.co_person_id');
                 $args['co'] = $menuCoId;
                 $args['search.member'] = '1';
                 $args['search.owner'] = '1';
                 print $this->Html->link(_txt('op.grm.my.memberships'), $args, array('class' => 'spin'));
-                print "</li>";   
+                print "</li>";
+  
+                // Groups I Can Join (Open Groups)
+                print '<li>';
+                $args = array();
+                $args['plugin'] = null;
+                $args['controller'] = 'co_groups';
+                $args['action'] = 'select';
+                $args['copersonid'] = $this->Session->read('Auth.User.co_person_id');
+                $args['co'] = $menuCoId;
+                $args['search.open'] = 't'; // show only open groups
+                print $this->Html->link(_txt('op.grm.join'), $args, array('class' => 'spin'));
+                print "</li>";
                 
               }
             }
           }
         }
-        
 
         // Plugins
         if(!empty(retrieve_plugin_menus($menuContent['plugins'], 'cogroups', $menuCoId))) {
@@ -378,8 +389,7 @@ if(!empty($vv_app_prefs['uiMainMenuSelectedParentId']) && $drawerState != 'half-
           print '<a class="menuTop" title="' . _txt('ct.co_services.pl') . '" aria-expanded="false" href="#">';
           print '<em class="material-icons" aria-hidden="true">apps</em>';
           print '<span class="menuTitle">' . _txt('ct.co_services.pl') . '</span>';
-          print '<span class="fa arrow fa-fw"></span>';
-  
+          print '<em class="material-icons arrow" aria-hidden="true">chevron_left</em>';
           print '</a>';
           print '<ul aria-expanded="false" class="collapse">';
           
@@ -522,7 +532,7 @@ if(!empty($vv_app_prefs['uiMainMenuSelectedParentId']) && $drawerState != 'half-
       print '<a href="#" class="menuTop" title="' . _txt('me.platform') . '" aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '">';
       print '<em class="material-icons" aria-hidden="true">build</em>';
       print '<span class="menuTitle">' . _txt('me.platform') . '</span>';
-      print '<span class="fa arrow fa-fw"></span>';
+      print '<em class="material-icons arrow" aria-hidden="true">chevron_left</em>';
       print '</a>';
       print '<ul aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '" class="collapse' . ($selectedMenu == $currentMenu ? " in" : "") . '">';
       

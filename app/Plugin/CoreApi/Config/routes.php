@@ -40,6 +40,30 @@ Router::connect(
   )
 );
 
+// COmanage CO Person API DELETE
+// /api/co/:coid/core/v1/people?identifier=1234567890@example.com
+Router::connect(
+  '/api/co/:coid/core/v1/people',
+  array(
+    'plugin'     => 'core_api',
+    'controller' => 'Api',
+    'action'     => 'delete',
+    '[method]'   => 'DELETE',
+  )
+);
+
+  // COmanage CO Person API PUT
+  // /api/co/:coid/core/v1/people?identifier=1234567890@example.com
+  Router::connect(
+    '/api/co/:coid/core/v1/people',
+    array(
+      'plugin'     => 'core_api',
+      'controller' => 'Api',
+      'action'     => 'update',
+      '[method]'   => 'PUT',
+    )
+  );
+
 // COmanage CO Person Read API
 Router::connect(
   '/api/co/:coid/core/v1/people/:identifier',
@@ -71,16 +95,7 @@ Router::connect(
   )
 );
 
-// Scoped identifiers are not parsed properly because they are perceived as file extensions
-// Enable extensions parse to resolve this problem
-Router::parseExtensions('json', 'xml');
-
-
-/*
-
 Router::connect(
-// XXX This needs to trigger identifier assignment and maybe some other stuff
-//     provisioning should only fire after all models are saved
   '/api/co/:coid/core/v1/people',
   array(
     'plugin'     => 'core_api',
@@ -89,4 +104,18 @@ Router::connect(
     '[method]'   => 'POST'
   )
 );
-*/
+
+// COmanage Match Resolution Callback API
+Router::connect(
+  '/api/co/:coid/core/v1/resolution',
+  array(
+    'plugin'      => 'core_api',
+    'controller'  => 'Api',
+    'action'      => 'resolveMatch',
+    '[method]'    => 'POST'
+  )
+);
+
+// Scoped identifiers are not parsed properly because they are perceived as file extensions
+// Enable extensions parse to resolve this problem
+Router::parseExtensions('json', 'xml');

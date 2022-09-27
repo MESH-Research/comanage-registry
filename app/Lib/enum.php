@@ -67,7 +67,7 @@ class ActionEnum
   const CoPersonEditedPipeline          = 'ECPL';
   const CoPersonManuallyProvisioned     = 'PCPM';
   const CoPersonMatchedPetition         = 'MCPP';
-  const CoPersonMatchedPipelne          = 'MCPL';
+  const CoPersonMatchedPipeline         = 'MCPL';
   const CoPersonProvisioned             = 'PCPA';
   const CoPersonStatusRecalculated      = 'RCPS';
   const CoPersonRoleAddedManual         = 'ACRM';
@@ -728,7 +728,8 @@ class ServerEnum
   // When adding a new server type, be sure to add it to ServersController::view_contains
   const HttpServer    = 'HT';
   const KafkaServer   = 'KA';
-  const LdapServer    = 'LD';
+// CO-1320
+//  const LdapServer    = 'LD';
   const MatchServer   = 'MT';
   const Oauth2Server  = 'O2';
   // Generic SQL Server, not "MS SQL Server"

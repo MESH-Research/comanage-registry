@@ -127,7 +127,7 @@
           $args = array('controller' => 'auth',
             'action'     => 'logout',
             'plugin'     => false);
-          print $this->Html->link(_txt('op.logout') . ' <span class="fa fa-sign-out"></span>',
+          print $this->Html->link(_txt('op.logout') . ' <em class="material-icons" aria-hidden="true">logout</em>',
             $args, array('escape'=>false, 'class' => 'btn'));
         ?>
       </div>
@@ -217,6 +217,8 @@
 
         // Plugin submenus
         // This rendering is a bit different from how render_plugin_menus() does it...
+        // Each plugin will appear by name (e.g. "Announcements") with all appropriate 
+        // COs listed beneath it. Each CO title will link to the plugin within that CO.
         if(!empty($menuContent['plugins'])) {
           $userPluginsExist = false;
           foreach(array_keys($menuContent['plugins']) as $plugin) {
@@ -241,11 +243,20 @@
                         continue;
                       }
   
+                      // Get the plugin link array
                       $args = $menuContent['plugins'][$plugin]['coperson'][$label];
   
-                      $args[] = 'copersonid:' . $co['co_person_id'];
-                      $args['plugin'] = Inflector::underscore($plugin);
-  
+                      // Always include the co_person_id and the co_id
+                      $args['copersonid'] = $co['co_person_id'];
+                      $args['co'] = $co['co_id'];
+                      
+                      // Generate the plugin path if $args['plugin'] hasn't been passed 
+                      // (it can be passed as empty '' to allow for non-plugin URLs).
+                      if(!isset($args['plugin'])) {
+                        $args['plugin'] = Inflector::underscore($plugin);  
+                      }
+                      
+                      // Generate the link
                       print '<li>' . $this->Html->link($co['co_name'], $args) . "</li>\n";
                     }
   
@@ -312,7 +323,7 @@
                     'action'     => 'login',
                     'plugin'     => false
                    );
-      print $this->Html->link(_txt('op.login') . ' <span class="fa fa-sign-in"></span>',
+      print $this->Html->link(_txt('op.login') . ' <em class="material-icons" aria-hidden="true">login</em>',
             $args, array('escape'=>false, 'id' => 'login', 'class' => ''));
     }
   ?>

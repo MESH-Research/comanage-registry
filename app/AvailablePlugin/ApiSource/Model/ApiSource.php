@@ -65,11 +65,6 @@ class ApiSource extends AppModel {
       'required' => true,
       'message' => 'An Org Identity Source ID must be provided'
     ),
-    'sor_label' => array(
-      'rule' => 'alphaNumeric',
-      'required' => true,
-      'allowEmpty' => false
-    ),
     'api_user_id' => array(
       'content' => array(
         'rule' => 'notBlank',
@@ -139,40 +134,6 @@ class ApiSource extends AppModel {
     foreach(array('kafka_server_id', 'kafka_groupid', 'kafka_topic') as $f) {
       $this->validate[$f]['required'] = false;
       $this->validate[$f]['allowEmpty'] = true;
-    }
-    
-    return true;
-  }
-  
-  /**
-   * Actions to take before a save operation is executed.
-   *
-   * @since  COmanage Registry v3.3.0
-   */
-
-  public function beforeSave($options = array()) {
-    if(!empty($this->data['ApiSource']['sor_label'])) {
-      // Make sure sor_label isn't already in use in this CO
-      
-      $coId = $this->OrgIdentitySource->field('co_id', array('OrgIdentitySource.id' => 
-                                                             $this->data['ApiSource']['org_identity_source_id']));
-      
-      $args = array();
-      $args['joins'][0]['table'] = 'org_identity_sources';
-      $args['joins'][0]['alias'] = 'OrgIdentitySource';
-      $args['joins'][0]['type'] = 'INNER';
-      $args['joins'][0]['conditions'][0] = 'OrgIdentitySource.id=ApiSource.org_identity_source_id';
-      $args['conditions']['OrgIdentitySource.co_id'] = $coId;
-      $args['conditions']['ApiSource.sor_label'] = $this->data['ApiSource']['sor_label'];
-      // We don't want to test against our own record
-      $args['conditions']['ApiSource.id NOT'] = $this->data['ApiSource']['id'];
-      $args['contain'] = false;
-      
-      $recs = $this->find('count', $args);
-      
-      if($recs > 0) {
-        throw new InvalidArgumentException(_txt('er.apisource.label.inuse', array($this->data['ApiSource']['sor_label'])));
-      }
     }
     
     return true;
@@ -346,15 +307,16 @@ class ApiSource extends AppModel {
    * Insert or update an ApiSource Record and associated Org Identity.
    *
    * @since  COmanage Registry v4.0.0
-   * @param  integer $id    ApiSource ID
-   * @param  boolean $oisId Org Identity Source ID
-   * @param  integer $coId  CO ID
-   * @param  string  $sorid System of Record ID
-   * @param  array   $json  Array, from json_decode
+   * @param  integer $id                ApiSource ID
+   * @param  boolean $oisId             Org Identity Source ID
+   * @param  integer $coId              CO ID
+   * @param  string  $sorid             System of Record ID
+   * @param  array   $json              Array, from json_decode
+   * @param  integer $targetCoPersonId  CO Person ID to link to, if known
    * @return array          Array with keys 'org_identity_id' and 'new' (indicating if the OrgIdentity was newly created)
    */
   
-  public function upsert($id, $oisId, $coId, $sorid, $json) {
+  public function upsert($id, $oisId, $coId, $sorid, $json, $targetCoPersonId=null) {
     $args = array();
     $args['conditions']['ApiSourceRecord.api_source_id'] = $id;
     $args['conditions']['ApiSourceRecord.sorid'] = $sorid;
@@ -393,26 +355,40 @@ class ApiSource extends AppModel {
     
     $curoisrec = $this->OrgIdentitySource->OrgIdentitySourceRecord->find('first', $args);
     
-    $orgId = null;
+    $ret = array();
     
     if(!empty($curoisrec)) {
       // Update
       
       $info = $this->OrgIdentitySource->syncOrgIdentity($oisId, $sorid);
       
-      return array(
-        'org_identity_id' => $info['id'],
-        'new' => false
-      );
+      $ret['org_identity_id'] = $info['id'];
+      $ret['new'] = false;
     } else {
       // Create
       
-      $newOrgId = $this->OrgIdentitySource->createOrgIdentity($oisId, $sorid, null, $coId);
+      $newOrgId = $this->OrgIdentitySource->createOrgIdentity($oisId, $sorid, null, $coId, $targetCoPersonId);
       
-      return array(
-        'org_identity_id' => $newOrgId,
-        'new' => true
-      );
+      $ret['org_identity_id'] = $newOrgId;
+      $ret['new'] = true;
     }
+    
+    // Map the Org Identity to a CO Person ID, which might have been created by
+    // a pipeline, and should be the same as $targetCoPersonId (if set).
+    
+    $args = array();
+    $args['conditions']['CoOrgIdentityLink.org_identity_id'] = $ret['org_identity_id'];
+    $args['contain'] = false;
+    
+    $link = $this->OrgIdentitySource
+                 ->OrgIdentitySourceRecord
+                 ->OrgIdentity
+                 ->CoOrgIdentityLink->find('first', $args);
+    
+    if(!empty($link)) {
+      $ret['co_person_id'] = $link['CoOrgIdentityLink']['co_person_id'];
+    }
+    
+    return $ret;
   }
 }
