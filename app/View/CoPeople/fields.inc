@@ -700,7 +700,7 @@
                         $badge_list[] = array(
                           'order' => $this->Badge->getBadgeOrder('Owner'),
                           'text' => _txt('fd.group.own'),
-                          'color' => $this->Badge->getBadgeColor('Primary'),
+                          'color' => $this->Badge->getBadgeColor('Light'),
                         );
                         // Member Badge
                         $badge_list[] = array(
@@ -712,7 +712,7 @@
                         $badge_list[] = array(
                           'order' => $this->Badge->getBadgeOrder('Owner'),
                           'text' => _txt('fd.group.own.only'),
-                          'color' => $this->Badge->getBadgeColor('Primary'),
+                          'color' => $this->Badge->getBadgeColor('Light'),
                         );
                       }
                     } elseif($g['member']) {
@@ -819,7 +819,7 @@
                     $badge_list[] = array(
                       'order' => $this->Badge->getBadgeOrder('Owner'),
                       'text' => _txt('fd.group.own'),
-                      'color' => $this->Badge->getBadgeColor('Primary'),
+                      'color' => $this->Badge->getBadgeColor('Light'),
                     );
                   }
                   if(!empty($group_memberships[$auto_group_format['key']])) {
@@ -1002,7 +1002,7 @@
 
             print $this->Html->link(_txt('op.add'),
                 $linktarget,
-                $linkparams) . "\n";
+                $linkparams) . PHP_EOL;
             print '</div>';
           }
           ?>
@@ -1063,7 +1063,7 @@
                   if(!empty($r['affiliation'])) {
                     $badge_list_role[] = array(
                       'order' => $this->Badge->getBadgeOrder('Title'),
-                      'text' => ucfirst(filter_var($r['affiliation'], FILTER_SANITIZE_SPECIAL_CHARS)),
+                      'text' => (filter_var($vv_copr_affiliation_types[$r['affiliation']], FILTER_SANITIZE_SPECIAL_CHARS)),
                       'color' => $this->Badge->getBadgeColor('Light'),
                     );
                   }
@@ -1075,14 +1075,15 @@
                     );
                   }
                   $cou_name = (empty($r['Cou']['name']))
-                              ? '<cite class="text-muted-cmg"><i class="mr-1 fa fa-caret-down"></i>empty</cite>'
-                              : '<i class="fa fa-caret-down"></i> ' . filter_var($r['Cou']['name'], FILTER_SANITIZE_SPECIAL_CHARS);
+                              ? '<cite class="text-muted-cmg"><em class="mr-1 material-icons">expand_less</em>empty</cite>'
+                              : '<em class="material-icons">expand_less</em> ' . filter_var($r['Cou']['name'], FILTER_SANITIZE_SPECIAL_CHARS);
 
                   // COU Name Column
                   print '<li class="field-data-container centered">';
                   print '<div class="field-data flex-column">';
                   $linkparams = array(
                     'id' => 'role-content_' . md5("CoPersonRole" . $r['id']),
+                    'class' => 'collapsed',
                     'aria-controls' => 'collapse_link_' . md5("CoPersonRole" . $r['id']),
                     'escape' => false,
                     'data-toggle' => 'collapse',
@@ -1218,7 +1219,8 @@
                   $card_role_args[_txt('fd.ordr')] = !empty($r['ordr']) ? filter_var($r['ordr'], FILTER_SANITIZE_SPECIAL_CHARS) : '-';
                   $card_role_args[_txt('fd.cou')] = !empty($r['Cou']['name']) ? filter_var($r['Cou']['name'], FILTER_SANITIZE_SPECIAL_CHARS) : '-';
                   $card_role_args[_txt('fd.title')] = !empty($r['title']) ? filter_var($r['title'], FILTER_SANITIZE_SPECIAL_CHARS) : '-';
-                  $card_role_args[_txt('fd.affiliation')] = !empty($r['affiliation']) ? filter_var($r['affiliation'], FILTER_SANITIZE_SPECIAL_CHARS) : '-';
+                  $card_role_args[_txt('fd.affiliation')] = !empty($r['affiliation']) ? filter_var($vv_copr_affiliation_types[$r['affiliation']], FILTER_SANITIZE_SPECIAL_CHARS) : '-';
+                  $card_role_args[_txt('fd.o')] = !empty($r['o']) ? filter_var($r['o'], FILTER_SANITIZE_SPECIAL_CHARS) : '-';
                   $card_role_args[_txt('fd.valid_from')] = !empty($r['valid_from']) ? filter_var($r['valid_from'], FILTER_SANITIZE_SPECIAL_CHARS) : '-';
                   $card_role_args[_txt('fd.valid_through')] = !empty($r['valid_through']) ? filter_var($r['valid_through'], FILTER_SANITIZE_SPECIAL_CHARS) : '-';
                   $card_role_args[_txt('fd.status')] = $status;
@@ -1270,8 +1272,8 @@
               foreach($co_people[0]['CoOrgIdentityLink'] as $link) {
                 // Organization Name and Id
                 $orgid_name = empty($link['OrgIdentity']['PrimaryName'])
-                    ? '<cite class="text-muted-cmg"><i class="mr-1 fa fa-caret-down"></i>empty</cite>'
-                    : '<i class="fa fa-caret-down"></i> ' . filter_var(generateCn($link['OrgIdentity']['PrimaryName']),FILTER_SANITIZE_SPECIAL_CHARS);
+                    ? '<cite class="text-muted-cmg"><em class="mr-1 material-icons">expand_less</em>empty</cite>'
+                    : '<em class="material-icons">expand_less</em> ' . filter_var(generateCn($link['OrgIdentity']['PrimaryName']),FILTER_SANITIZE_SPECIAL_CHARS);
 
                 $identifier = array();
                 if(!empty($link['OrgIdentity']['Identifier'])) {
@@ -1287,13 +1289,16 @@
                   $badge_list_org[] = array(
                     'order' => $this->Badge->getBadgeOrder('Status'),
                     'text' => _txt('op.login'),
-                    'color' => $this->Badge->getBadgeColor('Primary'),
+                    'color' => $this->Badge->getBadgeColor('Light'),
+                    'outline' => true,
                   );
                 }
+                // XXX  For OrgIdentity.affiliation we want to use the CoPersonRole values
+                //      AppModel::types($coId, $attribute)
                 if(!empty($link["OrgIdentity"]["affiliation"])) {
                   $badge_list_org[] = array(
                     'order' => $this->Badge->getBadgeOrder('Title'),
-                    'text' => ucfirst(filter_var($link["OrgIdentity"]["affiliation"], FILTER_SANITIZE_SPECIAL_CHARS)),
+                    'text' => filter_var($vv_copr_affiliation_types[$link["OrgIdentity"]["affiliation"]], FILTER_SANITIZE_SPECIAL_CHARS),
                     'color' => $this->Badge->getBadgeColor('Light'),
                   );
                 }
@@ -1302,6 +1307,7 @@
                 print '<div class="field-data flex-column">';
                 $linkparams = array(
                   'id' => 'role-content_' . md5("OrgIdentity" . $link['OrgIdentity']['id']),
+                  'class' => 'collapsed',
                   'aria-controls' => 'collapse_link_' . md5("OrgIdentity" . $link['OrgIdentity']['id']),
                   'escape' => false,
                   'data-toggle' => 'collapse',
@@ -1321,7 +1327,7 @@
                       'vv_badge_list' =>
                         array(
                           array(
-                            'text' => $type,
+                            'text' => $vv_identifiers_types[$type],
                             'color' => $this->Badge->getBadgeColor('Secondary'),
                             'outline' => true,
                           ),
@@ -1440,7 +1446,7 @@
                                                         $cm_texts[ $cm_lang ]['en.status.org'][ $link['OrgIdentity']['status'] ],
                                                         FILTER_SANITIZE_SPECIAL_CHARS) : '-';
                 $card_org_args[_txt('fd.affiliation')] = !empty($link['OrgIdentity']['affiliation'])
-                                               ? filter_var($link['OrgIdentity']['affiliation'], FILTER_SANITIZE_SPECIAL_CHARS) : '-';
+                                               ? filter_var($vv_copr_affiliation_types[$link["OrgIdentity"]["affiliation"]], FILTER_SANITIZE_SPECIAL_CHARS) : '-';
                 $card_org_args[_txt('fd.date_of_birth')] = !empty($link['OrgIdentity']['date_of_birth'])
                                                ? filter_var($link['OrgIdentity']['date_of_birth'], FILTER_SANITIZE_SPECIAL_CHARS) : '-';
                 $card_org_args[_txt('fd.valid_from.tz', array($vv_tz))] = (isset($link['OrgIdentity']['valid_from']) && $link['OrgIdentity']['valid_from'] > 0)

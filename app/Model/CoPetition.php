@@ -1342,6 +1342,7 @@ class CoPetition extends AppModel {
     try {
       $referenceId = $this->Co->Server->MatchServer->requestReferenceIdentifier(
         $pt['CoEnrollmentFlow']['match_server_id'],
+        $pt['CoEnrollmentFlow']['sor_label'],
         null,
         $pt['CoPetition']['enrollee_co_person_id'],
         $requestedReferenceId
@@ -2485,6 +2486,24 @@ class CoPetition extends AppModel {
         $enrolleeName = generateCn($pt['EnrolleeOrgIdentity']['PrimaryName']);
       }
       
+      // Select from the petition the CoPersonRole associated with the
+      // enrollee and the enrollment flow.
+      $enrolleeCoPersonRole = null;
+      if(!empty($pt['EnrolleeCoPerson']['CoPersonRole']) && !empty($pt['CoPetition']['enrollee_co_person_role_id'])) {
+        if(is_array($pt['EnrolleeCoPerson']['CoPersonRole'])) {
+          $roles = $pt['EnrolleeCoPerson']['CoPersonRole'];
+        } else {
+          $roles = array();
+          $roles[] = $pt['EnrolleeCoPerson']['CoPersonRole'];
+        }
+        foreach($roles as $r) {
+          if($r['id'] == $pt['CoPetition']['enrollee_co_person_role_id']) {
+            $enrolleeCoPersonRole = $r;
+            break;
+          }
+        }
+      }
+      
       // Pull the message components from the template (as of v2.0.0) or configuration
       // (now deprecated), if either is set. (Finalize only supports templates.)
       
@@ -2499,10 +2518,13 @@ class CoPetition extends AppModel {
         'APPROVER_COMMENT' => (!empty($pt['CoPetition']['approver_comment'])
                                ? $pt['CoPetition']['approver_comment'] : null),
         'CO_PERSON' => generateCn($pt['EnrolleeCoPerson']['PrimaryName']),
-        'NEW_COU'   => (!empty($pt['EnrolleeCoPerson']['CoPersonRole'][0]['Cou']['name'])
-                        ? $pt['EnrolleeCoPerson']['CoPersonRole'][0]['Cou']['name'] : null),
-        'SPONSOR'   => (!empty($pt['EnrolleeCoPerson']['CoPersonRole'][0]['SponsorCoPerson']['PrimaryName'])
-                        ? generateCn($pt['EnrolleeCoPerson']['CoPersonRole'][0]['SponsorCoPerson']['PrimaryName']) : null)
+        'CO_PERSON_ID' => $pt['EnrolleeCoPerson']['id'],
+        'NEW_COU'   => (!empty($enrolleeCoPersonRole['Cou']['name'])
+                        ? $enrolleeCoPersonRole['Cou']['name'] : null),
+        'SPONSOR'   => (!empty($enrolleeCoPersonRole['SponsorCoPerson']['PrimaryName'])
+                        ? generateCn($enrolleeCoPersonRole['SponsorCoPerson']['PrimaryName']) : null),
+        'SPONSOR_ID' => (!empty($enrolleeCoPersonRole['SponsorCoPerson']['id'])
+                        ? $enrolleeCoPersonRole['SponsorCoPerson']['id'] : null),
       );
       
       // Create substitution rules for any defined identifiers.
@@ -2794,7 +2816,9 @@ class CoPetition extends AppModel {
     // Should we proceed with Email Confirmation or not?
     if(!$toEmail) {
       throw new RuntimeException(_txt('er.pt.mail',
-        array(generateCn($pt['EnrolleeCoPerson']['PrimaryName']))));
+        array(!empty($pt['EnrolleeCoPerson']['PrimaryName']) 
+              ? generateCn($pt['EnrolleeCoPerson']['PrimaryName'])
+              : _txt('fd.enrollee.new'))));
     }
 
     // Pull the message components from the template (as of v2.0.0) or configuration

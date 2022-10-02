@@ -30,6 +30,7 @@ class CoreApiEnum
   const CoPersonRead      = "CR";
   // Write implies Read
   const CoPersonWrite     = "CW";
+  const MatchCallback     = "MC";
 }
 
 class ResponseTypeEnum

@@ -88,14 +88,6 @@
       add_observer(elem, 'tr', 'highlight');
     });
 
-    // Handle caret up/down toggle
-    $('li.field-data-container').on('shown.bs.collapse', function () {
-      $(this).find('.field-data > a i').removeClass('fa-caret-down').addClass('fa-caret-up');
-    })
-    $('li.field-data-container').on('hidden.bs.collapse', function () {
-      $(this).find('.field-data > a i').removeClass('fa-caret-up').addClass('fa-caret-down');
-    })
-
     $('#user-panel-toggle,#user-notifications,#global-search').on('click', function() {
       if($(window).width() < 768) {
         if ($('#navigation-drawer').is(':visible')) {
@@ -148,14 +140,13 @@
 
     // Desktop half-closed drawer behavior & expandable menu items
     $('#navigation-drawer a.menuTop').click(function () {
-      // widen the menu while a.menuTop is expanded so we can see the menu items
-      if ($("#navigation-drawer").hasClass("half-closed")) {
+      if($("#navigation-drawer").hasClass("half-closed") && $(this).attr("aria-expanded") == "true") {
+        // widen the menu when we open a.menuTop so we can see the menu items
         $("#navigation-drawer").removeClass("half-closed").addClass("intermediate-open");
-      } else {
+      }
+      if($("#navigation-drawer").hasClass("intermediate-open") && $(this).attr("aria-expanded") == "false") {
         // close it back down if we're in the intermediate state and we close a.menuTop
-        if ($("#navigation-drawer").hasClass("intermediate-open")) {
-          $("#navigation-drawer").removeClass("intermediate-open").addClass("half-closed");
-        }
+        $("#navigation-drawer").addClass("half-closed").removeClass("intermediate-open");
       }
 
       // Save the ID of the most recently expanded menuTop item in an Application Preference
@@ -598,23 +589,25 @@
       }
     });
 
-    // Add loading animation when a form is submitted
-    // or when any item with a "spin" class is clicked.
-    // XXX we might consider applying this to all anchors except for those marked for exclusion
-    $("input[type='submit'], .spin").click(function() {
-      displaySpinner();
-
-      // XXX This is a workaround. Currently the sidebar actions in CO Person Canvas
-      //     are part of the form. As a result the spinner is dismissed immediately after
-      if($(this).hasClass('ignore-invalid')) {
-        return;
+    // Add loading animation when a form is submitted or when any item with a "spin" class is clicked.
+    $("input[type='submit'], .spin").click(function(e) {
+      
+      // Start a spinner only if CTRL, CMD, or SHIFT is not pressed (which loads a new tab or window).
+      if(!(e.ctrlKey || e.metaKey || e.shiftKey)) {
+        displaySpinner();
+  
+        // XXX This is a workaround. Currently the sidebar actions in CO Person Canvas
+        //     are part of the form. As a result the spinner is dismissed immediately after
+        if($(this).hasClass('ignore-invalid')) {
+          return;
+        }
+  
+        // Test for invalid fields (HTML5) and turn off spinner explicitly if found.
+        if(document.querySelectorAll(":invalid").length) {
+          stopSpinner();
+        }
       }
-
-      // Test for invalid fields (HTML5) and turn off spinner explicitly if found
-      if(document.querySelectorAll(":invalid").length) {
-        stopSpinner();
-      }
-
+      
     });
 
     // Flash Messages
@@ -664,4 +657,8 @@
   var defaultConfirmOk = "<?php print _txt('op.ok'); ?>";
   var defaultConfirmCancel = "<?php print _txt('op.cancel'); ?>";
   var defaultConfirmTitle = "<?php print _txt('op.confirm'); ?>";
+  
+  // Define default text for session timeout and unknown errors
+  var defaultHttp500 = "<?php print _txt('er.500'); ?>";
+  var defaultHttp401 = "<?php print _txt('er.timeout'); ?>";
 </script>

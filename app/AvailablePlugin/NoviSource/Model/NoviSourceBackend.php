@@ -199,11 +199,20 @@ class NoviSourceBackend extends OrgIdentitySourceBackend {
   public function search($attributes) {
     $ret = array();
     
+    // EF OIS uses 'mail', but Novi uses 'email'
+    if(!empty($attributes['mail']) && !isset($attributes['email'])) {
+      $attributes['email'] = $attributes['mail'];
+      unset($attributes['mail']);
+    }
+
     $results = $this->queryNovi($attributes);
     
     if($results->TotalCount > 0) {
       foreach($results->Results as $r) {
-        $ret[ $r->UniqueID ] = $this->resultToOrgIdentity($r);
+        // Track the same behavior as retrieve() for Active && MemberStatus
+        if($r->Active && in_array($r->MemberStatus, array('current', 'grace_period'))) {
+          $ret[ $r->UniqueID ] = $this->resultToOrgIdentity($r);
+        }
       }
     }
     

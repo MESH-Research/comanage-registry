@@ -25,12 +25,11 @@
  */
 
 /* HTML, BODY, HEADINGS, ANCHORS, FONTS */
-@import url("fonts/notosans_regular/stylesheet.css");
-@import url("fonts/notosans_bold/stylesheet.css");
+@import url("fonts/opensans/stylesheet.css");
 @import url("fonts/material-icons/material-icons.css");
 
 html * {
-  font-family: 'Noto Sans','Trebuchet MS',Arial,Helvetica,sans-serif;
+  font-family: 'open_sansregular',Arial,Helvetica,sans-serif;
 }
 body {
   color: var(--cmg-color-black-002);
@@ -38,7 +37,6 @@ body {
   font-size: 12px;
 }
 h1,h2,h3,h4,h5 {
-  font-family: 'Noto Sans Bold','Noto Sans','Trebuchet MS',Arial,Helvetica,sans-serif;
   color: #555;
 }
 h1 {
@@ -51,7 +49,6 @@ h1.loginMsg {
   text-align: center;
 }
 h1.firstPrompt {
-  font-family: 'Noto Sans','Trebuchet MS',Arial,Helvetica,sans-serif;
   font-size: 1.2em;
   font-weight: normal;
   overflow: hidden;
@@ -297,7 +294,6 @@ body.logged-in #user-menu {
   font-size: 1.1em;
   font-weight: normal;
   margin: 1em 0 0 1em;
-  font-family: 'Noto Sans','Trebuchet MS',Arial,Helvetica,sans-serif;
 }
 #user-panel #panel-orgid-container {
   margin-top: 2em;
@@ -385,7 +381,6 @@ form#notificationStatus {
   color: var(--cmg-color-white);
   cursor: pointer;
   display: inline-block;
-  font-family: "Roboto","Helvetica","Arial",sans-serif;
   font-size: 14px;
   font-weight: 500;
   letter-spacing: 0;
@@ -397,6 +392,12 @@ form#notificationStatus {
   text-decoration: none;
   text-transform: uppercase;
   vertical-align: middle;
+}
+#login .material-icons {
+  font-size: 1rem;
+  vertical-align: middle;
+  position: relative;
+  top: -2px;
 }
 #welcome-login {
   text-align: center;
@@ -410,6 +411,12 @@ form#notificationStatus {
 #logout-in-panel {
   margin: 4px 0 -8px;
   text-align: right;
+}
+#logout-in-panel .material-icons {
+  font-size: 1rem;
+  vertical-align: top;
+  position: relative;
+  top: 3px;
 }
 /* Specialty Buttons */
 .co-raised-button {
@@ -431,28 +438,21 @@ form#notificationStatus {
   font-weight: bold;
 }
 .noty_icon{
-  margin-right: 4px;
+  display: none;
 }
-.warbg{
-  background-image: url("../js/jquery/jquery-ui-1.12.1.custom/images-comanage/ui-icons_826262_256x240.png") !important;
+.noty_close { /* always show */
+  opacity: 0.7 !important;
 }
-.sucbg{
-  background-image: url("../js/jquery/jquery-ui-1.12.1.custom/images-comanage/ui-icons_006400_256x240.png") !important;
+.noty_type_error {
+  background-color: #d00;
 }
-.errbg{
-  background-image: url("../js/jquery/jquery-ui-1.12.1.custom/images-comanage/ui-icons_ffffff_256x240.png") !important;
-}
-.notbg{
-  background-image: url("../js/jquery/jquery-ui-1.12.1.custom/images-comanage/ui-icons_444444_256x240.png") !important;
+.warbg, .sucbg, .errbg, .notbg {
+  background-image: none !important;
 }
 /* General icon and box styling */
 .co-info { /* info icon */
   float: left;
   margin: 0.3em 0.3em 0 0;
-}
-.co-alert { /* alert icon */
-  float:left;
-  margin:0 7px 20px 0;
 }
 .co-info-topbox {
   clear: both;
@@ -555,9 +555,6 @@ form#notificationStatus {
   color: #06c;
   background-color: #fafafa;
 }
-#main-menu .fa-fw {
-  width: 2em;
-}
 #main-menu li.active a.menuTop {
   background-color: #f2f2f2;
 }
@@ -567,6 +564,14 @@ form#notificationStatus {
 #main-menu .material-icons {
   margin-right: 6px;
   vertical-align: bottom;
+}
+#main-menu .material-icons.arrow {
+  margin: 0 0.25em 0;
+  font-size: 1.4em;
+  color: #555;
+}
+#main-menu .co-expandable-menu-item.active .material-icons.arrow {
+  transform: rotate(-90deg);
 }
 #main-menu #serviceMenu ul .material-icons {
   font-size: 1.1em;
@@ -902,13 +907,13 @@ body.co_people.canvas .titleNavContainer {
 #enrollmentFlowSteps li.incomplete {
   font-style: italic;
   text-indent: 0;
-  color: #999;
+  color: #666;
 }
 #enrollmentFlowSteps li.selected .material-icons {
-  color: #53B1F4;
+  color: #0c75c0;
 }
 #enrollmentFlowSteps li.complete .material-icons {
-  color: #6eac2c;
+  color: #070;
 }
 #enrollmentFlowSteps li.stopped .material-icons {
   color: #cd0a0a;
@@ -1019,6 +1024,100 @@ iframe#tandc_content {
   width: 100%;
   height: 100%;
 }
+/* CHECK DUPLICATES (RECONCILE) TABLE */
+#reconcile-table-container {
+  /* Allow the table to scroll on the x axis if too large */
+  overflow-x: auto;
+  max-width: 100vw;
+}
+#reconcile-table {
+  width: auto;
+  border: none;
+  font-size: 0.8em;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+#reconcile-table td,
+#reconcile-table th {
+  border: 1px solid var(--cmg-color-lightgray-006);
+  vertical-align: top;
+  padding: 1em;
+  background-color: var(--cmg-color-white);
+}
+#reconcile-table td {
+  padding: 1em;
+}
+#reconcile-table th {
+  font-weight: normal;
+  color: var(--cmg-color-black);
+}
+#reconcile-table th.col-names {
+  text-align: center;
+  background-color: var(--cmg-color-white);
+  border: none;
+  font-weight: bold;
+}
+#reconcile-table td.empty {
+  background-color: var(--cmg-color-white) !important;
+  border: none;
+  font-size: 0.5em;
+}
+#reconcile-table tbody td.reference-ids {
+  text-align: center;
+  word-break: break-all;
+  background-color: var(--cmg-color-lightgray-003) !important;
+}
+#reconcile-table td.reconcile-actions {
+  text-align: center;
+  white-space: nowrap;
+}
+#reconcile-table .btn {
+  font-size: 1em;
+}
+#reconcile-table th.attr-title {
+  border: none;
+  border-right: 1px solid var(--cmg-color-white); /* avoid scrolled content appearing in the border spacing */
+  background-color: var(--cmg-color-white);
+  text-align: right;
+  white-space: nowrap;
+}
+#reconcile-table .match-attributes-row td {
+  padding: 0 1em;
+}
+#reconcile-table .match-attr-name {
+  text-transform: capitalize;
+}
+#reconcile-table .reconcile-fields {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr; 
+  /* An alternative for grid-auto-columns is minmax(0, 1fr) - but by allowing the #reconcile-table-container
+     to overflow-x: scroll, we can get cleaner layout that works better for all devices. */ 
+}
+#reconcile-table .reconcile-fields ul.match-attr-list {
+  padding: 1em 1em 1em 0;
+  margin: 0;
+  border-top: 1px dashed var(--cmg-color-lightgray-008);
+  list-style: none;
+  white-space: nowrap;
+}
+#reconcile-table .reconcile-fields ul.match-attr-list:first-child {
+  border-top: none;
+}
+#reconcile-table .reconcile-fields ul.match-attr-list li.match {
+  background-color: var(--cmg-color-green-003);
+}
+/* set the borders on the "new" reference id */
+#reconcile-table tbody td:nth-child(2) {
+  border-left: 2px solid var(--cmg-color-lightgray-007);
+  border-right: 2px solid var(--cmg-color-lightgray-007);
+}
+#reconcile-table tbody tr:first-child td:nth-child(2) {
+  border-top: 2px solid var(--cmg-color-lightgray-007);
+}
+#reconcile-table tbody tr:last-child td:nth-child(2) {
+  border-bottom: 2px solid var(--cmg-color-lightgray-007);
+}
 /* INVITATIONS */
 .invitation {
   clear: both;
@@ -1040,7 +1139,7 @@ iframe#tandc_content {
 }
 #view_co_petition .status.Y,  /* approved */
 #view_co_petition .status.F { /* finalized */
-  background-color: #2a2;
+  background-color: #282;
   color: var(--cmg-color-white);
 }
 #view_co_petition .status.N { /* denied */
@@ -1105,10 +1204,6 @@ body.petitionerAttributes td {
   margin: 0.5em 0;
   float: right !important;
 }
-body.co_petitions .approve-button .ui-icon,
-body.co_petitions .deny-button .ui-icon {
-  background-image: url("../js/jquery/jquery-ui-1.12.1.custom/images-comanage/ui-icons_ffffff_256x240.png");
-}
 body.co_petitions .approve-button,
 body.co_petitions .deny-button,
 #vetting-plugin-wrapper .approve-button,
@@ -1121,21 +1216,21 @@ body.co_petitions .deny-button,
 body.co_petitions .approve-button,
 #vetting-plugin-wrapper .approve-button {
   float: left;
-  background-color: #2a2 !important;
+  background-color: #070;
   background-image: none;
 }
 body.co_petitions .approve-button:hover,
 #vetting-plugin-wrapper .approve-button:hover {
-  background-color: #3b3;
+  background-color: #181;
 }
 body.co_petitions .deny-button,
 #vetting-plugin-wrapper .deny-button {
-  background-color: #c33 !important;
+  background-color: #b00;
   background-image: none;
 }
 body.co_petitions .deny-button:hover,
 #vetting-plugin-wrapper .deny-button:hover {
-  background-color: #d44 !important;
+  background-color: #c33;
 }
 /* for T&Cs */
 .tc-checkbox-and-label {
@@ -1564,7 +1659,6 @@ a.ui-button:visited,
   font-size: 0.9em;
   width: 80px;
   line-height: 28px;
-  height: 28px;
   margin: 1em 0.5em;
   padding: 0;
 }
@@ -1628,13 +1722,12 @@ a.ui-button:visited,
   padding: 2px 4px;
   border: 1px solid #ddd;
   background-color: #fff;
-  width: calc(100% - 170px);
+  width: calc(100% - 184px);
 }
 .top-filter .submit-button {
   font-size: 0.9em;
   width: 80px;
   line-height: 24px;
-  height: 28px;
   margin: 0.25em;
   padding: 0;
 }
@@ -1743,9 +1836,19 @@ li .dropdown-item {
   padding: 0.3em 0;
   margin: 1em 0 0 0;
 }
+#content .fieldGroupName .material-icons,
+#content #changeLog .material-icons {
+  margin-top: 1px;
+}
 .coAddEditButtons {
   float: right;
   clear: left;
+}
+#content .field-actions-menu .material-icons {
+  font-size: 15px;
+}
+#content .field-actions-menu .coAddEditButtons .material-icons {
+  font-size: 12px;
 }
 body.co_people .addbutton {
   border: none;
@@ -1981,10 +2084,10 @@ ul.form-list li.fields-submit {
   background-color: unset;
 }
 ul.form-list li.warn-level-a {
-  background-color: var(--cmg-color-warn-yellow);
+  background-color: var(--cmg-color-warn-red);
 }
 ul.form-list li.warn-level-b {
-  background-color: var(--cmg-color-warn-red);
+  background-color: var(--cmg-color-warn-yellow);
 }
 ul.form-list .field-name {
   display: block;
@@ -2114,10 +2217,10 @@ ul.form-list li.field-stack textarea {
   opacity: 0.6;
   position: relative;
 }
-.checkbox-replace-container .fa {
-  font-size: 1.3em;
-  margin-right: 6px;
+#content .checkbox-replace-container .material-icons {
+  margin: 0 .3125rem 0 -.12rem;
   color: #555;
+  font-size: 16px;
 }
 .form-check-input.checkbox-replace {
   display: none;
@@ -2257,6 +2360,10 @@ ul, ol { /* MDL override XXX check if still needed */
 #tabs-role .field-data-container .field-data > a {
   color: inherit;
 }
+#tabs-orgid .field-data-container .field-data > a.collapsed .material-icons,
+#tabs-role .field-data-container .field-data > a.collapsed .material-icons {
+  transform: rotate(180deg);
+}
 tr.tr-highlight td,
 tr.tr-highlight th,
 tr.highlight td {
@@ -2276,11 +2383,11 @@ tr.highlight td:first-child {
 }
 .warn-level-a,
 .warn-level-a td {
-  background-color: var(--cmg-color-warn-yellow);
+  background-color: var(--cmg-color-warn-red);
 }
 .warn-level-b,
 .warn-level-b td {
-  background-color: var(--cmg-color-warn-red);
+  background-color: var(--cmg-color-warn-yellow);
 }
 .asc, .desc {
   font-style: italic;
@@ -2573,6 +2680,10 @@ td.indented {
   font-size: 0.9em;
   margin: -0.5em 0 0 0.1em;
 }
+.btn-sm .material-icons {
+  font-size: 15px;
+  vertical-align: top;
+}
 .btn-primary,
 .btn-primary:focus,
 .btn-primary:active {
@@ -2629,6 +2740,9 @@ td.indented {
   display: block;
   padding: 0.5em;
 }
+.dropdown-item > a:active {
+  background-color: var(--cmg-color-lightgray-004);
+}
 .dropdown-item > a:focus,
 .dropdown-item > a:hover {
   text-decoration: none !important;
@@ -2643,6 +2757,114 @@ td.indented {
 }
 .smaller {
   font-size: smaller;
+}
+.invalid-feedback {
+  font-size: 1em;
+}
+/* SELF-SERVICE WIDGETS (PLUGIN) Common Styles */
+.cm-ssw {
+  border: 1px solid var(--cmg-color-gray-border);
+  padding: 0;
+}
+.cm-ssw .hidden {
+  display: none;
+}
+.cm-ssw-display {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1em;
+}
+ul.cm-ssw-field-list {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+  row-gap: 0.5em;
+}
+ul.cm-ssw-field-list li {
+  padding: 0 1em;
+}
+.cm-ssw-display.editing ul.cm-ssw-field-list {
+  column-gap: 1em;
+}
+.cm-ssw-display.editing ul.cm-ssw-field-list li {
+  padding: 0;
+}
+ul.cm-ssw-field-list ul.dropdown-menu li {
+  padding: 0;
+}
+ul.cm-ssw-field-list ul.dropdown-menu button.btn {
+  text-transform: none;
+  padding: 0.5em 0.75em;
+}
+.cm-ssw-form-row:last-child {
+  border-bottom: none;
+}
+.cm-ssw-form-row-fields {
+  display: flex;
+  align-items: end;
+  padding: 1em;
+}
+.cm-ssw-form-field-type {
+  margin-left: 0.5em;
+}
+.cm-ssw-form-field.form-group {
+  margin-bottom: unset;
+}
+.cm-ssw-form-field.form-check {
+  margin: 1.5em 3em 0 1em;
+  font-size: 1.3em;
+}
+.cm-ssw-update-form .material-icons {
+  position: relative;
+  top: -2px;
+}
+.cm-ssw-form-field.form-group label {
+  font-size: 1.5em;
+}
+.cm-ssw-form-actions {
+  margin-top: 1em;
+}
+.cm-ssw .badge {
+  margin-left: 0.5em;
+}
+.cm-ssw .cm-ssw-edit-container .badge {
+  margin-left: 0;
+  top: 0;
+}
+.cm-ssw .alert {
+  margin-bottom: 0;
+  border-radius: 0;
+}
+#content .cm-ssw-edit-container .material-icons {
+  margin-right: -3px;
+}
+.cm-ssw-dropdown-toggle {
+  font-size: 1em;
+  display: flex;
+  align-items: center;
+  column-gap: 0.5em;
+  text-transform: none;
+  padding: 0.5em;
+}
+.cm-ssw-dropdown-toggle:hover {
+  text-decoration: none;
+}
+.cm-ssw-add-form {
+  padding: 1em;
+  background-color: #f2f2f2;
+  border-top: 1px solid var(--cmg-color-gray-border);
+}
+.cm-ssw-submit-buttons {
+  padding: 1em;
+  white-space: nowrap;
+  text-align: right;
+}
+[v-cloak] {
+  display: none;
 }
 /* FOOTER */
 #co-footer {

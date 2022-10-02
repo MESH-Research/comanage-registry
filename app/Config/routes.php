@@ -100,15 +100,31 @@ Router::mapResources(array(
                        'urls'
                      ));
 
+// CO Group
+Router::connect(
+  '/co_groups/reconcile/:id',
+  array('controller' => 'co_groups', 'action' => 'reconcile', '[method]' => 'POST'),
+  array(
+    'pass' => array('id'),
+    'id' => '[0-9]+'
+  )
+);
+
+Router::connect(
+  '/co_groups/reconcile',
+  array('controller' => 'co_groups', 'action' => 'reconcile', '[method]' => 'PUT'),
+);
+
 // CO People find
-$modes = array_keys(_txt('en.people.picker.mode'));
 Router::connect(
   '/co_people/find/*',
   array('controller' => 'co_people', 'action' => 'find', '[method]' => 'GET'),
   array(
     'named' => array(
       'co' => '[0-9]+',
-      'mode' => '[' . implode("|", $modes) . ']{1}'
+      'mode' => '[A-Z]+',
+      'petitionid' => '[0-9]*',
+      'token' => '[a-z0-9A-Z]*'
     )
   )
 );
@@ -168,6 +184,17 @@ Router::connect(
     'pass' => array('id'),
     'named' => array(
       'id' => '[0-9]+'
+    )
+  )
+);
+
+// Vetting Steps
+Router::connect(
+  '/vetting_steps/reorder/*',
+  array('controller' => 'vetting_steps', 'action' => 'reorder', '[method]' => 'POST'),
+  array(
+    'named' => array(
+      'co' => '[0-9]+'
     )
   )
 );

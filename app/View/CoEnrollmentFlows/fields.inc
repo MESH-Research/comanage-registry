@@ -278,6 +278,16 @@
   <li>
     <div class="field-name">
       <div class="field-title">
+        <?php print $this->Form->label('sor_label',_txt('fd.sor_label')); ?>
+      </div>
+    </div>
+    <div class="field-info">
+      <?php print ($e ? $this->Form->input('sor_label') : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['sor_label'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title">
         <?php print ($e ? $this->Form->label('status',_txt('fd.status')) : _txt('fd.status')); ?>
         <span class="required">*</span>
       </div>
@@ -552,6 +562,20 @@
             ? $this->Form->input('invitation_validity',
               array('default' => DEF_INV_VALIDITY))
             : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['invitation_validity'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+        </div>
+      </li>
+      <li>
+        <div class="field-name">
+          <div class="field-title">
+            <?php print ($e ? $this->Form->label('regenerate_expired_verification', _txt('fd.ef.inv.regen')) :_txt('fd.ef.inv.regen')); ?>
+          </div>
+          <div class="field-desc"><?php print _txt('fd.ef.inv.regen.desc'); ?></div>
+        </div>
+        <div class="field-info">
+          <?php print ($e
+            ? $this->Form->input('regenerate_expired_verification') . ' ' .
+            $this->Form->label('regenerate_expired_verification', _txt('fd.ef.inv.regen'))
+            : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['regenerate_expired_verification'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
         </div>
       </li>
       <li>

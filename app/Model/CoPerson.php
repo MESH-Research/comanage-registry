@@ -132,10 +132,9 @@ class CoPerson extends AppModel {
 
   // Default display field for cake generated views
   public $displayField = "PrimaryName.family";
-  
-  // Default ordering for find operations
-// XXX CO-296 Toss default order?
-//  public $order = array("CoPerson.id");
+
+  // Select clause for the paginator
+  private $paginate_fields = array( "DISTINCT CoPerson.id","PrimaryName.given","PrimaryName.family","CoPerson.status");
   
   // Validation rules for table elements
   // Validation rules must be named 'content' for petition dynamic rule adjustment
@@ -602,7 +601,18 @@ class CoPerson extends AppModel {
     
     return $this->find('all', $args);
   }
-  
+
+  /**
+   * Get paginator Select clause
+   *
+   * @since  COmanage Registry v4.0.3
+   * @return array
+   */
+  public function getPaginateFields()
+  {
+    return $this->paginate_fields;
+  }
+
   /**
    * Obtain the CO Person ID for an identifier (which must be Active).
    *
@@ -852,6 +862,33 @@ class CoPerson extends AppModel {
   }
 
   /**
+   * Return number of pages. By default CAKEPHP takes into account
+   * only 'conditions' and ignores 'fields'. As a result DISTINCT is
+   * not part of the count query
+   *
+   * @since  COmanage Registry v4.0.3
+   * @param array $conditions    Where clause conditions
+   * @param integer $recursive
+   * @param array $extra
+   * @return int                 Number of results
+   */
+  public function paginateCount($conditions, $recursive, $extra) {
+    $fields = $this->getPaginateFields();
+    $args = compact('conditions', 'fields');
+    if ($recursive != $this->recursive) {
+      $args['recursive'] = $recursive;
+    }
+    $args = array_merge($args, $extra);
+    // NOTE: According to the documentation:
+    //       Don’t pass fields as an array to find('count').
+    //       You would only need to specify fields for a DISTINCT
+    //       count (since otherwise, the count is always the same,
+    //       dictated by the conditions).
+    $args['fields'] = 'DISTINCT ' . $this->name . '.id';
+    return $this->find('count', $args);
+  }
+
+  /**
    * Recalculate the status of a CO Person based on the attached CO Person Roles.
    *
    * @since  COmanage Registry v0.9.2
@@ -985,18 +1022,36 @@ class CoPerson extends AppModel {
         
         foreach($cous as $couId) {
           // Find the admin group ID
-          $groupIds[] = $this->Co->CoGroup->adminCoGroupId($coId, $couId);
+          try {
+            $groupIds[] = $this->Co->CoGroup->adminCoGroupId($coId, $couId);
+          }
+          catch(InvalidArgumentException $e) {
+            // Group is inactive or missing for some reason
+          }
         }
         // Fall through, we want the CO Admin group as well
       case SponsorEligibilityEnum::CoAdmin:
         // Find the admin group ID
-        $groupIds[] = $this->Co->CoGroup->adminCoGroupId($coId);
+        try {
+          $groupIds[] = $this->Co->CoGroup->adminCoGroupId($coId);
+        }
+        catch(InvalidArgumentException $e) {
+          // Group is inactive or missing for some reason
+        }
         break; 
       case SponsorEligibilityEnum::CoGroupMember:
         // Find the configured group
         $groupId = $this->Co->CoSetting->getSponsorEligibilityCoGroup($coId);
         
         if($groupId) {
+          // Make sure the group is still Active
+          $gStatus = $this->Co->CoGroup->field('status', array('CoGroup.id' => $groupId));
+          
+          if($gStatus != SuspendableStatusEnum::Active) {
+            // Return an empty array
+            return array();
+          }
+          
           $groupIds[] = $groupId;
         }
         break;
@@ -1066,18 +1121,36 @@ class CoPerson extends AppModel {
         
         foreach($cous as $couId) {
           // Find the admin group ID
-          $groupIds[] = $this->Co->CoGroup->adminCoGroupId($coId, $couId);
+          try {
+            $groupIds[] = $this->Co->CoGroup->adminCoGroupId($coId, $couId);
+          }
+          catch(InvalidArgumentException $e) {
+            // Group is inactive or missing for some reason
+          }
         }
         // Fall through, we want the CO Admin group as well
       case SponsorEligibilityEnum::CoAdmin:
         // Find the admin group ID
-        $groupIds[] = $this->Co->CoGroup->adminCoGroupId($coId);
+        try {
+          $groupIds[] = $this->Co->CoGroup->adminCoGroupId($coId);
+        }
+        catch(InvalidArgumentException $e) {
+          // Group is inactive or missing for some reason
+        }
         break;
       case SponsorEligibilityEnum::CoGroupMember:
         // Find the configured group
         $groupId = $this->Co->CoSetting->getSponsorEligibilityCoGroup($coId);
         
         if($groupId) {
+          // Make sure the group is still Active
+          $gStatus = $this->Co->CoGroup->field('status', array('CoGroup.id' => $groupId));
+          
+          if($gStatus != SuspendableStatusEnum::Active) {
+            // Return an empty array so we don't render the people picker
+            return array();
+          }
+          
           $groupIds[] = $groupId;
         }
         break;
