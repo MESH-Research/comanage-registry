@@ -267,22 +267,13 @@
     <div class="field-name">
       <div class="field-title">
         <?php print ($e ? $this->Form->label('name',_txt('fd.name')) : _txt('fd.name')); ?>
+        <span class="required">*</span>
       </div>
     </div>
     <div class="field-info">
       <?php print ($e
                    ? $this->Form->input('name', array('default' => _txt('fd.untitled'),'class' => 'focusFirst'))
                    : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['name'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-    </div>
-  </li>
-  <li>
-    <div class="field-name">
-      <div class="field-title">
-        <?php print $this->Form->label('sor_label',_txt('fd.sor_label')); ?>
-      </div>
-    </div>
-    <div class="field-info">
-      <?php print ($e ? $this->Form->input('sor_label') : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['sor_label'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
     </div>
   </li>
   <li>
@@ -464,6 +455,17 @@
         </div>
       </li>
     </ul>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title">
+        <?php print $this->Form->label('sor_label',_txt('fd.sor_label')); ?>
+      </div>
+      <div class="field-desc"><?php print _txt('fd.sor_label.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e ? $this->Form->input('sor_label') : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['sor_label'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
   </li>
   <li>
     <div class="field-name">
@@ -899,12 +901,25 @@
       <div class="field-title">
         <?php print ($e ? $this->Form->label('introduction_text', _txt('fd.ef.intro')) : _txt('fd.ef.intro')); ?>
       </div>
-      <div class="field-desc"><?php print _txt('fd.ef.intro.desc'); ?></div>
+      <div class="field-desc"><?php print _txt('fd.ef.intro.start.desc'); ?></div>
     </div>
     <div class="field-info">
       <?php print ($e
                    ? $this->Form->input('introduction_text')
                    : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['introduction_text'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li class="field-stack">
+    <div class="field-name">
+      <div class="field-title">
+        <?php print ($e ? $this->Form->label('introduction_text_pa', _txt('fd.ef.intro')) : _txt('fd.ef.intro')); ?>
+      </div>
+      <div class="field-desc"><?php print _txt('fd.ef.intro.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e
+        ? $this->Form->input('introduction_text_pa')
+        : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['introduction_text_pa'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
     </div>
   </li>
   <li class="field-stack">
@@ -1238,7 +1253,9 @@
 
   <?php if($e): ?>
     <li class="fields-submit">
-      <div class="field-name"></div>
+      <div class="field-name">
+        <span class="required"><?php print _txt('fd.req'); ?></span>
+      </div>
       <div class="field-info">
         <?php print $this->Form->submit($submit_label); ?>
       </div>

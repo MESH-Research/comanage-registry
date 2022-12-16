@@ -16,7 +16,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-FROM php:7.4.28-apache-bullseye
+FROM php:8.0.26-apache-bullseye
 
 # Official PHP image with Apache HTTPD includes
 # --with-openssl
@@ -36,7 +36,7 @@ RUN apt-get update && apt-get install -y \
          zlib1g \
          libpcre3-dev \
       && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
-      && docker-php-ext-configure ldap --with-libdir=lib/x86_64-linux-gnu \
+      && docker-php-ext-configure ldap \
       && docker-php-ext-configure mysqli \
       && docker-php-ext-install xsl pdo pdo_mysql pdo_pgsql mysqli pgsql ldap \
       && docker-php-source delete \
@@ -45,6 +45,16 @@ RUN apt-get update && apt-get install -y \
          libmysqlclient-dev \
          libpq-dev \
       && apt-get clean
+
+# Build the redis extension to use Redis for session storage.
+RUN docker-php-source extract \
+    && pecl bundle -d /usr/src/php/ext redis \
+    && docker-php-ext-install redis \
+    && docker-php-ext-enable redis \
+    && docker-php-source delete
+
+# Copy the production php.ini into place.
+RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 
 ARG COMANAGE_REGISTRY_VERSION
 ENV COMANAGE_REGISTRY_VERSION ${COMANAGE_REGISTRY_VERSION:-develop}
@@ -82,7 +92,6 @@ RUN a2enmod headers \
       && ln -s /etc/ssl/certs/ssl-cert-snakeoil.pem cert.pem \
       && ln -s /etc/ssl/private/ssl-cert-snakeoil.key privkey.pem
 
-COPY container/registry/base/apache-* /etc/apache2/
 COPY container/registry/base/comanage_utils.sh /usr/local/lib/
 COPY container/registry/base/comanage_shibboleth_sp_utils.sh /usr/local/lib/
 COPY container/registry/base/docker-comanage-entrypoint /usr/local/bin/

@@ -37,51 +37,20 @@
     )
   );
   
-  if(!empty($this->request->params['named']['authenticatorid'])
-     && empty($vv_token)) {
-    // Initial "enter an email or identifier" form
-    $options['url']['authenticatorid'] = $this->request->params['named']['authenticatorid'];
-  }
-  
   print $this->Form->create('Password', $options);
   
   if(!empty($vv_token)) {
     print $this->Form->hidden('token', array('default' => $vv_token)) . "\n";
   }
 ?>
-<?php if(!empty($this->request->params['named']['authenticatorid']) && empty($vv_token)): ?>
-<div class="ui-state-highlight ui-corner-all co-info-topbox">
-  <span class="ui-icon ui-icon-info co-info"></span>
-  <strong><?php print _txt('pl.passwordauthenticator.ssr.info', array($vv_ssr_authenticated_url)); ?></strong>
-</div>
-
-<ul id="<?php print $this->action; ?>_ssr" class="fields form-list">
-  <li>
-    <div class="field-name vtop">
-      <div class="field-title">
-        <?php print _txt('pl.passwordauthenticator.ssr.q'); ?>
-      </div>
-    </div>
-    <div class="field-info">
-      <?php print $this->Form->input('q', array('label' => false)); ?>
-    </div>
-  </li>
-  <li class="fields-submit">
-    <div class="field-name">
-      <span class="required"><?php print _txt('fd.req'); ?></span>
-    </div>
-    <div class="field-info">
-      <?php print $this->Form->submit(_txt('op.search')); ?>
-    </div>
-  </li>
-</ul>
-<?php elseif(!empty($vv_token)): ?>
-<?php if(!empty($vv_name)): ?>
+<?php 
+  // This should merge with fields.inc to render password constraints, but we
+  // don't currently have access to vv_authenticator (since we only have a token)
+?>
 <div class="ui-state-highlight ui-corner-all co-info-topbox">
   <span class="ui-icon ui-icon-info co-info"></span>
   <strong><?php print _txt('pl.passwordauthenticator.ssr.for', array($vv_name)); ?></strong>
 </div>
-<?php endif; // vv_name ?>
 
 <ul id="<?php print $this->action; ?>_ssr" class="fields form-list">
   <li>
@@ -115,6 +84,5 @@
     </div>
   </li>
 </ul>
-<?php endif; // $vv_token ?>
 <?php
   print $this->Form->end();

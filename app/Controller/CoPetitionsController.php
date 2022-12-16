@@ -101,7 +101,9 @@ class CoPetitionsController extends StandardController {
         'PrimaryName'
       )
     ),
-    'CoEnrollmentFlow',
+    'CoEnrollmentFlow' => array(
+      'CoEnrollmentFlowWedge'
+    ),
     'CoInvite',
     'Cou',
     'OrgIdentitySourceRecord' => array(
@@ -1686,6 +1688,10 @@ class CoPetitionsController extends StandardController {
     $conclusionText = $this->CoPetition->CoEnrollmentFlow->field('conclusion_text', array('CoEnrollmentFlow.id' => $this->enrollmentFlowID()));
     if(!empty($conclusionText)) {
       $this->set('vv_conclusion_text', $conclusionText);
+    }
+    $introductoryText = $this->CoPetition->CoEnrollmentFlow->field('introduction_text_pa', array('CoEnrollmentFlow.id' => $this->enrollmentFlowID()));
+    if(!empty($introductoryText)) {
+      $this->set('vv_introduction_text_pa', $introductoryText);
     }
   }
   

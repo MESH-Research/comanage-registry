@@ -71,6 +71,10 @@ function build_base() {
 
     "${docker_build_command[@]}"
 
+    if (( $? != 0 )); then
+        exit 1
+    fi
+
     if [[ -n "${prefix}" ]]; then
         target="${prefix}${tag}"
         docker tag "${tag}" "${target}"
@@ -126,6 +130,69 @@ function build_basic_auth() {
     docker_build_command+=(--build-arg COMANAGE_REGISTRY_VERSION="${label}")
     docker_build_command+=(--build-arg COMANAGE_REGISTRY_BASE_IMAGE_VERSION="${suffix}")
     docker_build_command+=(--file container/registry/basic-auth/Dockerfile)
+    docker_build_command+=(.)
+
+    "${docker_build_command[@]}"
+
+    if (( $? != 0 )); then
+        exit 1
+    fi
+
+    if [[ -n "${prefix}" ]]; then
+        target="${prefix}${tag}"
+        docker tag "${tag}" "${target}"
+    fi
+}
+
+###########################################################################
+# Build the Registry cron image.
+# Globals:
+#   None
+# Arguments:
+#   Full image name prefix, a string.
+#   Tag label, a string.
+#   Tag suffix, a string.
+#   Docker build flags, other flags for docker build.
+# Outputs:
+#   None
+###########################################################################
+function build_crond() {
+    local docker_build_command
+    local docker_build_flags
+    local label
+    local prefix
+    local suffix
+
+    prefix="$1"
+    label="$2"
+    suffix="$3"
+
+    if [[ -z "${label}" ]]; then
+        err "ERROR:build_crond: label cannot be empty"
+        return 1
+    fi
+
+    if [[ -z "${suffix}" ]]; then
+        err "ERROR:build_crond: suffix cannot be empty"
+        return 1
+    fi
+
+    declare -a docker_build_flags=("${@:4}")
+
+    tag="comanage-registry-cron:${label}-${suffix}"
+
+    docker_build_command=(docker build)
+
+    if ((${#docker_build_flags[@]})); then
+        for flag in "${docker_build_flags[@]}"; do
+            docker_build_command+=("${flag}")
+        done
+    fi
+
+    docker_build_command+=(--tag "${tag}")
+    docker_build_command+=(--build-arg COMANAGE_REGISTRY_VERSION="${label}")
+    docker_build_command+=(--build-arg COMANAGE_REGISTRY_BASE_IMAGE_VERSION="${suffix}")
+    docker_build_command+=(--file container/registry/crond/Dockerfile)
     docker_build_command+=(.)
 
     "${docker_build_command[@]}"
@@ -189,6 +256,10 @@ function build_mod_auth_openidc() {
 
     "${docker_build_command[@]}"
 
+    if (( $? != 0 )); then
+        exit 1
+    fi
+
     if [[ -n "${prefix}" ]]; then
         target="${prefix}${tag}"
         docker tag "${tag}" "${target}"
@@ -246,6 +317,10 @@ function build_shibboleth_sp_base() {
     docker_build_command+=(.)
 
     "${docker_build_command[@]}"
+
+    if (( $? != 0 )); then
+        exit 1
+    fi
 
     if [[ -n "${prefix}" ]]; then
         target="${prefix}${tag}"
@@ -324,6 +399,10 @@ function build_shibboleth_sp_supervisor() {
 
     "${docker_build_command[@]}"
 
+    if (( $? != 0 )); then
+        exit 1
+    fi
+
     if [[ -n "${prefix}" ]]; then
         target="${prefix}${tag}"
         docker tag "${tag}" "${target}"
@@ -367,7 +446,7 @@ DESCRIPTION
 
     PRODUCT is one of 
         registry AUTHENTICATION
-        cron
+        crond
         slapd
 
     where AUTHENTICATION is one of
@@ -566,28 +645,32 @@ function main() {
     product="$1"
 
     case "${product}" in
+        crond )
+            build_base "${prefix}" "${label}" "${suffix}" "${docker_build_flags[@]}"
+            build_crond "${prefix}" "${label}" "${suffix}" "${docker_build_flags[@]}"
+            ;;
         registry )
             authentication="$2"
             case "${authentication}" in
                 all )
-                    build_base "${prefix}" "${label}" "${suffix}" "${docker_build_flags[@]}"
-                    build_basic_auth "${prefix}" "${label}" "${suffix}" "${docker_build_flags[@]}"
-                    build_mod_auth_openidc "${prefix}" "${label}" "${suffix}" "${docker_build_flags[@]}"
-                    build_shibboleth_sp_base "${prefix}" "${SHIBBOLETH_SP_VERSION}" "${suffix}" "${docker_build_flags[@]}"
-                    build_shibboleth_sp_supervisor "${prefix}" "${label}" "${suffix}" "${SHIBBOLETH_SP_VERSION}" "${suffix}" "${docker_build_flags[@]}"
+                    build_base "${prefix}" "${label}" "${suffix}" "${docker_build_flags[@]}" \
+                    && build_basic_auth "${prefix}" "${label}" "${suffix}" "${docker_build_flags[@]}" \
+                    && build_mod_auth_openidc "${prefix}" "${label}" "${suffix}" "${docker_build_flags[@]}" \
+                    && build_shibboleth_sp_base "${prefix}" "${SHIBBOLETH_SP_VERSION}" "${suffix}" "${docker_build_flags[@]}" \
+                    && build_shibboleth_sp_supervisor "${prefix}" "${label}" "${suffix}" "${SHIBBOLETH_SP_VERSION}" "${suffix}" "${docker_build_flags[@]}"
                     ;;
                 basic-auth )
-                    build_base "${prefix}" "${label}" "${suffix}" "${docker_build_flags[@]}"
-                    build_basic_auth "${prefix}" "${label}" "${suffix}" "${docker_build_flags[@]}"
+                    build_base "${prefix}" "${label}" "${suffix}" "${docker_build_flags[@]}" \
+                    && build_basic_auth "${prefix}" "${label}" "${suffix}" "${docker_build_flags[@]}"
                     ;;
                 mod_auth_openidc )
-                    build_base "${prefix}" "${label}" "${suffix}" "${docker_build_flags[@]}"
-                    build_mod_auth_openidc "${prefix}" "${label}" "${suffix}" "${docker_build_flags[@]}"
+                    build_base "${prefix}" "${label}" "${suffix}" "${docker_build_flags[@]}" \
+                    && build_mod_auth_openidc "${prefix}" "${label}" "${suffix}" "${docker_build_flags[@]}"
                     ;;
                 shibboleth-sp-supervisor )
-                    build_base "${prefix}" "${label}" "${suffix}" "${docker_build_flags[@]}"
-                    build_shibboleth_sp_base "${prefix}" "${SHIBBOLETH_SP_VERSION}" "${suffix}" "${docker_build_flags[@]}"
-                    build_shibboleth_sp_supervisor "${prefix}" "${label}" "${suffix}" "${SHIBBOLETH_SP_VERSION}" "${suffix}" "${docker_build_flags[@]}"
+                    build_base "${prefix}" "${label}" "${suffix}" "${docker_build_flags[@]}" \
+                    && build_shibboleth_sp_base "${prefix}" "${SHIBBOLETH_SP_VERSION}" "${suffix}" "${docker_build_flags[@]}" \
+                    && build_shibboleth_sp_supervisor "${prefix}" "${label}" "${suffix}" "${SHIBBOLETH_SP_VERSION}" "${suffix}" "${docker_build_flags[@]}"
                     ;;
                 *)
                     err "ERROR: Unrecognized authentication"

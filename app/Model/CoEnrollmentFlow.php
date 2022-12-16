@@ -121,8 +121,8 @@ class CoEnrollmentFlow extends AppModel {
     // responses?
     'sor_label' => array(
       'rule' => 'notBlank',
-      'required' => true,
-      'allowEmpty' => false
+      'required' => false,
+      'allowEmpty' => true
     ),
     'co_id' => array(
       'rule' => 'numeric',
@@ -301,6 +301,11 @@ class CoEnrollmentFlow extends AppModel {
       )
     ),
     'introduction_text' => array(
+      'rule' => 'notBlank',
+      'required' => false,
+      'allowEmpty' => true
+    ),
+    'introduction_text_pa' => array(
       'rule' => 'notBlank',
       'required' => false,
       'allowEmpty' => true
