@@ -16,7 +16,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-FROM php:8.0.26-apache-bullseye
+FROM php:8.0.27-apache-bullseye
 
 # Official PHP image with Apache HTTPD includes
 # --with-openssl
@@ -45,6 +45,11 @@ RUN apt-get update && apt-get install -y \
          libmysqlclient-dev \
          libpq-dev \
       && apt-get clean
+
+# Configure TLS CA signing certificates for LDAP TLS libraries.
+ARG LDAPTLS_CACERT
+ENV LDAPTLS_CACERT ${LDAPTLS_CACERT:-/etc/ssl/certs/ca-certificates.crt}
+LABEL ldaptls_cacert=${LDAPTLS_CACERT}
 
 # Build the redis extension to use Redis for session storage.
 RUN docker-php-source extract \
