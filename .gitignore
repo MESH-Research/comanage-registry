@@ -1,5 +1,6 @@
 /app/Config/core.php
 /lib/Cake/Console/Templates/skel/tmp/
+/local/
 /local/Config/database.php
 /local/Config/email.php
 /local/Config/security.salt
