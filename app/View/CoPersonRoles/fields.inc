@@ -89,6 +89,8 @@
 
   <script type="text/javascript">
     $(function() {
+      validate_date_input('<?php print _txt('er.validation') ?>', '<?php print _txt('er.validation.date') ?>');
+
       // Explorer menu toggles
       $(".fieldGroupName").click(function(event) {
         event.preventDefault();
@@ -121,11 +123,7 @@
         }
       });
       <?php endif; // vv_sponsor_mode ?>
-
-      <?php if($vv_sponsor_mode != SponsorEligibilityEnum::None && !isset($vv_sponsors)): ?>
-        reset_sponsor();
-      <?php endif; // vv_sponsor_mode ?>
-
+      
       // Used in inline-edit mode for Sponsor (i.e. when sponsor list > 50)
       $("#cm-ief-button-remove-sponsor_co_person_id").click(function() {
         reset_sponsor();
@@ -133,15 +131,51 @@
         $(this).closest(".cm-inline-editable-field").find(".cm-ief-widget").removeClass('hidden');
         $("#sponsors").focus();
       });
-
+      
+      // Unlike sponsor, manager is always active
+      $("#managers").autocomplete({
+        source: "<?php print $this->Html->url(array('controller' => 'co_people', 'action' => 'find', 'co' => $cur_co['Co']['id'], 'mode' => PeoplePickerModeEnum::Manager)); ?>",
+        minLength: 3,
+        select: function(event, ui) {
+          $("#managers").val(ui.item.label);
+          $("#manager_co_person_id").val(ui.item.value);
+          return false;
+        }
+      });
+      
+      $("#cm-ief-button-remove-manager_co_person_id").click(function() {
+        reset_manager();
+        $(this).closest(".cm-ief-val").hide();
+        $(this).closest(".cm-inline-editable-field").find(".cm-ief-widget").removeClass('hidden');
+        $("#managers").focus();
+      });
     });
+    
+    function reset_manager() {
+      $("#managers").val("");
+      $("#manager_co_person_id").val(null);
+    }
     
     function reset_sponsor() {
       $("#sponsors").val("");
       $("#sponsor_co_person_id").val(null);
     }
-
+    
+    function js_local_onload() {
+      enum_update_gadgets(false);
+    }
   </script>
+  
+  <?php 
+    $args = array(
+      'enumerables' => array(
+        'CoPersonRole.o',
+        'CoPersonRole.ou',
+        'CoPersonRole.title'
+      )
+    );
+    print $this->element('enumerations', $args);
+  ?>
 
   <div id="<?php print $this->action; ?>_role_attributes" class="explorerContainer">
     <div id="role-attributes" class="personExplorer">
@@ -173,7 +207,7 @@
                 </div>
               </li>
             <?php endif; ?>
-            <?php if(!empty($permissions['cous'])): ?>
+            <?php if(!empty($vv_available_cous)): ?>
               <li>
                 <div class="field-name">
                   <?php
@@ -192,11 +226,15 @@
                     $attrs['value'] = (isset($co_person_roles[0]['CoPersonRole']['cou_id'])
                       ? $co_person_roles[0]['CoPersonRole']['cou_id']
                       : 0);
-                    $attrs['empty'] = $vv_allow_empty_cou;
+                    $attrs['empty'] = '';
+                    if(!$vv_allow_empty_cou) {
+                      $attrs['required'] = 'required';
+                    }
+                    $attrs['autofocus'] = true;
 
                     if($e && !$es) {
                       print $this->Form->select('cou_id',
-                        $permissions['cous'],
+                        $vv_available_cous,
                         $attrs);
 
                       if($this->Form->isFieldError('cou_id')) {
@@ -230,6 +268,7 @@
                     ? $co_person_roles[0]['CoPersonRole']['affiliation']
                     : AffiliationEnum::Member);
                   $attrs['empty'] = false;
+                  $attrs['autofocus'] = empty($vv_available_cous);
 
                   if($e && !$es) {
                     print $this->Form->select('affiliation',
@@ -266,9 +305,13 @@
                 $attrs['empty'] = false;
 
                 if($e && !$es) {
+                  // Actions can not Lock roles because roles cannot be Locked
+                  $statuses = $cm_texts[ $cm_lang ]['en.status'];
+                  unset($statuses[StatusEnum::Locked]);
+                  
                   print $this->Form->select('status',
-                    $cm_texts[ $cm_lang ]['en.status'],
-                    $attrs);
+                                            $statuses,
+                                            $attrs);
 
                   if($this->Form->isFieldError('status')) {
                     print $this->Form->error('status');
@@ -325,35 +368,11 @@
               </div>
               <div class="field-info">
                 <?php
-                  if($e && !$es) {
-                    if(!empty($vv_enums_title)) {
-                      // Attribute enumerations defined
-
-                      if(!empty($co_person_roles[0]['CoPersonRole']['title'])
-                        && !array_search($co_person_roles[0]['CoPersonRole']['title'], $vv_enums_title)) {
-                        print filter_var($co_person_roles[0]['CoPersonRole']['title'],FILTER_SANITIZE_SPECIAL_CHARS);
-
-                        print '<div class="field-desc">
-                                 <span class="ui-icon ui-icon-info co-info"></span>
-                                 <em>' . _txt('er.ae.val.inv') . '</em>
-                               </div>';
-                      }
-
-                      $attrs = array();
-                      $attrs['empty'] = true;
-
-                      print $this->Form->select('title', $vv_enums_title, $attrs);
-
-                      if($this->Form->isFieldError('title')) {
-                        print $this->Form->error('title');
-                      }
-                    } else {
-                      // No attribute enumerations defined
-                      print $this->Form->input('title', array('size' => 60, 'class' => 'focusFirst'));
-                    }
-                  } else {
-                    print filter_var($co_person_roles[0]['CoPersonRole']['title'],FILTER_SANITIZE_SPECIAL_CHARS);
-                  }
+                  $args = array(
+                    'column' => 'title',
+                    'editable' => ($e && !$es)
+                  );
+                  print $this->element('enumerableField', $args);
                 ?>
               </div>
             </li>
@@ -369,43 +388,11 @@
               </div>
               <div class="field-info">
                 <?php
-                  if($e && !$es) {
-                    if(!empty($vv_enums_o)) {
-                      // Attribute enumerations defined
-
-                      if(!empty($co_person_roles[0]['CoPersonRole']['o'])
-                        && !array_search($co_person_roles[0]['CoPersonRole']['o'], $vv_enums_o)) {
-                        print filter_var($co_person_roles[0]['CoPersonRole']['o'],FILTER_SANITIZE_SPECIAL_CHARS);
-
-                        print '<div class="field-desc">
-                                 <span class="ui-icon ui-icon-info co-info"></span>
-                                 <em>' . _txt('er.ae.val.inv') . '</em>
-                               </div>';
-                      }
-
-                      $attrs = array();
-                      $attrs['empty'] = true;
-
-                      print $this->Form->select('o', $vv_enums_o, $attrs);
-
-                      if($this->Form->isFieldError('o')) {
-                        print $this->Form->error('o');
-                      }
-                    } else {
-                      // No attribute enumerations defined
-                      $args = array(
-                        'size' => 60
-                      );
-
-                      if($this->action == 'add') {
-                        $args['default'] = filter_var($cur_co['Co']['name'],FILTER_SANITIZE_SPECIAL_CHARS);
-                      }
-
-                      print $this->Form->input('o', $args);
-                    }
-                  } else {
-                    print filter_var($co_person_roles[0]['CoPersonRole']['o'],FILTER_SANITIZE_SPECIAL_CHARS);
-                  }
+                  $args = array(
+                    'column' => 'o',
+                    'editable' => ($e && !$es)
+                  );
+                  print $this->element('enumerableField', $args);
                 ?>
               </div>
             </li>
@@ -421,35 +408,11 @@
               </div>
               <div class="field-info">
                 <?php
-                  if($e && !$es) {
-                    if(!empty($vv_enums_ou)) {
-                      // Attribute enumerations defined
-
-                      if(!empty($co_person_roles[0]['CoPersonRole']['ou'])
-                         && !array_search($co_person_roles[0]['CoPersonRole']['ou'], $vv_enums_ou)) {
-                        print filter_var($co_person_roles[0]['CoPersonRole']['ou'],FILTER_SANITIZE_SPECIAL_CHARS);
-
-                        print '<div class="field-desc">
-                                 <span class="ui-icon ui-icon-info co-info"></span>
-                                 <em>' . _txt('er.ae.val.inv') . '</em>
-                               </div>';
-                      }
-
-                      $attrs = array();
-                      $attrs['empty'] = true;
-
-                      print $this->Form->select('ou', $vv_enums_ou, $attrs);
-
-                      if($this->Form->isFieldError('ou')) {
-                        print $this->Form->error('ou');
-                      }
-                    } else {
-                      // No attribute enumerations defined
-                      print $this->Form->input('ou', array('size' => 60));
-                    }
-                  } else {
-                    print filter_var($co_person_roles[0]['CoPersonRole']['ou'],FILTER_SANITIZE_SPECIAL_CHARS);
-                  }
+                  $args = array(
+                    'column' => 'ou',
+                    'editable' => ($e && !$es)
+                  );
+                  print $this->element('enumerableField', $args);
                 ?>
               </div>
             </li>
@@ -533,6 +496,82 @@
               </div>
             </li>
             <?php endif; // vv_sponsor_mode ?>
+            <li>
+              <div class="field-name">
+                <?php
+                  if($e && !$es) {
+                    // The manager field is a manual placeholder, so we generate the label manually too
+                    print '<label for="managers">' . _txt('fd.manager') . "</label>";
+                  } else {
+                    print _txt('fd.manager');
+                  }
+                ?><br />
+              </div>
+              <div class="field-info">
+                <?php if(isset($vv_sponsor_valid) && !$vv_sponsor_valid): ?>
+                  <div class="field-desc">
+                    <span class="ui-icon ui-icon-info co-info"></span>
+                    <em><?php print _txt('fd.sponsor.inel'); ?></em>
+                  </div>
+                <?php endif; ?>
+
+                <?php
+                  if($e && !$es) {
+                    // Unlike sponsors, managers always uses a people picker
+                    // since by the time an organization is large enough to want
+                    // to track managers we're probably past the ~50 threshold
+                    // we use for sponsors.
+                    print '<div class="cm-inline-editable-field">';
+                    $inlineEditableFields['manager-val']['set'] = false;
+
+                    if(!empty($co_person_roles[0]['CoPersonRole']['manager_co_person_id'])
+                       && !empty($co_person_roles[0]['ManagerCoPerson']['PrimaryName'])) {
+
+                      $inlineEditableFields['manager-val']['set'] = true;
+
+                      print '<div class="cm-ief-val">';
+                      print $this->Html->link(
+                        generateCn($co_person_roles[0]['ManagerCoPerson']['PrimaryName']),
+                        array(
+                          'controller' => 'co_people',
+                          'action' => 'canvas',
+                          $co_person_roles[0]['ManagerCoPerson']['id']
+                        )
+                      );
+
+                      print $this->element('inlineEditControls', array(
+                        'fieldName' => 'manager_co_person_id',
+                        'actions' => array('remove')
+                      ));
+                      
+                      print '</div>';
+                    }
+
+                    $iefClasses = "cm-ief-widget";
+                    if ($inlineEditableFields['manager-val']['set']) {
+                      $iefClasses .= " hidden";
+                    }
+
+                    print '<div class="' . $iefClasses . '">
+                             <div class="ui-widget">                      
+                               <input id="managers" type="text" />'
+                               . $this->Form->hidden('manager_co_person_id',
+                               array(
+                                 'id'      => 'manager_co_person_id',
+                                 'default' => (!empty($co_person_roles[0]['CoPersonRole']['manager_co_person_id'])) ? $co_person_roles[0]['CoPersonRole']['manager_co_person_id'] : null
+                               ))
+                          . '</div>
+                             <div class="field-desc">
+                               <span class="ui-icon ui-icon-info co-info"></span>
+                               <em>' . _txt('fd.manager.desc') . '</em>
+                             </div>';
+                    print '</div>';
+                    // We need to unlock the field for autocomplete manipulation
+                    $this->Form->unlockField('CoPersonRole.manager_co_person_id');
+                  }
+                ?>
+              </div>
+            </li>
             <li class="modelbox-data">
               <div class="field-name">
                 <?php

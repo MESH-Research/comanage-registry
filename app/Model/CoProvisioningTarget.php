@@ -83,27 +83,40 @@ class CoProvisioningTarget extends AppModel {
       'message' => 'A plugin must be provided'
     ),
     'provision_co_group_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'skip_org_identity_source_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'status' => array(
       'rule' => array(
         'inList',
         array(
-          ProvisionerStatusEnum::AutomaticMode,
-          ProvisionerStatusEnum::Disabled,
-          ProvisionerStatusEnum::EnrollmentMode,
-          ProvisionerStatusEnum::ManualMode
+          ProvisionerModeEnum::AutomaticMode,
+          ProvisionerModeEnum::Disabled,
+          ProvisionerModeEnum::EnrollmentMode,
+          ProvisionerModeEnum::QueueMode,
+          ProvisionerModeEnum::QueueOnErrorMode,
+          ProvisionerModeEnum::ManualMode
         )
       ),
       'required' => true,
-      'message' => 'A valid status must be selected'
+      'allowEmpty' => false
+    ),
+    'retry_interval' => array(
+      'rule' => 'numeric',
+      'required' => false,
+      'allowEmpty' => true
     ),
     'ordr' => array(
       'rule' => 'numeric',

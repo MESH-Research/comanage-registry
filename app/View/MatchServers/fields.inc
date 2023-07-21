@@ -68,7 +68,7 @@
   </li>
   <li>
     <div class="field-name">
-      <?php print $this->Form->label('username',_txt('fd.server.username')); ?>
+      <?php print $this->Form->label('username',_txt('fd.server.username')); ?><span class="required">*</span>
     </div>
     <div class="field-info">
       <?php print ($e ? $this->Form->input('username') : filter_var($match_servers[0]['MatchServer']['username'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
@@ -76,45 +76,18 @@
   </li>
   <li>
     <div class="field-name">
-      <?php print $this->Form->label('password',_txt('fd.password')); ?>
+      <?php print $this->Form->label('password',_txt('fd.password')); ?><span class="required">*</span>
     </div>
     <div class="field-info">
       <?php print ($e ? $this->Form->input('password') : filter_var($match_servers[0]['MatchServer']['password'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
     </div>
   </li>
   <li>
-    <div class="field-name">
-      <div class="field-title">
-        <?php print $this->Form->label('sor_label',_txt('fd.server.match.sor_label')); ?>
-      </div>
-      <div class="field-desc"><?php print _txt('fd.server.match.sor_label.desc'); ?></div>
+    <div class="field-name" id="CallbackUrlDiv">
+      <?php print _txt('fd.match.callback_url'); ?>
     </div>
     <div class="field-info">
-      <?php print ($e ? $this->Form->input('sor_label') : filter_var($match_servers[0]['MatchServer']['sor_label'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
-    </div>
-  </li>
-  <li>
-    <div class="field-name">
-      <?php print _txt('fd.attrs.match'); ?>
-    </div>
-    <div class="field-info">
-      <?php print _txt('fd.name') . '/' . _txt('fd.name.primary_name'); ?></br>
-      <?php print _txt('fd.date_of_birth'); ?></br>
-      <?php print _txt('fd.identifier.identifier') . '/' . _txt('en.identifier.type', null, IdentifierEnum::National); ?>
-    </div>
-  </li>
-  <li>
-    <div class="field-name vtop">
-      <div class="field-title">
-        <?php print _txt('fd.server.match.is_comanage_match'); ?>
-      </div>
-      <div class="field-desc"><?php print _txt('fd.server.match.is_comanage_match.desc'); ?></div>
-    </div>
-    <div class="field-info checkbox">
-      <?php print ($e
-                   ? $this->Form->input('is_comanage_match') .
-                     $this->Form->label('is_comanage_match', _txt('fd.server.match.is_comanage_match'))
-                   : ($co_enrollment_flows[0]['MatchServer']['is_comanage_match'] ? _txt('fd.yes') : _txt('fd.no'))); ?>
+      <?php print $vv_api_endpoint; ?>
     </div>
   </li>
   <?php if($e): ?>

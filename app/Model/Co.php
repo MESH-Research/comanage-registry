@@ -49,7 +49,6 @@ class Co extends AppModel {
     "CoProvisioningTarget" => array('dependent' => true),
     "CoService" => array('dependent' => true),
     "CoDashboard" => array('dependent' => true),
-    "CoDepartment" => array('dependent' => true),
     "CoEmailList" => array('dependent' => true),
     // A CO has zero or more enrollment flows
     "CoEnrollmentFlow" => array('dependent' => true),
@@ -60,7 +59,6 @@ class Co extends AppModel {
     // A CO has zero or more groups
     "CoIdentifierAssignment" => array('dependent' => true),
     "CoIdentifierValidator" => array('dependent' => true),
-    "CoJob" => array('dependent' => true),
     "CoLocalization" => array('dependent' => true),
     "CoMessageTemplate" => array('dependent' => true),
     "CoNavigationLink" => array('dependent' => true),
@@ -75,13 +73,21 @@ class Co extends AppModel {
     // It's OK to make the model dependent, because if they are pooled the
     // link won't be there to delete.
     "DataFilter" => array('dependent' => true),
+    "Dictionary" => array('dependent' => true),
+    "Organization" => array('dependent' => true),
     "OrgIdentity" => array('dependent' => true),
     "OrgIdentitySource" => array('dependent' => true),
     "CoPipeline" => array('dependent' => true),
-    "CoGroup" => array('dependent' => true),
     // A CO has zero or more COUs
+    // XXX A COU has dependent Groups. Delete the COUs before the Groups
+    // XXX A COU has dependent Departments. Delete the COUs before the Departments
     "Cou" => array('dependent' => true),
-    "Server" => array('dependent' => true)
+    "CoDepartment" => array('dependent' => true),
+    "CoGroup" => array('dependent' => true),
+    "Server" => array('dependent' => true),
+    "VettingStep" => array('dependent' => true),
+    "Lock" => array('dependent' => true),
+    "CoJob" => array('dependent' => true),
   );
   
   public $hasOne = array(
@@ -109,7 +115,8 @@ class Co extends AppModel {
     'status' => array(
       'rule' => array('inList', array(TemplateableStatusEnum::Active,
                                       TemplateableStatusEnum::Suspended,
-                                      TemplateableStatusEnum::Template)),
+                                      TemplateableStatusEnum::Template,
+                                      TemplateableStatusEnum::InTrash)),
       'required' => true,
       'message' => 'A valid status must be selected'
     )
@@ -139,6 +146,59 @@ class Co extends AppModel {
     
     return true;
   }
+  
+  /**
+   * Determine the CO ID for the COmanage CO.
+   *
+   * @since  COmanage Registry v4.0.0
+   * @return int The COmanage CO ID
+   */
+  
+  public function getCOmanageCOID() {
+    return $this->field('id', array('Co.name' => DEF_COMANAGE_CO_NAME));
+  }
+
+  /**
+   * Determine if a CO is read only.
+   *
+   * @since  COmanage Registry v4.0.0
+   * @param  Integer $id CO  ID
+   * @return True if the CO is read only, false otherwise
+   * @throws InvalidArgumentException
+   */
+
+  public function readOnly($id) {
+    // A CO is read only if the status field is 'TR'.
+
+    // Refer to CO-2385
+    try{
+      return (bool)$this->inTrash($id);
+    } catch (InvalidArgumentException $e) {
+      return false;
+    }
+
+  }
+
+  /**
+   * Determine if a CO is in Trash
+   *
+   * @since  COmanage Registry  v4.0.0
+   * @param  Integer $id    Job ID
+   * @return Boolean True on success
+   * @throws InvalidArgumentException
+   */
+
+  public function inTrash($id) {
+    $curStatus = $this->field('status', array('Co.id' => $id));
+
+    if(!$curStatus) {
+      throw new InvalidArgumentException(_txt('er.notfound', array(_txt('ct.cos.1'), $id)));
+    }
+
+    return ($curStatus == TemplateableStatusEnum::InTrash);
+  }
+
+
   
   /**
    * Delete a CO.
@@ -177,17 +237,51 @@ class Co extends AppModel {
     // data structures they might point to
     
     // Make sure to update this list in duplicate() as well
-    foreach(array("Authenticator",
-                  "CoDashboard", // triggers CoDashboardWidget
+    foreach(array("CoDashboard", // triggers CoDashboardWidget
+                  "Authenticator",
                   "CoProvisioningTarget",
                   "DataFilter",
                   "OrgIdentitySource") as $m) {
       // If set, we use duplicatableModels as a sort of inverse logic for cleanup
-      
+
+      // Reset the Changelog Behavior foreign keys
       if($this->$m->Behaviors->enabled('Changelog')) {
         $this->$m->reloadBehavior('Changelog', array('expunge' => true));
       }
-      
+
+      // Reset all the Changelog Behaviors from hasMany Relations
+      foreach($this->$m->hasMany as $modelName => $options) {
+        $modelRelation = ClassRegistry::init($modelName);
+
+        if($modelRelation->Behaviors->enabled('Changelog')) {
+          $modelRelation->reloadBehavior('Changelog', array('expunge' => true));
+        }
+      }
+
+      // Load all the Configured plugins and disable the Changelog Behavior config if any
+      // XXX For the case of CoDashboardWidget plugins we will call the beforeDelete callback in the Model itself
+      $modelPluginTypes = !empty($this->$m->hasManyPlugins)
+                          ? array_keys($this->$m->hasManyPlugins)
+                          : array();
+      foreach($modelPluginTypes as $pluginType) {
+        $plugins = $this->loadAvailablePlugins($pluginType);
+        foreach($plugins as $pluginName => $plugin) {
+          $pluginClassName = $pluginName;
+          if(!empty($this->$m->hasManyPlugins)
+             && isset($this->$m->hasManyPlugins[$pluginType]['coreModelFormat'])) {
+            $corem = sprintf($this->$m->hasManyPlugins[$pluginType]['coreModelFormat'], $plugin->name);
+            $pluginClassName = "{$plugin->name}.{$corem}";
+          }
+
+          $relation = array('hasMany' => array( $pluginClassName => array('dependent' => true)));
+
+          // Set reset to false so the bindings don't disappear after the first find
+          $this->$m->bindModel($relation, false);
+          // Unload the Changelog Behavior for all the descendants
+          $this->unloadChangelogBehavior($plugin, $pluginClassName);
+        }
+      }
+
       $this->$m->deleteAll(
         array($m.'.co_id' => $id),
         true,
@@ -196,7 +290,23 @@ class Co extends AppModel {
         true
       );
     }
-    
+
+    // We are in the middle of an expunge so disable Changelog behaviors.
+    // Skipping callbacks is not enough for a Shell Job
+    foreach(App::objects('Model') as $m) {
+      try {
+        // Not all Models are associated to CO model
+        $modell = ClassRegistry::init($m);
+        if($modell->Behaviors->enabled('Changelog')) {
+          $modell->reloadBehavior('Changelog', array('expunge' => true));
+        }
+      } catch(Exception $e) {
+        // Do nothing
+        // App::objects('Model) will fetch every Model, even the abstract ones which we can not
+        // initialize. Catch the error and continue to the next one
+      }
+    }
+
     // CoGroupNestings have two parent CoGroup pointers, which makes them hard
     // to delete, so we'll delete them manually. They also have a foreign key
     // into co_group_members that needs to be cleared as well. We'll clean up
@@ -215,15 +325,22 @@ class Co extends AppModel {
       
       $this->CoGroup->CoGroupMember->updateAll(array('CoGroupMember.co_group_nesting_id' => null),
                                                array('CoGroupMember.co_group_id' => array_keys($groups)));
-      
-      // By skipping callbacks we don't need to disable ChangelogBehavior
+
+      // Disable Changelog behaviors. Skipping callbacks is not enough for a Shell Job
       $this->CoGroup->CoGroupNesting->deleteAll(array('CoGroupNesting.co_group_id' => array_keys($groups)));
     }
     
-    // Unload TreeBehavior from Cou, since it throws errors and we don't need to
+    // Unload TreeBehavior from Cou, since it throws errors, and we don't need to
     // rebalance a tree that we're about to remove entirely.
     $this->Cou->Behaviors->unload('Tree');
-    
+    // Delete all parent_id foreign keys since they will generate errors. We do not
+    // need them anymore since we are about to delete everything.
+    $this->Cou->updateAll(array('Cou.parent_id' => null),
+                          array(
+                            "Cou.co_id={$id}",
+                            "Cou.parent_id IS NOT null"
+                          ));
+
     return parent::delete($id, $cascade);
   }
 
@@ -269,6 +386,7 @@ class Co extends AppModel {
       
       foreach(array(
         'CoGroup',
+        'Dictionary',
         'AttributeEnumeration',
         'Authenticator',
         'CoDashboard',
@@ -304,8 +422,10 @@ class Co extends AppModel {
         'CoGroupOisMapping' => 'OrgIdentitySource',
         'CoGroupNesting' => 'CoGroup',
         'HttpServer' => 'Server',
+        'MatchServer' => 'Server',
         'Oauth2Server' => 'Server',
         'SqlServer' => 'Server',
+        'DictionaryEntry' => 'Dictionary'
       ) as $m => $parentm) {
         $fk = Inflector::underscore($parentm) . "_id";
         
@@ -339,8 +459,12 @@ class Co extends AppModel {
       
       foreach(App::objects('plugin') as $p) {
         $m = ClassRegistry::init($p . "." . $p);
-        
-        $plugins[$m->cmPluginType][$p] = $m;
+
+        // XXX As of v2.0.0, $cmPluginType may also be an array.
+        //     If it is an array, pick up the first
+        $pluginType = is_array($m->cmPluginType) ? $m->cmPluginType[0] : $m->cmPluginType;
+
+        $plugins[$pluginType][$p] = $m;
       }
       
       // Make sure to update this list in delete() as well
@@ -386,8 +510,10 @@ class Co extends AppModel {
               foreach($corem->duplicatableModels as $dupeModelName => $dupecfg) {
                 // Probably need to load the model
                 $dupem = ClassRegistry::init($pluginName . "." . $dupeModelName);
-                
-                $this->duplicateObjects($dupem, $dupecfg['fk'], array_keys($idmap[$dupecfg['parent']]), $idmap);
+                // Skip duplication if no records exist
+                if(!empty($idmap[$dupecfg['parent']])) {
+                  $this->duplicateObjects($dupem, $dupecfg['fk'], array_keys($idmap[$dupecfg['parent']]), $idmap);
+                }
               }
             } else {
               // Duplicate the main plugin object
@@ -464,7 +590,9 @@ class Co extends AppModel {
           'lft',
           'rght'
         ) as $field) {
-          unset($o[$model->name][$field]);
+          if(isset($o[$model->name][$field])) {
+            unset($o[$model->name][$field]);
+          }
         }
         
         if(!empty($model->belongsTo)) {
@@ -503,7 +631,7 @@ class Co extends AppModel {
         $model->save($o, array('validate' => false, 'callbacks' => false));
         
         if($isTree) {
-          // Since we disabled callacks, we have to manually rebuild the tree
+          // Since we disabled callbacks, we have to manually rebuild the tree
           $model->recover('parent');
         }
         
@@ -526,7 +654,47 @@ class Co extends AppModel {
     
     // Create the default groups
     $this->CoGroup->addDefaults($coId);
+
+    // Register the garbage Collector
+    if($coId == $this->getCOmanageCOID()) {
+      $this->CoJob->register(
+        $coId,                                                       // $coId
+        'CoreJob.GarbageCollector',                                  // $jobType
+        null,                                                        // $jobTypeFk
+        "",                                                          // $jobMode
+        _txt('rs.jb.started.web', array(__FUNCTION__ , -1)),         // $summary
+        true,                                                        // $queued
+        false,                                                       // $concurrent
+        array(                                                       // $params
+          'object_type' => 'Co',
+        ),
+        0,                                                           // $delay (in seconds)
+        DEF_GARBAGE_COLLECT_INTERVAL                                 // $requeueInterval (in seconds)
+      );
+    }
     
     return true;
+  }
+
+  /**
+   * Unload Changelog Behavior retrospectively
+   *
+   * @since  COmanage Registry v4.1.0
+   * @param  Object         $plugin
+   */
+
+  public function unloadChangelogBehavior($plugin, $pluginClassName) {
+    if($plugin->Behaviors->enabled('Changelog')) {
+      $plugin->reloadBehavior('Changelog', array('expunge' => true));
+    }
+
+    // Get the prefix by the full Class Name
+    list($pluginName, $pluginParentModel) = explode('.', $pluginClassName);
+
+    foreach($plugin->hasMany as $pluginModelName => $options) {
+      $pluginModel = ClassRegistry::init($pluginName . '.' . $pluginModelName);
+      $this->unloadChangelogBehavior($pluginModel, $pluginClassName);
+    }
+
   }
 }

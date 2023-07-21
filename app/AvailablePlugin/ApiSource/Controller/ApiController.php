@@ -68,11 +68,32 @@ class ApiController extends Controller {
     
     // Need to explicitly load the model, using $uses confuses things
     $this->loadModel('ApiSource.ApiSource');
+    $this->loadModel('Co');
     $this->loadModel('OrgIdentitySource');
     
     // We want json views in responses
     $this->RequestHandler->renderAs($this, 'json');
     $this->layout = 'ApiSource.json';
+    
+    // This should be provided by routes.php
+    if(empty($this->request->params['coid'])) {
+      $this->set('results', array('error' => _txt('er.co.specify')));
+      $this->Api->restResultHeader(404);
+      return;
+    }
+    
+    $args = array();
+    $args['conditions']['Co.id'] = $this->request->params['coid'];
+    $args['conditions']['Co.status'] = SuspendableStatusEnum::Active;
+    $args['contain'] = false;
+    
+    $co = $this->Co->find('first', $args);
+    
+    if(empty($co)) {
+      $this->set('results', array('error' => _txt('er.co.unk-a', array($this->request->params['coid']))));
+      $this->Api->restResultHeader(404);
+      return;
+    }
     
     // Check authentication
     
@@ -86,26 +107,21 @@ class ApiController extends Controller {
        && !empty($_SERVER['PHP_AUTH_PW'])
        && !empty($this->request->params['coid'])
        && !empty($this->request->params['sor'])) {
-      // Cake is doing some unexpected auto-joining which breaks changelog
-      // on the related models, so make sure we account for ChangelogBehavior
-      
       $args = array();
-      $args['conditions']['ApiSource.sor_label'] = $this->request->params['sor'];
-      $args['joins'][0]['table'] = 'cos';
-      $args['joins'][0]['alias'] = 'Co';
-      $args['joins'][0]['type'] = 'INNER';
-      $args['joins'][0]['conditions'][0] = 'OrgIdentitySource.co_id=Co.id';
-      $args['conditions']['Co.id'] = $this->request->params['coid'];
-      $args['conditions']['OrgIdentitySource.deleted'] = false;
-      $args['conditions']['OrgIdentitySource.org_identity_source_id'] = null;
-      $args['contain'] = array('ApiUser', 'OrgIdentitySource');
+      $args['conditions']['OrgIdentitySource.co_id'] = $this->request->params['coid'];
+      $args['conditions']['OrgIdentitySource.sor_label'] = $this->request->params['sor'];
+      $args['conditions']['OrgIdentitySource.status'] = SuspendableStatusEnum::Active;
+      $args['contain'] = array('ApiSource' => array('ApiUser'));
       
-      $this->cur_api_src = $this->ApiSource->find('first', $args);
+      // Bind ApiSource to OrgIdentitySource
+      $this->OrgIdentitySource->bindModel(array('hasOne' => array('ApiSource.ApiSource')), false);
+      
+      $this->cur_api_src = $this->OrgIdentitySource->find('first', $args);
       
       // If no API User is set, then Push Mode is disabled
       
-      if(!empty($this->cur_api_src['ApiUser']['username'])) {
-        if(strcmp($_SERVER['PHP_AUTH_USER'], $this->cur_api_src['ApiUser']['username'])==0) {
+      if(!empty($this->cur_api_src['ApiSource']['ApiUser']['username'])) {
+        if(strcmp($_SERVER['PHP_AUTH_USER'], $this->cur_api_src['ApiSource']['ApiUser']['username'])==0) {
           // This is similar to the configuration in AppController for general API Auth
           $this->Auth->authenticate = array(
             'Basic' => array(
@@ -145,10 +161,10 @@ class ApiController extends Controller {
             $username = $this->Auth->user('username');
             
             if(!empty($username)
-               && $username == $this->cur_api_src['ApiUser']['username']
+               && $username == $this->cur_api_src['ApiSource']['ApiUser']['username']
                // Maybe check remote IP, if configured
-               && (empty($this->cur_api_src['ApiUser']['remote_ip'])
-                   || preg_match($this->cur_api_src['ApiUser']['remote_ip'], $_SERVER['REMOTE_ADDR']))) {
+               && (empty($this->cur_api_src['ApiSource']['ApiUser']['remote_ip'])
+                   || preg_match($this->cur_api_src['ApiSource']['ApiUser']['remote_ip'], $_SERVER['REMOTE_ADDR']))) {
               $authok = true;
             }
           }
@@ -171,6 +187,10 @@ class ApiController extends Controller {
   
   public function delete() {
     // On a delete, we drop the record from our cache, then we trigger a resync.
+    // We don't current support deletion of multiple roles at once, though we
+    // probably could by searching for matching records WHERE sorid LIKE
+    // "${sorid}:". For now we require each role to be deleted using the compound
+    // SOR ID.
     
     try {
       // First make sure we have a record
@@ -278,119 +298,135 @@ class ApiController extends Controller {
         unset($json['returnUrl']);
       }
       
-      // We shouldn't get here if params['sorid'] is null
-      $args = array();
-      $args['conditions']['ApiSourceRecord.api_source_id'] = $this->cur_api_src['ApiSource']['id'];
-      $args['conditions']['ApiSourceRecord.sorid'] = $this->request->params['sorid'];
-      $args['contain'] = false;
+      // As a temporary solution until we refactor OrgIdentities as part of PE,
+      // ApiSource supports multiple roles in a single message by leveraging the
+      // external nature of processing. When we receive a message, we convert it
+      // into one request per role, cloning the non-role specific attributes.
+      // (This is referred to as "Message Meoisis" is the documentation.)
       
-      $currec = $this->ApiSourceRecord->find('first', $args);
-      
-      $rec = array(
-        'api_source_id' => $this->cur_api_src['ApiSource']['id'],
-        'sorid' => $this->request->params['sorid'],
-        // Since we may have mucked with $json for returnUrl above, we don't know
-        // if the original document was "pretty" or not. For consistency, we'll
-        // always make the source_record pretty (which should also make it slightly)
-        // easier for an admin to look at it.
-        'source_record' => json_encode($json, JSON_PRETTY_PRINT)
-      );
-      
-      $this->ApiSourceRecord->clear();
-      
-      if(!empty($currec)) {
-        // Update, though it's possible an update for us still needs to trigger a
-        // createOrgIdentity() call...
-        
-        $rec['id'] = $currec['ApiSourceRecord']['id'];
-      } else {
-        // Insert
-      }
-      
-      // Save the new or updated record
-      // We currently don't bother diff'ing the record to see if it changed, but we could
-      $this->ApiSourceRecord->save($rec);
+      $requests = array();
 
-      // Do we already have an OIS Record for this sorid?
-      $args = array();
-      $args['conditions']['OrgIdentitySourceRecord.org_identity_source_id'] = $this->cur_api_src['OrgIdentitySource']['id'];
-      $args['conditions']['OrgIdentitySourceRecord.sorid'] = $this->request->params['sorid'];
-      $args['contain'] = false;
-      
-      $this->loadModel('OrgIdentitySource');
-      
-      $curoisrec = $this->OrgIdentitySource->OrgIdentitySourceRecord->find('first', $args);
-      
-      $orgId = null;
-      
-      if(!empty($curoisrec)) {
-        // Update
+      if(!empty($json['sorAttributes']['roles'])) {
+        // Multi-role format, convert to multiple requests
         
-        $info = $this->OrgIdentitySource->syncOrgIdentity($this->cur_api_src['OrgIdentitySource']['id'],
-                                                          $this->request->params['sorid']);
-        
-        $orgId = $info['id'];
-        
-        $this->Api->restResultHeader(200);
-      } else {
-        // Create
-        
-        $orgId = $this->OrgIdentitySource->createOrgIdentity($this->cur_api_src['OrgIdentitySource']['id'],
-                                                             $this->request->params['sorid'],
-                                                             null,
-                                                             $this->cur_api_src['OrgIdentitySource']['co_id']);
-        
-        if($returnUrl) {
-          $this->loadModel('CoPetition');
-          
-          // Try to find the CO Petition ID associated with this Org Identity.
-          // If found, insert the return URL.
-          $coPetitionId = $this->CoPetition->field('id', array('CoPetition.enrollee_org_identity_id' => $orgId));
-          
-          if($coPetitionId) {
-            $this->CoPetition->clear();
-            $this->CoPetition->id = $coPetitionId;
-            $this->CoPetition->saveField('return_url', $returnUrl);
+        foreach($json['sorAttributes']['roles'] as $role) {
+          if(empty($role['roleIdentifier'])) {
+            throw new InvalidArgumentException(_txt('er.apisource.role.id'));
           }
-          // XXX else?
+          
+          $rjson = $json;
+          unset($rjson['sorAttributes']['roles']);
+          
+          // Construct the Compound Key
+          $sorkey = $this->request->params['sorid'] . ":" . $role['roleIdentifier'];
+          unset($role['roleIdentifier']);
+          
+          // Move the role attributes into the main json
+          $rjson['sorAttributes'] = array_merge($rjson['sorAttributes'], $role);
+          
+          $requests[$sorkey] = $rjson;
+        }
+      } else {
+        // Else single record format, just pass it through
+        $requests[$this->request->params['sorid']] = $json;
+      }
+
+      // Default to Created
+      $responseCode = 201;
+      $results = array();
+      
+      // For multi-role format, we don't need pipelines to rerun matching once
+      // we have a CO Person ID. This gets a bit more complicated if a new role
+      // shows up in the message _before_ an existing one -- in that case
+      // hopefully the match policy correctly links the person.
+      $cachedCoPersonId = null;
+
+      foreach($requests as $sorkey => $rjson) {
+        // We shouldn't get here if params['sorid'] is null
+        
+        $r = $this->ApiSource->upsert($this->cur_api_src['ApiSource']['id'], 
+                                      $this->cur_api_src['OrgIdentitySource']['id'],
+                                      $this->cur_api_src['OrgIdentitySource']['co_id'],
+                                      $sorkey,
+                                      $rjson,
+                                      $cachedCoPersonId);
+        
+        if(!$r['new']) {
+          // Update. In a multi-role context, we simply consider if the main
+          // Org Identity was known or not, regardless of whether or not we
+          // processed any new roles. So any existing record sets $existing to
+          // true.
+          
+          // Note we return 200 or 201 based on whether or not an org identity
+          // was created, not based on whether or not we saved the SOR attributes.
+          // While a bit of an edge case, it might be more correct to tie it to
+          // $rec['id'] already being set.
+          
+          $responseCode = 200;
+        } else {
+          // Create
+          
+          if($returnUrl) {
+            $this->loadModel('CoPetition');
+            
+            // Try to find the CO Petition ID associated with this Org Identity.
+            // If found, insert the return URL.
+            $coPetitionId = $this->CoPetition->field('id', array('CoPetition.enrollee_org_identity_id' => $r['org_identity_id']));
+            
+            if($coPetitionId) {
+              $this->CoPetition->clear();
+              $this->CoPetition->id = $coPetitionId;
+              $this->CoPetition->saveField('return_url', $returnUrl);
+            }
+          }
         }
         
-        // Note we return 201 based on whether or not an org identity was created,
-        // not based on whether or not we saved the SOR attributes. While a bit of
-        // an edge case, it might be more correct to tie it to $rec['id'] already
-        // being set.
-        $this->Api->restResultHeader(201);
+        if(!empty($r['org_identity_id'])
+           && empty($results['identifiers'])) {
+          // We always return identifiers, since on a 200 we might have generated
+          // new ones. In a multi-role format, all the identifiers should be the
+          // same, so we only pull them once.
+// XXX is this going to be the case with Identifier Assignments per COU?
+//     maybe move this outside the foreach loop and only pull identifiers once
+//     all roles have been processed.
+          $this->loadModel('Identifier');
+          $results = array();
+          
+          $args = array();
+          $args['joins'][0]['table'] = 'co_people';
+          $args['joins'][0]['alias'] = 'CoPerson';
+          $args['joins'][0]['type'] = 'INNER';
+          $args['joins'][0]['conditions'][0] = 'Identifier.co_person_id=CoPerson.id';
+          $args['joins'][1]['table'] = 'co_org_identity_links';
+          $args['joins'][1]['alias'] = 'CoOrgIdentityLink';
+          $args['joins'][1]['type'] = 'INNER';
+          $args['joins'][1]['conditions'][0] = 'CoPerson.id=CoOrgIdentityLink.co_person_id';
+          $args['conditions']['CoOrgIdentityLink.org_identity_id'] = $r['org_identity_id'];
+          $args['conditions']['Identifier.status'] = StatusEnum::Active;
+          $args['contain'] = false;
+          
+          $ids = $this->Identifier->find('all', $args);
+          
+          foreach($ids as $id) {
+            $results['identifiers'][] = array(
+              'identifier' => $id['Identifier']['identifier'],
+              'type' => $id['Identifier']['type']
+            );
+          }
+        }
+        
+        if(!empty($r['co_person_id'])) {
+          $cachedCoPersonId = $r['co_person_id'];
+        }
       }
       
-      if($orgId) {
-        // We always return identifiers, since on a 200 we might have generated new ones
-        $this->loadModel('Identifier');
-        $results = array();
-        
-        $args = array();
-        $args['joins'][0]['table'] = 'co_people';
-        $args['joins'][0]['alias'] = 'CoPerson';
-        $args['joins'][0]['type'] = 'INNER';
-        $args['joins'][0]['conditions'][0] = 'Identifier.co_person_id=CoPerson.id';
-        $args['joins'][1]['table'] = 'co_org_identity_links';
-        $args['joins'][1]['alias'] = 'CoOrgIdentityLink';
-        $args['joins'][1]['type'] = 'INNER';
-        $args['joins'][1]['conditions'][0] = 'CoPerson.id=CoOrgIdentityLink.co_person_id';
-        $args['conditions']['CoOrgIdentityLink.org_identity_id'] = $orgId;
-        $args['conditions']['Identifier.status'] = StatusEnum::Active;
-        $args['contain'] = false;
-        
-        $ids = $this->Identifier->find('all', $args);
-        
-        foreach($ids as $id) {
-          $results['identifiers'][] = array(
-            'identifier' => $id['Identifier']['identifier'],
-            'type' => $id['Identifier']['type']
-          );
-        }
-        
-        $this->set('results', $results);
-      }
+      $this->set('results', $results);
+      $this->Api->restResultHeader($responseCode);
+    }
+    catch(UnexpectedValueException $e) {
+      // This is a 202 Accepted response from the Match Server
+      $this->set('results', array('error' => $e->getMessage()));
+      $this->Api->restResultHeader(202);
     }
     catch(Exception $e) {
       $this->set('results', array('error' => $e->getMessage()));

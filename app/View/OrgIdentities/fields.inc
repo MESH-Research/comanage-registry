@@ -77,9 +77,10 @@
   $l = 1;
 ?>
 
-
 <script type="text/javascript">
   $(function() {
+    validate_date_input('<?php print _txt('er.validation') ?>', '<?php print _txt('er.validation.date') ?>');
+
     // Explorer menu toggles
     $(".fieldGroupName").click(function(event) {
       event.preventDefault();
@@ -93,7 +94,22 @@
     });
 
   });
+
+  function js_local_onload() {
+    enum_update_gadgets(false);
+  }
 </script>
+  
+<?php 
+  $args = array(
+    'enumerables' => array(
+      'OrgIdentity.o',
+      'OrgIdentity.ou',
+      'OrgIdentity.title'
+    )
+  );
+  print $this->element('enumerations', $args); 
+?>
 
 <?php if($this->action == 'view' && !empty($org_identities[0]['OrgIdentitySourceRecord']['OrgIdentitySource']['id'])): ?>
   <div class="co-info-topbox">
@@ -223,63 +239,127 @@
           <?php else: // add ?>
             <ul id="tabs-name" class="fields data-list">
               <?php foreach($org_identities[0]['Name'] as $n): ?>
+              <?php
+                $action_name_args = array();
+                $action_name_args['vv_attr_mdl'] = "Name";
+                $action_name_args['vv_attr_id'] = $n['id'];
+              ?>
                 <li class="field-data-container">
-                  <div class="field-data">
+                  <div class="field-data force-wrap">
                     <?php
-                      print $this->Html->link(generateCn($n),
-                          array('controller' => 'names',
-                            'action' => ($e ? 'edit' : 'view'),
-                            $n['id']))
-                        . " ("
-                        . ($n['primary_name'] ? (_txt('fd.name.primary_name') . ", ") : "")
-                        . _txt('en.name.type', null, $n['type'])
-                        . (!empty($n['language']) ? (", " . _txt('en.language', null, $n['language'])) : "")
-                        . ")";
+                      $primary_name_with_bg = $this->Badge->badgeIt(
+                        _txt('fd.name.primary_name'),
+                        $this->Badge->getBadgeColor('Secondary'),
+                        false,
+                        true
+                      );
+                      $cn = $n['primary_name'] ? filter_var(generateCn($n),FILTER_SANITIZE_SPECIAL_CHARS) . " " . $primary_name_with_bg
+                                               : filter_var(generateCn($n),FILTER_SANITIZE_SPECIAL_CHARS);
+                      print $this->Html->link(
+                        $cn,
+                        array(
+                          'controller' => 'names',
+                          'action' => ($e ? 'edit' : 'view'),
+                          $n['id']),
+                        array(
+                          'escape' => false,
+                        )
+                      );
+                    ?>
+                  </div>
+                  <div class="field-data data-label">
+                    <?php
+                    $badge_list = array();
+                    // Name Type
+                    $badge_list[] = array(
+                      'order' => $this->Badge->getBadgeOrder('Type'),
+                      'text' => _txt('en.name.type', null, $n['type']),
+                      'color' => $this->Badge->getBadgeColor('Light'),
+                    );
+                    // Name Language
+                    if(!empty($n['language'])) {
+                      $badge_list[] = array(
+                        'order' => $this->Badge->getBadgeOrder('Other'),
+                        'text' => _txt('en.language', null, $n['language']),
+                        'color' => $this->Badge->getBadgeColor('Light'),
+                      );
+                    }
+                    if(!empty($badge_list)) {
+                      print $this->element('badgeList', array('vv_badge_list' => $badge_list));
+                    }
                     ?>
                   </div>
                   <div class="field-actions">
                     <?php
                       if($e) {
                         if(!$n['primary_name']) {
-                          print '<a class="deletebutton" title="' . _txt('op.delete')
-                            . '" onclick="javascript:js_confirm_generic(\''
-                            . _txt('js.remove') . '\',\''    // dialog body text
-                            . $this->Html->url(              // dialog confirm URL
+                          // Delete Action Button
+                          $dg_url = array(
+                            'controller' => 'names',
+                            'action' => 'delete', $n['id'],
+                            'co' => $cur_co['Co']['id']
+                          );
+                          $action_name_args['vv_actions'][] = array(
+                            'order' => $this->Menu->getMenuOrder('Delete'),
+                            'icon' => $this->Menu->getMenuIcon('Delete'),
+                            'url' => 'javascript:void(0);',
+                            'label' => _txt('op.delete'),
+                            'onclick' => array(
+                              'dg_bd_txt' => _txt('js.remove'),
+                              'dg_url' => $this->Html->url($dg_url),
+                              'dg_conf_btn' => _txt('op.remove'),
+                              'dg_cancel_btn' => _txt('op.cancel'),
+                              'dg_title' => _txt('op.remove'),
+                              'db_bd_txt_repl_str' => filter_var(_jtxt(generateCn($n)), FILTER_SANITIZE_STRING),
+                            ),
+                          );
+                          // Primary Name Action Button
+                          $action_name_args['vv_actions'][] = array(
+                            'order' => $this->Menu->getMenuOrder('PrimaryName'),
+                            'icon' => $this->Menu->getMenuIcon('Icon'),
+                            'label' => _txt('op.primary'),
+                            'url' => $this->Html->url(
                               array(
                                 'controller' => 'names',
-                                'action' => 'delete',
+                                'action' => 'primary',
                                 $n['id'],
-                                'co' => ($pool_org_identities ? false : $cur_co['Co']['id'])
+                                'orgidentityid' => $org_identities[0]['OrgIdentity']['id'],
                               )
-                            ) . '\',\''
-                            . _txt('op.remove') . '\',\''    // dialog confirm button
-                            . _txt('op.cancel') . '\',\''    // dialog cancel button
-                            . _txt('op.remove') . '\',[\''   // dialog title
-                            . filter_var(_jtxt(generateCn($n)),FILTER_SANITIZE_STRING)  // dialog body text replacement strings
-                            . '\']);">'
-                            . _txt('op.delete')
-                            . '</a>';
-
-                          print $this->Html->link(_txt('op.primary'),
-                              array('controller'    => 'names',
-                                'action'        => 'primary',
-                                $n['id'],
-                                'orgidentityid' => $org_identities[0]['OrgIdentity']['id']),
-                              array('class' => 'primarybutton')) . "\n";
+                            ),
+                          );
                         }
-
-                        print $this->Html->link(_txt('op.edit'),
-                            array('controller' => 'names',
+                        // Edit Action Button
+                        $action_name_args['vv_actions'][] = array(
+                          'order' => $this->Menu->getMenuOrder('Edit'),
+                          'icon' => $this->Menu->getMenuIcon('Edit'),
+                          'url' => $this->Html->url(
+                            array(
+                              'controller' => 'names',
                               'action' => 'edit',
-                              $n['id']),
-                            array('class' => 'editbutton')) . "\n";
+                              $n['id'],
+                            )
+                          ),
+                          'label' => _txt('op.edit'),
+                        );
                       } else {
-                        print $this->Html->link(_txt('op.view'),
-                            array('controller' => 'names',
+                        // View Action Button
+                        $action_name_args['vv_actions'][] = array(
+                          'order' => $this->Menu->getMenuOrder('View'),
+                          'icon' => $this->Menu->getMenuIcon('View'),
+                          'lightbox' => true,
+                          'url' => $this->Html->url(
+                            array(
+                              'controller' => 'names',
                               'action' => 'view',
-                              $n['id']),
-                            array('class' => 'viewbutton')) . "\n";
-                      }
+                              $n['id'],
+                            )
+                          ),
+                          'label' => _txt('op.view'),
+                        );
+                    }
+                    if(!empty($action_name_args['vv_actions'])) {
+                      print $this->element('menuAction', $action_name_args);
+                    }
                     ?>
                   </div>
                 </li>
@@ -345,16 +425,15 @@
             </div>
             <div class="field-info">
               <?php
-                global $cm_lang, $cm_texts;
                 $attrs = array();
                 $attrs['value'] = (isset($org_identities[0]['OrgIdentity']['affiliation'])
                   ? $org_identities[0]['OrgIdentity']['affiliation']
-                  : "M");
+                  : null);
                 $attrs['empty'] = true;
 
                 if($e) {
                   print $this->Form->select('affiliation',
-                    $cm_texts[ $cm_lang ]['en.org_identity.affiliation'],
+                    $vv_affiliation_types,
                     $attrs);
 
                   if($this->Form->isFieldError('affiliation')) {
@@ -362,7 +441,7 @@
                   }
                 } else {
                   if(!empty($org_identities[0]['OrgIdentity']['affiliation'])) {
-                    print $cm_texts[ $cm_lang ]['en.org_identity.affiliation'][ $org_identities[0]['OrgIdentity']['affiliation'] ];
+                    print $vv_affiliation_types[ $org_identities[0]['OrgIdentity']['affiliation'] ];
                   }
                 }
               ?>
@@ -374,35 +453,11 @@
             </div>
             <div class="field-info">
               <?php
-                if($e) {
-                  if(!empty($vv_enums_title)) {
-                    // Attribute enumerations defined
-
-                    if(!empty($org_identities[0]['OrgIdentity']['title'])
-                       && !array_search($org_identities[0]['OrgIdentity']['title'], $vv_enums_title)) {
-                      print filter_var($org_identities[0]['OrgIdentity']['title'],FILTER_SANITIZE_SPECIAL_CHARS);
-                      
-                      print '<div>
-                               <span class="ui-icon ui-icon-info co-info"></span>
-                               <em>' . _txt('er.ae.val.inv') . '</em>
-                             </div>';
-                    }
-
-                    $attrs = array();
-                    $attrs['empty'] = true;
-
-                    print $this->Form->select('title', $vv_enums_title, $attrs);
-
-                    if($this->Form->isFieldError('title')) {
-                      print $this->Form->error('title');
-                    }
-                  } else {
-                    // No attribute enumerations defined
-                    print $this->Form->input('title', array('size' => 60));
-                  }
-                } else {
-                  print filter_var($org_identities[0]['OrgIdentity']['title'],FILTER_SANITIZE_SPECIAL_CHARS);
-                }
+                $args = array(
+                  'column' => 'title',
+                  'editable' => $e
+                );
+                print $this->element('enumerableField', $args);
               ?>
             </div>
           </li>
@@ -412,35 +467,11 @@
             </div>
             <div class="field-info">
               <?php
-                if($e) {
-                  if(!empty($vv_enums_o)) {
-                    // Attribute enumerations defined
-
-                    if(!empty($org_identities[0]['OrgIdentity']['o'])
-                      && !array_search($org_identities[0]['OrgIdentity']['o'], $vv_enums_o)) {
-                      print filter_var($org_identities[0]['OrgIdentity']['o'],FILTER_SANITIZE_SPECIAL_CHARS);
-                      
-                      print '<div>
-                         <span class="ui-icon ui-icon-info co-info"></span>
-                         <em>' . _txt('er.ae.val.inv') . '</em>
-                       </div>';
-                    }
-
-                    $attrs = array();
-                    $attrs['empty'] = true;
-
-                    print $this->Form->select('o', $vv_enums_o, $attrs);
-
-                    if($this->Form->isFieldError('o')) {
-                      print $this->Form->error('o');
-                    }
-                  } else {
-                    // No attribute enumerations defined
-                    print $this->Form->input('o', array('size' => 60));
-                  }
-                } else {
-                  print filter_var($org_identities[0]['OrgIdentity']['o'],FILTER_SANITIZE_SPECIAL_CHARS);
-                }
+                $args = array(
+                  'column' => 'o',
+                  'editable' => $e
+                );
+                print $this->element('enumerableField', $args);
               ?>
             </div>
           </li>
@@ -450,35 +481,11 @@
             </div>
             <div class="field-info">
               <?php
-                if($e) {
-                  if(!empty($vv_enums_ou)) {
-                    // Attribute enumerations defined
-
-                    if(!empty($org_identities[0]['OrgIdentity']['ou'])
-                      && !array_search($org_identities[0]['OrgIdentity']['ou'], $vv_enums_ou)) {
-                      print filter_var($org_identities[0]['OrgIdentity']['ou'],FILTER_SANITIZE_SPECIAL_CHARS);
-                      
-                      print '<div>
-                         <span class="ui-icon ui-icon-info co-info"></span>
-                         <em>' . _txt('er.ae.val.inv') . '</em>
-                       </div>';
-                    }
-
-                    $attrs = array();
-                    $attrs['empty'] = true;
-
-                    print $this->Form->select('ou', $vv_enums_ou, $attrs);
-
-                    if($this->Form->isFieldError('ou')) {
-                      print $this->Form->error('ou');
-                    }
-                  } else {
-                    // No attribute enumerations defined
-                    print $this->Form->input('ou', array('size' => 60));
-                  }
-                } else {
-                  print filter_var($org_identities[0]['OrgIdentity']['ou'],FILTER_SANITIZE_SPECIAL_CHARS);
-                }
+                $args = array(
+                  'column' => 'ou',
+                  'editable' => $e
+                );
+                print $this->element('enumerableField', $args);
               ?>
             </div>
           </li>
@@ -562,6 +569,26 @@
               ?>
             </div>
           </li>
+          <!-- Manager and Sponsor fields are read only because we only support
+               setting these fields in an OIS context. In Registry v5, Org
+               Identities basically become read only to the administrator.
+          -->
+          <li>
+            <div class="field-name">
+              <?php print _txt('fd.manager'); ?>
+            </div>
+            <div class="field-info">
+              <?php if(!empty($org_identities[0]['OrgIdentity']['manager_identifier'])) print filter_var($org_identities[0]['OrgIdentity']['manager_identifier'], FILTER_SANITIZE_SPECIAL_CHARS); ?>
+            </div>
+          </li>
+          <li>
+            <div class="field-name">
+              <?php print _txt('fd.sponsor'); ?>
+            </div>
+            <div class="field-info">
+              <?php if(!empty($org_identities[0]['OrgIdentity']['sponsor_identifier'])) print filter_var($org_identities[0]['OrgIdentity']['sponsor_identifier'], FILTER_SANITIZE_SPECIAL_CHARS); ?>
+            </div>
+          </li>
           <?php if($e): ?>
             <li class="fields-submit">
               <div class="field-name">
@@ -621,23 +648,22 @@
       <?php if($this->action != "add"): ?>       
         <!-- Associated CoPeople listings -->
         <li id="fields-copeople" class="fieldGroup">
-          <?php if($e): ?>
-            <div class="coAddEditButtons">
-              <?php
-                if($permissions['link']) {
-                  foreach($vv_linkable_cos as $lcoid => $lconame) {
-                    print $this->Html->link(_txt('op.link.to.co', array($lconame)),
-                      array('controller'    => 'co_people',
-                        'action'        => 'link',
-                        'orgidentityid' => $org_identities[0]['OrgIdentity']['id'],
-                        'co'            => $lcoid),
-                      array('class'  => 'addbutton'));
+          <div class="coAddEditButtons">
+            <?php
+              if($permissions['link']) {
+                foreach($vv_linkable_cos as $lcoid => $lconame) {
+                  print $this->Html->link(_txt('op.link.to.co', array($lconame)),
+                    array('controller'    => 'co_people',
+                      'action'        => 'link',
+                      'orgidentityid' => $org_identities[0]['OrgIdentity']['id'],
+                      'co'            => $lcoid,
+                      'render'        => 'norm'),
+                    array('class'  => 'addbutton'));
 
-                  }
                 }
-              ?>
-            </div>
-          <?php endif; ?>
+              }
+            ?>
+          </div>
           <a href="#tabs-copeople" class="fieldGroupName">
             <em class="material-icons">indeterminate_check_box</em>
             <?php print _txt('ct.co_people.pl'); ?>
@@ -647,58 +673,110 @@
               if(!empty($org_identities[0]['CoOrgIdentityLink'])) {
                 foreach($org_identities[0]['CoOrgIdentityLink'] as $o) {
                   print '<li class="field-data-container">';
-                  print '<div class="field-data">';
+                  print '<div class="field-data force-wrap">';
                   print $this->Html->link(generateCn($o['CoPerson']['PrimaryName']),
                     array('controller' => 'co_people',
                       'action'     => 'canvas',
                       $o['CoPerson']['id']));
-
-                  print "&nbsp;(" . filter_var($o['CoPerson']['Co']['name'],FILTER_SANITIZE_SPECIAL_CHARS) . ")<br />\n";
                   print '</div>';
-                  print '<div class="field-actions">';
+                  print '<div class="field-data data-label">';
+                  print $this->element('badgeList',
+                    array('vv_badge_list' =>
+                      array(
+                        array(
+                          'order' => $this->Badge->getBadgeOrder('Other'),
+                          'text' => filter_var($o['CoPerson']['Co']['name'],FILTER_SANITIZE_SPECIAL_CHARS),
+                          'color' => $this->Badge->getBadgeColor('Light'),
+                        )
+                      )
+                    )
+                  );
+                  print '</div>';
+                  $action_coil_args = array();
+                  $action_coil_args['vv_attr_mdl'] = "CoOrgIdentityLink";
+                  $action_coil_args['vv_attr_id'] = $o['id'];
 
                   // We don't currently offer an unlink button here, that can only (currently)
                   // be done from CO Person Canvas, which places some restrictions on that action.
 
-                  print $this->Html->link(_txt('op.view'),
-                      array('controller' => 'co_people',
-                        'action'     => 'canvas',
-                        $o['CoPerson']['id']),
-                      array('class' => 'editbutton')) . "\n";
+                  $action_coil_args['vv_actions'][] = array(
+                    'order' => $this->Menu->getMenuOrder('View'),
+                    'icon' => $this->Menu->getMenuIcon('View'),
+                    'url' => $this->Html->url(
+                      array(
+                        'controller' => 'co_people',
+                        'action' => 'canvas',
+                        $o['CoPerson']['id'],
+                      )
+                    ),
+                    'label' => _txt('op.view'),
+                  );
+                  print '<div class="field-actions">';
+                  if(!empty($action_coil_args['vv_actions'])) {
+                    print $this->element('menuAction', $action_coil_args);
+                  }
                   print '</div>';
                   print '</li>';
                 }
               }
 
               if(!empty($vv_co_person_roles['PipelineCoPersonRole']['id'])) {
+                $action_pcpr_args = array();
+                $action_pcpr_args['vv_attr_mdl'] = "PipelineCoPersonRole";
+                $action_pcpr_args['vv_attr_id'] = $vv_co_person_roles['PipelineCoPersonRole']['id'];
                 print '<li class="field-data-container">';
-                print '<div class="field-data">';
+                print '<div class="field-data force-wrap">';
                 print _txt('in.orgid.pi.role') . "<br />\n";
                 print '</div>';
-                print '<div class="field-actions">';
+                print '<div class="field-data data-label"></div>';
 
-                print $this->Html->link(_txt('op.view'),
-                    array('controller' => 'co_person_roles',
-                      'action'     => 'edit',
-                      $vv_co_person_roles['PipelineCoPersonRole']['id']),
-                    array('class' => 'editbutton')) . "\n";
+                $action_pcpr_args['vv_actions'][] = array(
+                  'order' => $this->Menu->getMenuOrder('Edit'),
+                  'icon' => $this->Menu->getMenuIcon('Edit'),
+                  'url' => $this->Html->url(
+                    array(
+                      'controller' => 'co_person_roles',
+                      'action' => 'edit',
+                      $vv_co_person_roles['PipelineCoPersonRole']['id'],
+                    )
+                  ),
+                  'label' => _txt('op.edit'),
+                );
+                print '<div class="field-actions">';
+                if(!empty($action_pcpr_args['vv_actions'])) {
+                  print $this->element('menuAction', $action_pcpr_args);
+                }
                 print '</div>';
                 print '</li>';
               }
 
               if(!empty($org_identities[0]['PipelineCoGroupMember'])) {
                 foreach($org_identities[0]['PipelineCoGroupMember'] as $g) {
+                  $action_pcgm_args = array();
+                  $action_pcgm_args['vv_attr_mdl'] = "PipelineCoGroupMember";
+                  $action_pcgm_args['vv_attr_id'] = $g['id'];
                   print '<li class="field-data-container">';
-                  print '<div class="field-data">';
+                  print '<div class="field-data force-wrap">';
                   print _txt('in.orgid.pi.group', array(filter_var($g['CoGroup']['name'],FILTER_SANITIZE_SPECIAL_CHARS))) . "<br />\n";
                   print '</div>';
-                  print '<div class="field-actions">';
+                  print '<div class="field-data data-label"></div>';
 
-                  print $this->Html->link(_txt('op.view'),
-                      array('controller' => 'co_group_members',
-                        'action'     => 'edit',
-                        $g['id']),
-                      array('class' => 'editbutton')) . "\n";
+                  $action_pcgm_args['vv_actions'][] = array(
+                    'order' => $this->Menu->getMenuOrder('Edit'),
+                    'icon' => $this->Menu->getMenuIcon('Edit'),
+                    'url' => $this->Html->url(
+                      array(
+                        'controller' => 'co_group_members',
+                        'action' => 'edit',
+                        $g['id'],
+                      )
+                    ),
+                    'label' => _txt('op.edit'),
+                  );
+                  print '<div class="field-actions">';
+                  if(!empty($action_pcgm_args['vv_actions'])) {
+                    print $this->element('menuAction', $action_pcgm_args);
+                  }
                   print '</div>';
                   print '</li>';
                 }

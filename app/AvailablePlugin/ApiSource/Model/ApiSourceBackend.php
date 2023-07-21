@@ -123,9 +123,11 @@ class ApiSourceBackend extends OrgIdentitySourceBackend {
         $n = array();
         
         if(!empty($name['prefix']))
-          $n['prefix'] = $name['prefix'];
+          $n['honorific'] = $name['prefix'];
         if(!empty($attrs['sorAttributes']['names'][0]['given']))
           $n['given'] = $name['given'];
+        if(!empty($attrs['sorAttributes']['names'][0]['middle']))
+          $n['middle'] = $name['middle'];
         if(!empty($attrs['sorAttributes']['names'][0]['family']))
           $n['family'] = $name['family'];
         if(!empty($attrs['sorAttributes']['names'][0]['suffix']))
@@ -229,8 +231,18 @@ class ApiSourceBackend extends OrgIdentitySourceBackend {
       }
     }
     
+    if(!empty($attrs['sorAttributes']['managerIdentifier'])) {
+      // The Pipeline maps this to a CO Person ID
+      $orgdata['OrgIdentity']['manager_identifier'] = $attrs['sorAttributes']['managerIdentifier'];
+    }
+    
     if(!empty($attrs['sorAttributes']['organization'])) {
       $orgdata['OrgIdentity']['o'] = $attrs['sorAttributes']['organization'];
+    }
+    
+    if(!empty($attrs['sorAttributes']['sponsorIdentifier'])) {
+      // The Pipeline maps this to a CO Person ID
+      $orgdata['OrgIdentity']['sponsor_identifier'] = $attrs['sorAttributes']['sponsorIdentifier'];
     }
     
     if(!empty($attrs['sorAttributes']['telephoneNumbers'])) {
@@ -271,6 +283,18 @@ class ApiSourceBackend extends OrgIdentitySourceBackend {
       }
     }
     
+    // Note this is an object, not an array
+    if(!empty($attrs['sorAttributes']['adhoc'])) {
+      foreach($attrs['sorAttributes']['adhoc'] as $a) {
+        if(!empty($a['tag']) && isset($a['value'])) {
+          $orgdata['AdHocAttribute'][] = array(
+            'tag'   => $a['tag'],
+            'value' => $a['value']
+          );
+        }
+      }
+    }
+    
     return $orgdata;
   }
   
@@ -292,14 +316,21 @@ class ApiSourceBackend extends OrgIdentitySourceBackend {
     
     // We search the cache of existing records (push), but not (currently) a
     // remote URL (pull).
+    $ApiSource = ClassRegistry::init('ApiSource.ApiSource');
     $ApiSourceRecord = ClassRegistry::init('ApiSource.ApiSourceRecord');
+    
+    // Map OIS ID to ApiSource ID
+    $apiSourceId = $ApiSource->field('id', array('ApiSource.org_identity_source_id' => $this->pluginCfg['org_identity_source_id']));
+    
+    if(!$apiSourceId) {
+      throw new InvalidArgumentException(_txt('er.notfound', array(_txt('ct.api_sources.1'))));
+    }
     
     $args = array();
     $args['conditions']['ApiSourceRecord.sorid'] = $id;
-    $args['conditions']['ApiSource.org_identity_source_id'] = $this->pluginCfg['org_identity_source_id'];
-    // We don't really need ApiSource, but it forces the join
-    $args['contain'] = array('ApiSource');
-    
+    $args['conditions']['ApiSourceRecord.api_source_id'] = $apiSourceId;
+    $args['contain'] = false;
+
     $result = $ApiSourceRecord->find('first', $args);
     
     if(empty($result)) {
@@ -328,13 +359,20 @@ class ApiSourceBackend extends OrgIdentitySourceBackend {
     
     // We search the cache of existing records (push), but not (currently) a
     // remote URL (pull).
+    $ApiSource = ClassRegistry::init('ApiSource.ApiSource');
     $ApiSourceRecord = ClassRegistry::init('ApiSource.ApiSourceRecord');
+    
+    // Map OIS ID to ApiSource ID
+    $apiSourceId = $ApiSource->field('id', array('ApiSource.org_identity_source_id' => $this->pluginCfg['org_identity_source_id']));
+    
+    if(!$apiSourceId) {
+      throw new InvalidArgumentException(_txt('er.notfound', array(_txt('ct.api_sources.1'))));
+    }
     
     $args = array();
     $args['conditions']['ApiSourceRecord.sorid'] = $attributes['SORID'];
-    $args['conditions']['ApiSource.org_identity_source_id'] = $this->pluginCfg['org_identity_source_id'];
-    // We don't really need ApiSource, but it forces the join
-    $args['contain'] = array('ApiSource');
+    $args['conditions']['ApiSourceRecord.api_source_id'] = $apiSourceId;
+    $args['contain'] = false;
     
     $results = $ApiSourceRecord->find('all', $args);
     

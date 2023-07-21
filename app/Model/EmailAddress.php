@@ -44,6 +44,8 @@ class EmailAddress extends AppModel {
     "CoDepartment",
     // An email address may be attached to a CO Person
     "CoPerson",
+    // An Ad Hoc Attribute may be attached to an Organization
+    "Organization",
     // An email address may be attached to an Org Identity
     "OrgIdentity",
     // An email address created from a Pipeline has a Source Email Address
@@ -270,16 +272,18 @@ class EmailAddress extends AppModel {
    * Perform a keyword search.
    *
    * @since  COmanage Registry v3.1.0
-   * @param  Integer $coId CO ID to constrain search to
-   * @param  String  $q    String to search for
+   * @param  integer $coId  CO ID to constrain search to
+   * @param  string  $q     String to search for
+   * @param  integer $limit Search limit
    * @return Array Array of search results, as from find('all)
    */
   
-  public function search($coId, $q) {
+  public function search($coId, $q, $limit) {
     $args = array();
     $args['conditions']['LOWER(EmailAddress.mail)'] = strtolower($q);
     $args['conditions']['CoPerson.co_id'] = $coId;
     $args['order'] = array('EmailAddress.mail');
+    $args['limit'] = $limit;
     $args['contain']['CoPerson'] = 'PrimaryName';
     
     return $this->find('all', $args);
@@ -328,8 +332,12 @@ class EmailAddress extends AppModel {
         $this->clear();
         $this->id = $m['EmailAddress']['id'];
         
-        // Make sure to disable callbacks since beforeSave will try to update this field, too
-        if(!$this->saveField('verified', true, array('callbacks' => false))) {
+        // Pass the option 'safeties' with value 'off' so that the logic this model's
+        // beforeSave() method is short circuited and does not interfere with the updating
+        // of the verified field. This approach still allows the beforeSave() and afterSave()
+        // methods of the Provisioning behavior to fire and provision the updated
+        // EmailAddress.
+        if(!$this->saveField('verified', true, array('safeties' => 'off'))) {
           throw new RuntimeException(_txt('er.db.save-a', array('EmailAddress::verify()')));
         }
         

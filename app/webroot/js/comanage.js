@@ -47,67 +47,37 @@ function generateFlash(text, type) {
     type: type,
     dismissQueue: true,
     layout: 'topCenter',
+    closeWith: ['button'],
     theme: 'comanage'
   });
 }
 
-// Explicitly generate a spinner. This can normally be done by
-// setting the "spin" class on an element.  (See View/Elements/javascript.ctp)
-// For dynamically created elements, we can generate the spinner
-// dynamically by calling this function.
+// Set an application preference
+// tag     - name of preference to save (string, required)
+// value   - value to save (json in the form of {"value":"something"} or {"value":null} to unset)
+function setApplicationPreference(tag,value) {
+  var apUrl = "/registry/application_preferences/" + tag;
+  var jsonData = value;
+  $.ajax({
+    url: apUrl,
+    type: 'PUT',
+    data: jsonData
+  });
+}
 
-// Set defaults - this is used by all full-page spinners.
-var coSpinnerOpts = {
-  lines: 13, // The number of lines to draw
-  length: 20, // The length of each line
-  width: 8, // The line thickness
-  radius: 20, // The radius of the inner circle
-  corners: 0.4, // Corner roundness (0..1)
-  rotate: 0, // The rotation offset
-  direction: 1, // 1: clockwise, -1: counterclockwise
-  color: '#9FC6E2', // #rgb or #rrggbb or array of colors
-  speed: 1.2, // Rounds per second
-  trail: 60, // Afterglow percentage
-  shadow: false, // Whether to render a shadow
-  hwaccel: false, // Whether to use hardware acceleration
-  className: 'spinner', // The CSS class to assign to the spinner
-  zIndex: 100 // The z-index (defaults to 2000000000)
-};
+// Generate a loading animation by revealing a persistent hidden div with CSS animation.
+// An element's onclick action will trigger this to appear if it has the class "spin" class on an element.
+// (See View/Elements/javascript.ctp)
+// For dynamically created elements, we can generate the loading animation by calling this function.
 
-// Set defaults - this is used by all mini (localized) spinners.
-var coMiniSpinnerOpts = {
-  lines: 10, // The number of lines to draw
-  length: 4, // The length of each line
-  width: 2, // The line thickness
-  radius: 2, // The radius of the inner circle
-  corners: 0.2, // Corner roundness (0..1)
-  rotate: 0, // The rotation offset
-  direction: 1, // 1: clockwise, -1: counterclockwise
-  color: '#9FC6E2', // #rgb or #rrggbb or array of colors
-  speed: 1.2, // Rounds per second
-  trail: 60, // Afterglow percentage
-  shadow: false, // Whether to render a shadow
-  hwaccel: false, // Whether to use hardware acceleration
-  className: 'mini-spinner', // The CSS class to assign to the spinner
-  zIndex: 100, // The z-index (defaults to 2000000000)
-  top: '18px', // Positioning offset
-  left: '18px' // Positioning offset
-};
-
-
-// show a spinner
+// show loading animation
 function displaySpinner() {
-  var spinnerDiv = '<div id="coSpinner"></div>';
-  $("body").append(spinnerDiv);
-
-  var coSpinnerTarget = document.getElementById('coSpinner');
-  var coSpinner = new Spinner(coSpinnerOpts).spin(coSpinnerTarget);
+  $("#co-loading").show();
 }
 
 // stop a spinner explicitly
-// assumes spinner is in a div with ID "coSpinner"
 function stopSpinner() {
-  $("#coSpinner").remove();
+  $("#co-loading").hide();
 }
 
 
@@ -163,13 +133,62 @@ function js_confirm_generic(txt, url, confirmbtxt, cancelbtxt, titletxt, tokenRe
   $("#dialog-text").text(bodyText);
 
   // Set the dialog buttons
-  var dbuttons = {};
-  dbuttons[cxlbutton] = function() { $(this).dialog("close"); };
-  dbuttons[confbutton] = function() { window.location = forwardUrl; };
+  var dbuttons = []
+  // Cancel button
+  dbuttons.push({
+    text: cxlbutton,
+    id: "btn-confirm-generic-cxl",
+    click: function () {$(this).dialog("close");}
+  });
+  // Confirm button
+  dbuttons.push({
+    text: confbutton,
+    id: "btn-confirm-generic-conf",
+    click: function () {
+      // Handle the submit button
+      loadUiDialogSpinner($("#btn-confirm-generic-conf"));
+      // loadButtonSpinner($("#btn-confirm-generic-conf"), confirmbtxt);
+      // Redirect to action
+      window.location = forwardUrl;
+    }
+  });
   $("#dialog").dialog("option", "buttons", dbuttons);
 
   // Open the dialog
   $('#dialog').dialog('open');
+}
+
+// Load button spinner followed by Text
+// elem         - button element (object, required)
+// bodyText     - button text    (string, required)
+function loadButtonSpinner(elem, btnText) {
+  let btn_payload = "<span class='spinner-grow spinner-grow-sm align-middle' role='status' aria-hidden='true'></span><span class='sr-only'>"
+    + btnText
+    + "</span> "
+    + btnText;
+  elem.html(btn_payload);
+  elem.button("disable");
+}
+
+// Load UI Dialog co-loading-mini spinner inline with UI Buttons
+// elem         - button element (object, required)
+function loadUiDialogSpinner(elem) {
+  // debugger;
+  $pane = elem.closest('.ui-dialog-buttonpane');
+  $pane.prepend('<span class="d-inline-flex align-bottom co-loading-mini"><span></span><span></span><span></span></span>');
+  elem.button("disable");
+}
+
+// Turn the loader to visible and disable the submit button
+// This function assumes that the view contains only one submit button
+function showBtnSpinnerLightbox() {
+  var $spinner = $(".btn-submit-with-loader");
+  var $form = $spinner.closest('form');
+  if($('.lightbox').length > 0) {
+    $spinner.addClass('visible').removeClass('invisible');
+    $spinner.closest("button").attr('disabled', true);
+  }
+  $form.submit();
 }
 
 // Generic goto page form handling for multi-page listings.
@@ -269,4 +288,222 @@ function clearTopSearch(formObj) {
     }
   }
   formObj.submit();
+}
+
+// Generate a dialog box with input form.  On confirmation, post to <url>.
+// txt                - body text           (string, optional)
+// url                - forward url         (string, required)
+// submitbtxt         - submit button text  (string, optional)
+// cancelbtxt         - cancel button text  (string, optional)
+// titletxt           - dialog title text   (string, optional)
+// lbltxt             - dialog label text   (string, optional)
+// sendingtxt         - submit button text
+//                      while processing    (string, optional)
+function js_form_generic(txt, url, submitbtxt, cancelbtxt, titletxt, lbltxt, sendingtxt) {
+  let url_str = (url) ? url : '#';
+  let body_text = (txt) ? txt : 'Form';
+  let cancel_btn_txt = (cancelbtxt) ? cancelbtxt : 'Cancel';
+  let title_txt = (titletxt) ? titletxt : 'Provide input.';
+  let label_text = (lbltxt) ? lbltxt : 'Input:';
+  let submit_btn_txt = (submitbtxt) ? submitbtxt : 'Submit';
+  let submit_btn_txt_sending = (sendingtxt) ? sendingtxt : 'Sending...';
+
+  if(txt != null) {
+    $("#form-dialog-legend").html(body_text);
+  }
+  if(lbltxt != null) {
+    $("#form-dialog-input-lbl").html(label_text);
+  }
+
+  $("#form-dialog").dialog({
+    modal: true,
+    title: title_txt,
+    buttons: [{
+      text: submit_btn_txt,
+      id: "btn-form-generic-submit",
+      click: function () {
+        let dialog_input = $(this).find('input[id="form-dialog-text"]').val();
+        let $data = {};
+        $data.input = dialog_input;
+
+        // Handle the submit button
+        // Handle the submit button
+        // loadButtonSpinner($("#btn-form-generic-submit"), submit_btn_txt_sending);
+        loadUiDialogSpinner($("#btn-form-generic-submit"));
+
+        let jqxhr = $.ajax({
+          cache: false,
+          type: "POST",
+          url: url_str,
+          beforeSend: function(xhr) {
+            xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+          },
+          data: $data,
+        });
+
+        jqxhr.done((data, textStatus, xhr) => {
+          $("#form-dialog").dialog('close');
+          generateFlash(data, textStatus);
+        });
+
+        jqxhr.fail((xhr, textStatus, error) => {
+          $("#form-dialog").dialog('close');
+          // Show an error message
+          // HTML Text
+          let err_msg = $.parseHTML(xhr.responseText)[0].innerHTML;
+          // JSON text
+          try{
+            //try to parse JSON
+            encodedJson = $.parseJSON(xhr.responseText);
+            err_msg = encodedJson.msg;
+          }catch(error){
+            // Plain text
+            err_msg = xhr.responseText;
+          }
+
+          if(err_msg != null) {
+            error = error + ': ' + err_msg;
+          }
+          generateFlash(error, textStatus);
+        });
+      },
+    }, {
+      text: cancel_btn_txt,
+      id: "btn-form-generic-cxl",
+      click: function () {
+        $(this).dialog('close');
+      },
+    }],
+    close: function () {
+      //do something
+    }
+  });
+}
+
+// CO-2077, Do not permit illogical validity dates (eg: CoPersonRole, CoGroupMember) (eg: start dates that are after end dates)
+// flashmsg          - Flash message text     (string, required)
+// errormsg          - Tooltip Error message  (string, required)
+function validate_date_input(flashmsg, errormsg) {
+  $("input[id*='ValidFrom'], input[id*='ValidThrough']").on('change', function () {
+    var $valid_from = $("input[id*='ValidFrom']");
+    let valid_from_date = $valid_from.val();
+    var $valid_through = $("input[id*='ValidThrough']");
+    let valid_through_date = $valid_through.val();
+
+    // In case any of the two is empty return success
+    if((!valid_from_date || valid_from_date.length === 0 )
+        || (!valid_through_date || valid_through_date.length === 0 )) {
+      return;
+    }
+
+    let valid_from_tmstmp = new Date(valid_from_date).getTime();
+    let valid_through_tmstmp = new Date(valid_through_date).getTime();
+    let ddiff = valid_through_tmstmp-valid_from_tmstmp;
+    if( ddiff < 0) {
+      this.setCustomValidity(errormsg);
+      generateFlash(flashmsg, "error");
+      $("input[type='submit']").prop('disabled', true);
+    } else {
+      $valid_through.get(0).setCustomValidity("");
+      $valid_from.get(0).setCustomValidity("");
+      $("input[type='submit']").prop('disabled', false);
+    }
+  });
+}
+
+// Identify if the lightbox rendered using `open in new tab` action
+// redirect_url   - where to redirect if standalone render is detected (string, required)
+function whereami(redirect_url) {
+  // Hide lightbox Content
+  document.getElementById('lightboxContent').style.display = 'none';
+
+  let is_lightbox = document.getElementsByClassName("light-box").length;
+  let is_logged_in = document.getElementsByClassName("logged-in").length;
+
+  if(is_lightbox > 0 && is_logged_in == 0) {
+    // Add a spinner into the body
+    document.body.innerHTML = '<div id="co-loading"><span></span><span></span><span></span></div>';
+    // reload my parent
+    window.location.assign(redirect_url);
+  } else {
+    // Show the content
+    document.getElementById('lightboxContent').style.display = 'block';
+  }
+}
+
+// CO-2263, Format CO Person autocomplete widget items for easier disambiguation
+// Depends on jQuery UI - this function is fed to the _renderItem extension point for the autocomplete widget
+// ul            - list for the jQuery UI autocomplete selection menu                  (DOM element)
+// item          - json item used to construct the autocomplete selection list element (JSON object)
+function formatCoPersonAutoselectItem(ul, item) {
+  var itemMarkup = '<div class="cm-ac-item-wrapper">';
+  itemMarkup += '<div class="cm-ac-name">' + item.label + '</div>';
+  if(item.email != '') {
+    itemMarkup += '<div class="cm-ac-subitem cm-ac-email"><span class="cm-ac-label">' + item.emailLabel + '</span>' + item.email + '</div>';
+  }
+  if(item.identifier != '') {
+    itemMarkup += '<div class="cm-ac-subitem cm-ac-id"><span class="cm-ac-label">' + item.identifierLabel + '</span>' + item.identifier + '</div>';
+  }
+  itemMarkup += '</div>';
+  
+  return $("<li>").append(itemMarkup).appendTo(ul);
+}
+
+/**
+ * COmanage Registry API AJAX Calls: general function for making an ajax call to Registry API v.1
+ * @param url              {string} API Url
+ * @param method           {string} HTTP Method (GET, POST, PUT, DELETE)
+ * @param dataType         {string} Data type (json, html)
+ * @param successCallback  {string} [Name of the callback function for success]
+ * @param entityId         {string} [ID used to identify an entity in the DOM]
+ * @param failureCallback  {string} [Name of the callback function for failure]
+ * @param data             {Object} [POST or PUT data in JSON]
+ * @param alwaysCallback   {string} [Name of the callback function for always]
+ */
+function callRegistryAPI(url, method, dataType, successCallback, entityId, failureCallback, data = undefined, alwaysCallback = undefined) {
+  var apiUrl = url;
+  var httpMethod = method;
+  var dataType = dataType;
+  var entityId = entityId;
+  var successCallback = successCallback;
+  var failureCallback = failureCallback;
+  var alwaysCallback = alwaysCallback;
+  var data = data;
+
+  if(data === undefined) {
+    data = '';
+  }
+
+  if(entityId === undefined) {
+    entityId = '';
+  }
+
+  var xhr = $.ajax({
+    url: apiUrl,
+    method: httpMethod,
+    dataType: dataType,
+    data: data,
+    encode: true
+  })
+  .done(function() {
+    if(successCallback != undefined) {
+      successCallback(xhr, entityId);  
+    } else {
+      return xhr;
+    }
+  })
+  .fail(function() {
+    if(failureCallback != undefined) {
+      failureCallback(xhr, entityId);
+    } else {
+      return xhr;
+    }
+  })
+  .always(function() {
+    if(alwaysCallback != undefined) {
+      alwaysCallback(xhr, entityId);
+    } else {
+      return xhr;
+    }
+  });
 }

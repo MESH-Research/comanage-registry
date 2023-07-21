@@ -27,7 +27,7 @@
 
   // Determine if fields are editable
   $e = false;
-  
+
   // XXX drop this if we don't have a manual way to create a notification
   if(($this->action == "add" && $permissions['add']) || ($this->action == "edit" && $permissions['edit']))
     $e = true;
@@ -73,14 +73,21 @@
         
         if($co_notifications[0]['CoNotification']['status'] == NotificationStatusEnum::PendingAcknowledgment
            && $permissions['acknowledge']) {
+          $route =             array(
+            'controller' => 'co_notifications',
+            'action'     => 'acknowledge',
+            $co_notifications[0]['CoNotification']['id']
+          );
+          if(isset($this->request->params['named']['origin'])) {
+            $route['origin'] = $this->request->params['named']['origin'];
+          }
           print $this->Html->link(
-            _txt('op.ack'),
+            '<em class="material-icons mr-1" aria-hidden="true">check_circle_outline</em>' . _txt('op.ack'),
+            $route,
             array(
-              'controller' => 'co_notifications',
-              'action'     => 'acknowledge',
-              $co_notifications[0]['CoNotification']['id']
-            ),
-            array('class' => 'checkbutton')
+              'class' => 'btn btn-primary btn-sm mt-auto mb-auto mr-1',
+              'escape' => false
+            )
           );
         }
         
@@ -88,14 +95,21 @@
         if(($co_notifications[0]['CoNotification']['status'] == NotificationStatusEnum::PendingAcknowledgment
             || $co_notifications[0]['CoNotification']['status'] == NotificationStatusEnum::PendingResolution)
            && $permissions['cancel']) {
+          $route =             array(
+            'controller' => 'co_notifications',
+            'action'     => 'cancel',
+            $co_notifications[0]['CoNotification']['id']
+          );
+          if(isset($this->request->params['named']['origin'])) {
+            $route['origin'] = $this->request->params['named']['origin'];
+          }
           print $this->Html->link(
-            _txt('op.cancel'),
+           '<em class="material-icons mr-1" aria-hidden="true">cancel</em>' . _txt('op.cancel'),
+            $route,
             array(
-              'controller' => 'co_notifications',
-              'action'     => 'cancel',
-              $co_notifications[0]['CoNotification']['id']
-            ),
-            array('class' => 'cancelbutton')
+              'class' => 'btn btn-danger btn-sm mt-auto mb-auto',
+              'escape' => false
+           )
           );
         }
       ?>

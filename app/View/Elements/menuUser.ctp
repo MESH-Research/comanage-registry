@@ -39,7 +39,7 @@
         )
       );
       print $this->Form->create('CoDashboard', $options);
-      print $this->Form->label('q', '<span class="visuallyhidden">' . _txt('op.search')
+      print $this->Form->label('q', '<span class="sr-only">' . _txt('op.search')
         . '</span><button type="button" id="global-search-toggle" aria-expanded="false" class="cm-toggle"><em class="material-icons">search</em></button>');
       print '<div id="global-search-box" style="display: none;">';
       $options = array(
@@ -69,7 +69,7 @@
       <?php endif?>
       <em class="material-icons">arrow_drop_down</em>
     </button>
-    <ul id="notifications-menu" for="user-notifications" class="mdl-menu mdl-js-menu mdl-js-ripple-effect mdl-menu--bottom-right">
+    <ul id="notifications-menu">
 
       <?php $notificationCount = 0; ?>
       <?php foreach($vv_my_notifications as $n): ?>
@@ -78,15 +78,18 @@
             $args = array(
               'controller' => 'co_notifications',
               'action'     => 'view',
-              $n['CoNotification']['id']
+              $n['CoNotification']['id'],
+              'origin'     => base64_encode($this->request->url)
             );
 
-/*            $linkedMarkup = '<span class="notification-comment">' . $n['CoNotification']['comment'] . '</span>';
-            $linkedMarkup += '<span class="notification-created">' . $this->Time->timeAgoInWords($n['CoNotification']['created']) . '</span>';
-            print $this->Html->link($linkedMarkup,$args);*/
-
             print '<span class="notification-comment">';
-            print $this->Html->link($n['CoNotification']['comment'],$args, array('title' => _txt('op.see.notification.num',array($n['CoNotification']['id']))));
+            print $this->Html->link($n['CoNotification']['comment'],
+                                    $args,
+                                    array(
+                                      'class' => 'lightbox spin',
+                                      'title' => _txt('op.see.notification.num',array($n['CoNotification']['id']))
+                                    )
+            );
             print '</span>';
             print '<span class="notification-created">';
             print $this->Time->timeAgoInWords($n['CoNotification']['created']);
@@ -100,8 +103,8 @@
         </li>
       <?php endforeach; ?>
       <li id="see-all">
-        <a href="/registry/co_notifications/index/recipientcopersonid:<?php print $vv_co_person_id_notifications; ?>/sort:created/direction:desc"
-           class="co-raised-button mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect"><?php print _txt('op.see.notifications')?></a>
+        <a href="<?php print $this->Html->url('/');?>co_notifications/index/recipientcopersonid:<?php print $vv_co_person_id_notifications; ?>/sort:created/direction:desc"
+           class="co-raised-button btn btn-default"><?php print _txt('op.see.notifications')?></a>
       </li>
     </ul>
   </div>
@@ -124,8 +127,8 @@
           $args = array('controller' => 'auth',
             'action'     => 'logout',
             'plugin'     => false);
-          print $this->Html->link(_txt('op.logout') . ' <span class="fa fa-sign-out"></span>',
-            $args, array('escape'=>false, 'class' => 'mdl-button mdl-js-button mdl-js-ripple-effect'));
+          print $this->Html->link(_txt('op.logout') . ' <em class="material-icons" aria-hidden="true">logout</em>',
+            $args, array('escape'=>false, 'class' => 'btn'));
         ?>
       </div>
       <div id="user-panel-user-info">
@@ -158,10 +161,10 @@
                     $co['co_person_id']
                   );
                   print $this->Html->link('<em class="material-icons" aria-hidden="true">account_circle</em>' . _txt('me.profile.for', array($co['co_name'])), $args,
-                    array('escape' => false, 'id' => 'co-profile-link', 'class' => 'co-profile-button co-raised-button mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect'));
+                    array('escape' => false, 'id' => 'co-profile-link', 'class' => 'co-profile-button co-raised-button btn btn-default'));
                 }
 
-                // Groups
+                // Group Memberships
                 // Show the groups link too, if permissions allow
                 if(isset($permissions['menu']['cogroups']) && $permissions['menu']['cogroups']
                    && !empty($co['co_person_id'])) {
@@ -170,10 +173,12 @@
                     'controller' => 'co_groups',
                     'action' => 'select',
                     'copersonid' => $co['co_person_id'],
-                    'co' => $co['co_id']
+                    'co' => $co['co_id'],
+                    'search.member' => '1',
+                    'search.owner' => '1'
                   );
-                  print $this->Html->link('<em class="material-icons" aria-hidden="true">group_work</em>' . _txt('op.grm.my.groups'), $args,
-                    array('escape' => false, 'id' => 'co-mygroups-link', 'class' => 'co-profile-button co-raised-button mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect'));
+                  print $this->Html->link('<em class="material-icons" aria-hidden="true">group_work</em>' . _txt('op.grm.my.groupmems'), $args,
+                    array('escape' => false, 'id' => 'co-mygroups-link', 'class' => 'co-profile-button co-raised-button btn btn-default'));
                 }
 
                 print '</div>';
@@ -212,6 +217,8 @@
 
         // Plugin submenus
         // This rendering is a bit different from how render_plugin_menus() does it...
+        // Each plugin will appear by name (e.g. "Announcements") with all appropriate 
+        // COs listed beneath it. Each CO title will link to the plugin within that CO.
         if(!empty($menuContent['plugins'])) {
           $userPluginsExist = false;
           foreach(array_keys($menuContent['plugins']) as $plugin) {
@@ -236,11 +243,20 @@
                         continue;
                       }
   
+                      // Get the plugin link array
                       $args = $menuContent['plugins'][$plugin]['coperson'][$label];
   
-                      $args[] = 'copersonid:' . $co['co_person_id'];
-                      $args['plugin'] = Inflector::underscore($plugin);
-  
+                      // Always include the co_person_id and the co_id
+                      $args['copersonid'] = $co['co_person_id'];
+                      $args['co'] = $co['co_id'];
+                      
+                      // Generate the plugin path if $args['plugin'] hasn't been passed 
+                      // (it can be passed as empty '' to allow for non-plugin URLs).
+                      if(!isset($args['plugin'])) {
+                        $args['plugin'] = Inflector::underscore($plugin);  
+                      }
+                      
+                      // Generate the link
                       print '<li>' . $this->Html->link($co['co_name'], $args) . "</li>\n";
                     }
   
@@ -307,7 +323,7 @@
                     'action'     => 'login',
                     'plugin'     => false
                    );
-      print $this->Html->link(_txt('op.login') . ' <span class="fa fa-sign-in"></span>',
+      print $this->Html->link(_txt('op.login') . ' <em class="material-icons" aria-hidden="true">login</em>',
             $args, array('escape'=>false, 'id' => 'login', 'class' => ''));
     }
   ?>

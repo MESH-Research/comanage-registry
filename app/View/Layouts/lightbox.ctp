@@ -33,66 +33,42 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <!-- <?php
-    // Include version number, but only if logged in
-    if($this->Session->check('Auth.User')) {
-      print chop(file_get_contents(APP . "Config/VERSION"));
-    }
-    ?> -->
     <title><?php print _txt('coordinate') . ': ' . filter_var($title_for_layout,FILTER_SANITIZE_STRING)?></title>
-    <?php print $this->Html->charset(); ?>
-    <?php print $this->Html->meta('favicon.ico','/favicon.ico',array('type' => 'icon')); ?>
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
-
-    <!-- Load CSS -->
-    <?php
-    print $this->Html->css('jquery/jquery-ui-1.12.1.custom/jquery-ui.min') . "\n    ";
-    print $this->Html->css('mdl/mdl-1.3.0/material.min.css') . "\n    ";
-    print $this->Html->css('fonts/Font-Awesome-4.6.3/css/font-awesome.min') . "\n    ";
-    print $this->Html->css('co-base');
-    print $this->Html->css('co-responsive');
-    print $this->Html->css('co-lightbox');
-    ?>
-
-    <!-- Load JavaScript -->
-    <?php
-    print $this->Html->script('jquery/jquery-3.5.1.min.js') . "\n    ";
-    print $this->Html->script('jquery/jquery-ui-1.12.1.custom/jquery-ui.min.js') . "\n    ";
-    print $this->Html->script('jquery/spin.min.js');
-    ?>
-
-    <!-- Get timezone detection -->
-    <?php print $this->Html->script('jstimezonedetect/jstz.min.js'); ?>
-    <script type="text/javascript">
-      // Determines the time zone of the browser client
-      var tz = jstz.determine();
-      // This won't be available for the first delivered page, but after that the
-      // server side should see it and process it
-      document.cookie = "cm_registry_tz_auto=" + tz.name() + "; path=/; SameSite=Strict";
-    </script>
-
-
-    <?php if($this->here != '/registry/pages/eds/index'):
-      // Don't load the following scripts when loading the Shib EDS. ?>
-      <!-- noty scripts -->
-      <?php
-      print $this->Html->script('jquery/noty/jquery.noty.js');
-      print $this->Html->script('jquery/noty/layouts/topCenter.js');
-      print $this->Html->script('jquery/noty/themes/comanage.js');
-      ?>
-      <!-- COmanage JavaScript library and onload scripts -->
-      <?php
-      print $this->Html->script('comanage.js');
-      print $this->element('javascript');
-      ?>
-    <?php endif // !eds ?>
-
-      <!-- Include external files and scripts -->
-      <?php
-      print $this->fetch('meta');
-      print $this->fetch('css');
-      print $this->fetch('script');
-      ?>
+    <head>
+      <style>
+        @keyframes loading {
+          0%   { opacity: 0.3; }
+          30%  { opacity: 1.0; }
+          100% { opacity: 0.3; }
+        }
+        #co-loading {
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          width: 160px;
+          height: 100px;
+          margin: -56px 0 0 -80px;
+          padding: 0;
+          line-height: 0;
+          color: #9FC6E2;
+          text-align: center;
+        }
+        #co-loading span {
+          animation: 1.2s linear infinite both loading;
+          background-color: #9FC6E2;
+          display: inline-block;
+          height: 28px;
+          width: 28px;
+          border-radius: 20px;
+          margin: 0 2.5px;
+        }
+        #co-loading span:nth-child(2) {
+          animation-delay: 0.2s;
+        }
+        #co-loading span:nth-child(3) {
+          animation-delay: 0.4s;
+        }
+      </style>
   </head>
 
   <?php
@@ -100,21 +76,23 @@
     $controller_stripped = preg_replace('/[^a-zA-Z0-9\-_]/', '', $this->params->controller);
     $action_stripped = preg_replace('/[^a-zA-Z0-9\-_]/', '', $this->params->action);
     $bodyClasses = $controller_stripped . ' ' .$action_stripped;
+
+    $redirect_url = $_SERVER["REQUEST_SCHEME"] . '://' . $_SERVER["SERVER_NAME"] . $this->request->here . '/render:norm';
+
+    // Load Dependencies
+    print $this->Html->script('comanage.js') . "\n    ";
   ?>
 
-  <body class="<?php print $bodyClasses ?>" onload="js_onload_call_hooks()">
+  <!-- Body element will only be loaded if we load lightbox as a standalone layout.  -->
+  <!-- Otherwise we will find ourselves using the existing body. So we choose to hide the body when not -->
+  <!-- in the context of another layout -->
+  <body class="<?php print $bodyClasses ?>" onload="whereami('<?php print $redirect_url; ?>')">
 
-    <div id="lightboxContent">
+    <div id="lightboxContent" class="light-box">
       <?php
         // insert the page internal content
         print $this->fetch('content');
       ?>
     </div>
-
-    <?php if(Configure::read('debug') > 0): ?>
-      <div>
-        <?php print $this->element('sql_dump'); ?>
-      </div>
-    <?php endif; ?>
   </body>
 </html>

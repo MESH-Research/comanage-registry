@@ -36,34 +36,25 @@
 
   print $this->element("pageTitleAndButtons", $params);
 
+  // Search Block
+  if(!empty($vv_search_fields)) {
+    print $this->element('search', array('vv_search_fields' => $vv_search_fields));
+  }
 ?>
 
-<div class="listControl"></div>
-<?php // Load the top search bar
-if(!empty($this->plugin)) {
-  $fileLocation = APP . "Plugin/" . $this->plugin . "/View/CoEnrollmentFlows/search.inc";
-  if(file_exists($fileLocation))
-    include($fileLocation);
-} else {
-  $fileLocation = APP . "View/CoEnrollmentFlows/search.inc";
-  if(file_exists($fileLocation))
-    include($fileLocation);
-}
-?>
-
-<div id="co_enrollment_flows" class="co-grid co-grid-with-header mdl-shadow--2dp">
-  <div class="mdl-grid co-grid-header">
-    <div class="mdl-cell mdl-cell--9-col"><?php print _txt('fd.name'); ?></div>
-    <div class="mdl-cell mdl-cell--2-col actions"><?php print _txt('fd.actions'); ?></div>
+<div id="co_enrollment_flows" class="co-grid co-grid-with-header container">
+  <div class="row co-grid-header">
+    <div class="col"><?php print _txt('fd.name'); ?></div>
+    <div class="col actions"><?php print _txt('fd.actions'); ?></div>
   </div>
 
   <?php $i = 0; ?>
   <?php foreach ($co_enrollment_flows as $c): ?>
-    <div class="mdl-grid">
-      <div class="mdl-cell mdl-cell--9-col mdl-cell--6-col-tablet mdl-cell--2-col-phone first-cell">
+    <div class="row">
+      <div class="col first-cell">
         <?php print filter_var($c['CoEnrollmentFlow']['name'],FILTER_SANITIZE_SPECIAL_CHARS); ?>
       </div>
-      <div class="mdl-cell mdl-cell--2-col actions">
+      <div class="col actions">
         <?php
           if($permissions['select']) {
 
@@ -75,7 +66,7 @@ if(!empty($this->plugin)) {
                 'coef' => $c['CoEnrollmentFlow']['id']
               ),
               array(
-                'class' => 'co-button mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect',
+                'class' => 'co-button btn btn-primary',
                 'escape' => false
               )
             ) . "\n";
@@ -106,7 +97,7 @@ if(!empty($this->plugin)) {
                   )
                 ),
                 array(
-                  'class' => 'co-button qr-button mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect', 
+                  'class' => 'co-button qr-button btn btn-primary', 
                   'escape' => false,
                   'title'  => _txt('op.display.qr.for',array($c['CoEnrollmentFlow']['name']))
                 )

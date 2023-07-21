@@ -77,6 +77,7 @@ class CoGroup extends AppModel {
       'className' => 'CoExpirationPolicy',
       'foreignKey' => 'act_notify_co_group_id'
     ),
+    "CoIdentifierAssignment",
     "CoNotificationRecipientGroup" => array(
       'className' => 'CoNotification',
       'foreignKey' => 'recipient_co_group_id'
@@ -107,8 +108,12 @@ class CoGroup extends AppModel {
       'className' => 'CoEmailList',
       'foreignKey' => 'moderators_co_group_id'
     ),
-    "HistoryRecord",
-    "Identifier" => array('dependent' => true)
+    "HistoryRecord" => array('dependent' => true),
+    "Identifier" => array('dependent' => true),
+    "VetterCoGroup" => array(
+      'className' => 'VettingStep',
+      'foreignKey' => 'vetter_co_group_id'
+    )
   );
 
   public $belongsTo = array(
@@ -167,7 +172,14 @@ class CoGroup extends AppModel {
       'allowEmpty' => true
     ),
     'cou_id' => array(
-      'rule' => 'numeric',
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true
+      )
+    ),
+    'nesting_mode_all' => array(
+      'rule' => array('boolean'),
       'required' => false,
       'allowEmpty' => true
     )
@@ -483,6 +495,20 @@ class CoGroup extends AppModel {
         }
       }
     }
+
+    // If the group type is missing add the default Standard type
+    if(!isset($this->data['CoGroup']['group_type'])) {
+      $this->data['CoGroup']['group_type'] = GroupEnum::Standard;
+    }
+
+    // Calculate and assign the group auto value if not set
+    if(!isset($this->data['CoGroup']['auto'])) {
+      $this->data['CoGroup']['auto'] = in_array(
+        $this->data['CoGroup']['group_type'],
+        array(GroupEnum::ActiveMembers, GroupEnum::AllMembers),
+        true
+      );
+    }
     
     return true;
   }
@@ -542,63 +568,6 @@ class CoGroup extends AppModel {
     }
     
     return $this->find('all', $args);
-  }
-  
-  /**
-   * Obtain the set of members of a group, sorted by owner status and member name.
-   *
-   * @since  COmanage Registry v1.0.0
-   * @param  Integer CO Group ID
-   * @return Array Group member information, as returned by find
-   */
-  
-  public function findSortedMembers($id) {
-    $args = array();
-    $args['conditions'] = array();
-    $args['conditions']['CoGroupMember.co_group_id'] = $id;
-    // Only pull currently valid group memberships
-    $args['conditions']['AND'][] = array(
-      'OR' => array(
-        'CoGroupMember.valid_from IS NULL',
-        'CoGroupMember.valid_from < ' => date('Y-m-d H:i:s', time())
-      )
-    );
-    $args['conditions']['AND'][] = array(
-      'OR' => array(
-        'CoGroupMember.valid_through IS NULL',
-        'CoGroupMember.valid_through > ' => date('Y-m-d H:i:s', time())
-      )
-    );
-    $args['contain'] = array(
-      'CoPerson' => array('PrimaryName')
-    );
-    
-    // Because we're using containable behavior, we can't easily sort by PrimaryName
-    // as part of the find. So instead we'll pull the records and sort using Hash.
-    $results = $this->CoGroupMember->find('all', $args);
-    
-    // Before we sort we'll manually split out the members and owners for rendering.
-    // We could order by (eg) owner in the find, but we'll still need to walk the results
-    // to find the divide.
-    $members = array();
-    $owners = array();
-    
-    foreach($results as $r) {
-      if(isset($r['CoGroupMember']['owner']) && $r['CoGroupMember']['owner']) {
-        $owners[] = $r;
-      } else {
-        $members[] = $r;
-      }
-    }
-    
-    // Now sort each set of results by family name.
-    
-    $sortedMembers = Hash::sort($members, '{n}.CoPerson.PrimaryName.family', 'asc');
-    $sortedOwners = Hash::sort($owners, '{n}.CoPerson.PrimaryName.family', 'asc');
-    
-    // Finally, combine the two arrays back and return
-    
-    return array_merge($sortedOwners, $sortedMembers);
   }
   
   /**
@@ -691,10 +660,10 @@ class CoGroup extends AppModel {
     // First find the group
     $args = array();
     $args['conditions']['CoGroup.id'] = $id;
-    $args['contain'][] = 'CoGroupNesting';
+    $args['contain'] = array('CoGroupNesting' => 'CoGroup');
     
     $group = $this->find('first', $args);
-    
+
     if(empty($group['CoGroup'])) {
       throw new InvalidArgumentException(_txt('er.gr.nf', array($id)));
     }
@@ -724,6 +693,11 @@ class CoGroup extends AppModel {
     $nMembers = array();
     
     foreach($group['CoGroupNesting'] as $n) {
+      // If this group is Suspended, we act as if it has no members
+      if($n['CoGroup']['status'] == SuspendableStatusEnum::Suspended) {
+        continue;
+      }
+
       // Pull the list of members of each nested group. This approach won't scale
       // well to very large groups, but we can't use subselects because Cake doesn't
       // support them natively, and buildStatement isn't directly supported by
@@ -731,6 +705,18 @@ class CoGroup extends AppModel {
       
       $args = array();
       $args['conditions']['CoGroupMember.co_group_id'] = $n['co_group_id'];
+      $args['conditions']['AND'][] = array(
+        'OR' => array(
+          'CoGroupMember.valid_from IS NULL',
+          'CoGroupMember.valid_from < ' => date('Y-m-d H:i:s', time())
+        )
+      );
+      $args['conditions']['AND'][] = array(
+        'OR' => array(
+          'CoGroupMember.valid_through IS NULL',
+          'CoGroupMember.valid_through > ' => date('Y-m-d H:i:s', time())
+        )
+      );
       $args['fields'] = array('co_person_id', 'id');
       
       $nMembers[ $n['id'] ] = $this->CoGroupMember->find('list', $args);
@@ -748,25 +734,23 @@ class CoGroup extends AppModel {
         continue;
       }
       
-      if(!isset($nMembers[ $t['CoGroupMember']['co_group_nesting_id'] ][ $t['CoGroupMember']['co_person_id'] ])) {
-        // Remove the CoGroupMember record
-        $this->CoGroupMember->syncNestedMembership($group['CoGroup'], $t['CoGroupMember']['co_group_nesting_id'], $t['CoGroupMember']['co_person_id'], false);
-      } else {
-        $tMembersByPerson[ $t['CoGroupMember']['co_person_id'] ] = $t['CoGroupMember']['id'];
-      }
+      // We always have to fully recalculate the membership due to ALL mode complexities
+      $tMembersByPerson[ $t['CoGroupMember']['co_person_id'] ] = $this->CoGroupMember->syncNestedMembership($group['CoGroup'], $t['CoGroupMember']['co_group_nesting_id'], $t['CoGroupMember']['co_person_id']);
     }
     
     // Pull the list of members of the nested group ($n) that are not already in
     // the target group ($id) and add them.
     
     foreach($group['CoGroupNesting'] as $n) {
-      foreach($nMembers[ $n['id'] ] as $ncopid => $gmid) {
-        if(!isset($tMembersByPerson[$ncopid])) {
-          // For each person in $nMembers but not $tMembers, add them.
-          $this->CoGroupMember->syncNestedMembership($group['CoGroup'], $n['id'], $ncopid, true);
-          
-          // Also update $tMembers so we don't add them again from another group.
-          $tMembersByPerson[$ncopid] = $gmid;
+      if(!empty($nMembers[ $n['id'] ])) {
+        foreach($nMembers[ $n['id'] ] as $ncopid => $gmid) {
+          if(!isset($tMembersByPerson[$ncopid])) {
+            // For each person in $nMembers but not $tMembers, add them.
+            $this->CoGroupMember->syncNestedMembership($group['CoGroup'], $n['id'], $ncopid, true);
+            
+            // Also update $tMembers so we don't add them again from another group.
+            $tMembersByPerson[$ncopid] = $gmid;
+          }
         }
       }
     }
@@ -821,7 +805,6 @@ class CoGroup extends AppModel {
       // Determine the set of people currently in the target group
       $args = array();
       $args['conditions']['CoGroupMember.co_group_id'] = $group['CoGroup']['id'];
-      $args['conditions']['CoGroupMember.co_group_id'] = $group['CoGroup']['id'];
       $args['fields'] = array('CoGroupMember.co_person_id', 'CoGroupMember.id' );
       $args['contain'] = false;
       
@@ -862,12 +845,13 @@ class CoGroup extends AppModel {
    * Perform a keyword search.
    *
    * @since  COmanage Registry v3.1.0
-   * @param  Integer $coId CO ID to constrain search to
-   * @param  String  $q    String to search for
+   * @param  integer $coId  CO ID to constrain search to
+   * @param  string  $q     String to search for
+   * @param  integer $limit Search limit
    * @return Array Array of search results, as from find('all)
    */
   
-  public function search($coId, $q) {
+  public function search($coId, $q, $limit) {
     // Tokenize $q on spaces
     $tokens = explode(" ", $q);
     
@@ -881,6 +865,7 @@ class CoGroup extends AppModel {
     }
     $args['conditions']['CoGroup.co_id'] = $coId;
     $args['order'] = array('CoGroup.name');
+    $args['limit'] = $limit;
     $args['contain'] = false;
     
     return $this->find('all', $args);

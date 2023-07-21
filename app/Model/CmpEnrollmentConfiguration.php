@@ -82,6 +82,16 @@ class CmpEnrollmentConfiguration extends AppModel {
       'required' => false,
       'allowEmpty' => true
     ),
+    'redirect_on_logout' => array(
+      'rule' => array('url', true),
+      'required' => false,
+      'allowEmpty' => true
+    ),
+    'app_base' => array(
+      'rule' => 'notBlank',
+      'required' => true,
+      'message' => 'The webroot location must be provided'
+    ),
   );
   
   /**
@@ -101,7 +111,9 @@ class CmpEnrollmentConfiguration extends AppModel {
       'attrs_from_ldap'     => false,
       'attrs_from_saml'     => false,
       'pool_org_identities' => $pool,
-      'status'              => StatusEnum::Active
+      'status'              => StatusEnum::Active,
+      'redirect_on_logout'  => null,
+      'app_base'            => '/registry/',
     );
     
     if($this->save($ef)) {
@@ -127,7 +139,47 @@ class CmpEnrollmentConfiguration extends AppModel {
     
     return $this->find('first', $args);
   }
-  
+
+
+  /**
+   * Get the App.base location
+   *
+   * @since  COmanage Registry v4.0.0
+   * @return string App.base location
+   */
+
+  public function getAppBase() {
+    $args = array();
+    $args['conditions']['CmpEnrollmentConfiguration.name'] = 'CMP Enrollment Configuration';
+    $args['conditions']['CmpEnrollmentConfiguration.status'] = StatusEnum::Active;
+    $args['fields'] = array('CmpEnrollmentConfiguration.app_base');
+    $args['contain'] = false;
+
+    $cmp = $this->find('first', $args);
+
+    return isset($cmp["CmpEnrollmentConfiguration"]["app_base"]) ? $cmp["CmpEnrollmentConfiguration"]["app_base"] : "";
+  }
+
+
+  /**
+   * Get the Logout Redirect URL specified in the Platform CO.
+   *
+   * @since  COmanage Registry v4.0.0
+   * @return string Logout Redirect URL
+   */
+
+  public function getLogoutRedirectUrl() {
+    $args = array();
+    $args['conditions']['CmpEnrollmentConfiguration.name'] = 'CMP Enrollment Configuration';
+    $args['conditions']['CmpEnrollmentConfiguration.status'] = StatusEnum::Active;
+    $args['fields'] = array('CmpEnrollmentConfiguration.redirect_on_logout');
+    $args['contain'] = false;
+
+    $cmp = $this->find('first', $args);
+
+    return isset($cmp["CmpEnrollmentConfiguration"]["redirect_on_logout"]) ? $cmp["CmpEnrollmentConfiguration"]["redirect_on_logout"] : "";
+  }
+
   /**
    * Determine if enrollment attribute values may be obtained from the environment,
    * and if so which ones.

@@ -26,21 +26,23 @@
  */
 
 class Password extends AppModel {
-	// Define class name for cake
+  // Define class name for cake
   public $name = "Password";
-	
+
   // Current schema version for API
   public $version = "1.0";
   
-	// Add behaviors
-  public $actsAs = array('Containable');
-	
-	// Association rules from this model to other models
-	public $belongsTo = array(
+  // Add behaviors
+  public $actsAs = array('Containable',
+                         'Changelog' => array('priority' => 5),
+                         'Provisioner');
+
+  // Association rules from this model to other models
+  public $belongsTo = array(
     "PasswordAuthenticator.PasswordAuthenticator",
     "CoPerson"
   );
-	
+
   // Default display field for cake generated views
   public $displayField = "password_type";
 
@@ -49,7 +51,7 @@ class Password extends AppModel {
     'password_authenticator_id' => array(
       'rule' => 'numeric',
       'required' => true,
-			'allowEmpty' => false
+      'allowEmpty' => false
     ),
     'co_person_id' => array(
       'rule' => 'numeric',
@@ -61,7 +63,7 @@ class Password extends AppModel {
       'required' => true,
       'allowEmpty' => false
     ),
-		'password_type' => array(
+    'password_type' => array(
       'rule' => array('inList', 
                       array(
                         PasswordEncodingEnum::Crypt,
@@ -82,10 +84,11 @@ class Password extends AppModel {
    * @param  int    $coPersonId              CO Person ID
    * @param  int    $maxLength               Maximum length of password to generate
    * @param  int    $actorCoPersonId         Actor CO Person ID
+   * @param  int    $actorApiUserId          Actor API User ID
    * @return string                          Service Token
    */
 
-  public function generateToken($passwordAuthenticatorId, $coPersonId, $maxLength, $actorCoPersonId) {
+  public function generateToken($passwordAuthenticatorId, $coPersonId, $maxLength, $actorCoPersonId, $actorApiUserId=null) {
     $token = generateRandomToken($maxLength);
     
     $data = array(
@@ -96,7 +99,7 @@ class Password extends AppModel {
       )
     );
     
-    $this->PasswordAuthenticator->manage($data, $actorCoPersonId);
+    $this->PasswordAuthenticator->manage($data, $actorCoPersonId, $actorApiUserId);
     
     return $token;
   }

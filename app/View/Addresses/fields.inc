@@ -38,6 +38,7 @@
 
   // We can emit all attributes because the ones we don't want should be null
   print $this->Form->hidden('co_department_id', array('default' => $vv_pid['codeptid'])) . "\n";
+  print $this->Form->hidden('organization_id', array('default' => $vv_pid['organizationid'])) . "\n";
   print $this->Form->hidden('org_identity_id', array('default' => $vv_pid['orgidentityid'])) . "\n";
   print $this->Form->hidden('co_person_role_id', array('default' => $vv_pid['copersonroleid'])) . "\n";
   
@@ -56,7 +57,7 @@
       <?php endif; // required_fields ?>
     </div>
     <div class="field-info">
-      <?php print ($e ? $this->Form->input('street', array('class' => 'focusFirst')) : filter_var($addresses[0]['Address']['street'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+      <?php print ($e ? $this->Form->input('street', array('class' => 'focusFirst', 'required' => in_array('street', $required_fields))) : filter_var($addresses[0]['Address']['street'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
     </div>
   </li>
   <li>
@@ -67,7 +68,7 @@
       <?php endif; // required_fields ?>
     </div>
     <div class="field-info">
-      <?php print ($e ? $this->Form->input('room') : filter_var($addresses[0]['Address']['room'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+      <?php print ($e ? $this->Form->input('room', array('required' => in_array('room', $required_fields))) : filter_var($addresses[0]['Address']['room'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
     </div>
   </li>
   <li>
@@ -78,7 +79,7 @@
       <?php endif; // required_fields ?>
     </div>
     <div class="field-info">
-      <?php print ($e ? $this->Form->input('locality') : filter_var($addresses[0]['Address']['locality'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+      <?php print ($e ? $this->Form->input('locality', array('required' => in_array('locality', $required_fields))) : filter_var($addresses[0]['Address']['locality'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
     </div>
   </li>
   <li>
@@ -89,7 +90,7 @@
       <?php endif; // required_fields ?>
     </div>
     <div class="field-info">
-      <?php print ($e ? $this->Form->input('state') : filter_var($addresses[0]['Address']['state'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+      <?php print ($e ? $this->Form->input('state', array('required' => in_array('state', $required_fields))) : filter_var($addresses[0]['Address']['state'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
     </div>
   </li>
   <li>
@@ -100,7 +101,7 @@
       <?php endif; // required_fields ?>
     </div>
     <div class="field-info">
-      <?php print ($e ? $this->Form->input('postal_code') : filter_var($addresses[0]['Address']['postal_code'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+      <?php print ($e ? $this->Form->input('postal_code', array('required' => in_array('postal_code', $required_fields))) : filter_var($addresses[0]['Address']['postal_code'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
     </div>
   </li>
   <li>
@@ -111,7 +112,7 @@
       <?php endif; // required_fields ?>
     </div>
     <div class="field-info">
-      <?php print ($e ? $this->Form->input('country') : filter_var($addresses[0]['Address']['country'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+      <?php print ($e ? $this->Form->input('country', array('required' => in_array('country', $required_fields))) : filter_var($addresses[0]['Address']['country'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
     </div>
   </li>
   <li>

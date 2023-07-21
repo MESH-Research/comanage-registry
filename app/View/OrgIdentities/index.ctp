@@ -65,7 +65,6 @@ if($permissions['add']) {
 }
 
 print $this->element("pageTitleAndButtons", $params);
-
 ?>
 
 <div class="co-info-topbox">
@@ -74,16 +73,13 @@ print $this->element("pageTitleAndButtons", $params);
 </div>
 
 <?php // Load the top search bar
-if(isset($permissions['search']) && $permissions['search'] ) {
-  if(!empty($this->plugin)) {
-    $fileLocation = APP . "Plugin/" . $this->plugin . "/View/OrgIdentities/search.inc";
-    if(file_exists($fileLocation))
-      include($fileLocation);
-  } else {
-    $fileLocation = APP . "View/OrgIdentities/search.inc";
-    if(file_exists($fileLocation))
-      include($fileLocation);
-  }
+// Search Block
+if(!empty($vv_search_fields)) {
+  print $this->element('search', array('vv_search_fields' => $vv_search_fields));
+}
+// Alphabet Search quick access bar
+if(!empty($vv_alphabet_search)) {
+  print $this->element('alphabetSearch', array('vv_alphabet_search_config' => $vv_alphabet_search));
 }
 ?>
 
@@ -96,7 +92,7 @@ if(isset($permissions['search']) && $permissions['search'] ) {
       <th><?php print $this->Paginator->sort('ou', _txt('fd.ou')); ?></th>
       <th><?php print $this->Paginator->sort('title', _txt('fd.title')); ?></th>
       <th><?php print $this->Paginator->sort('affiliation', _txt('fd.affiliation')); ?></th>
-      <th class="actionButtons"><?php print _txt('fd.actions'); ?></th>
+      <th class="thinActionButtonsCol"><?php print _txt('fd.actions'); ?></th>
     </tr>
     </thead>
 
@@ -119,7 +115,7 @@ if(isset($permissions['search']) && $permissions['search'] ) {
         <td><?php print filter_var($p['OrgIdentity']['o'],FILTER_SANITIZE_SPECIAL_CHARS); ?></td>
         <td><?php print filter_var($p['OrgIdentity']['ou'],FILTER_SANITIZE_SPECIAL_CHARS); ?></td>
         <td><?php print filter_var($p['OrgIdentity']['title'],FILTER_SANITIZE_SPECIAL_CHARS); ?></td>
-        <td><?php if(!empty($p['OrgIdentity']['affiliation'])) print _txt('en.org_identity.affiliation', null, $p['OrgIdentity']['affiliation']); ?></td>
+        <td><?php if(!empty($p['OrgIdentity']['affiliation'])) print $vv_affiliation_types[ $p['OrgIdentity']['affiliation'] ]; ?></td>
 
         <td class="actions">
           <?php

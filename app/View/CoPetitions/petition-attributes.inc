@@ -19,7 +19,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  * 
- * @link          http://www.internet2.edu/comanage COmanage Project
+ * @link          https://www.internet2.edu/comanage COmanage Project
  * @package       registry
  * @since         COmanage Registry v0.7
  * @license       Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
@@ -30,112 +30,27 @@
   
   $l = 1;
   
-  // Are there T&C to agree to?
-  $tandc = !empty($vv_terms_and_conditions);
-  
   // Track the names of the matching fields and emit them later
   $givenNameAttr = "";
   $familyNameAttr = "";
 ?>
-  
 <script type="text/javascript">
-  var tandcids = new Array(
-    <?php
-      // Use PHP to dynamically generate a list of T&C IDs into a Javascript array
-      if(!empty($vv_terms_and_conditions)) {
-        $i = 0;
-        foreach($vv_terms_and_conditions as $t) {
-          if($i > 0) { print ","; } else { $i++; }
-          print '"' . $t['CoTermsAndConditions']['id'] . '"';
-        }
-      }
-    ?>
-  );
-  
-  function open_tandc(title, tandcUrl, id) {
-    // Set title
-    $("div#dialog-review").dialog("option", "title", title);
-    
-    // Set up buttons
-    $("div#dialog-review").dialog("option",
-                                  "buttons",
-                                  {
-                                    "<?php print _txt('op.ok'); ?>": function() {
-                                      $(this).dialog("close");
-                                    }
-                                  });
-
-    // Open dialog
-    $("#dialog-review").dialog("open");
-
-    // Load T&C into iframe
-    $("#tandc_content").attr("src", tandcUrl);
-
-    <?php if($tandc && $vv_tandc_mode == TAndCEnrollmentModeEnum::ExplicitConsent): ?>
-    // Enable the checkbox
-    document.getElementById('CoTermsAndConditions'+id).disabled = false;
-    <?php endif; // explicit consent ?>
-  }
-  
-  function maybe_enable_submit() {
-    // If all checkboxes are enabled, enable submit
-    
-    var allagreed = 1;
-    
-    <?php if($tandc && $vv_tandc_mode == TAndCEnrollmentModeEnum::ExplicitConsent): ?>
-    for(var i = 0;i < tandcids.length;i++) {
-      if(!document.getElementById('CoTermsAndConditions'+tandcids[i]).checked) {
-        allagreed = 0;
-      }
-    }
-    <?php endif; // explicit consent ?>
-    
-    if(allagreed) {
-      $(":submit").removeAttr('disabled');
-    } else {
-      // Reset disabled in case "I Agree" was unchecked or on initial form rendering
-      $(":submit").attr('disabled', true);
-    }
-  }
-  
-<?php if($tandc): ?>
-  function js_local_onload()
-  {
-    // Local (to this view) initializations
-    
-    <?php if($tandc && $vv_tandc_mode == TAndCEnrollmentModeEnum::ExplicitConsent): ?>
-    // Disable checkboxes until individual T&C are reviewed
-    for(var i = 0;i < tandcids.length;i++) {
-      // If the box is already ticked (eg: if the form re-renders), make sure it remains enabled
-      if(!document.getElementById('CoTermsAndConditions'+tandcids[i]).checked) {
-        document.getElementById('CoTermsAndConditions'+tandcids[i]).disabled = true;
-      }
-    }
-    <?php endif; // explicit consent ?>
-    
-    // Disable submit button until all T&C are agreed to
-    maybe_enable_submit();
-    //$(":submit").attr('disabled', true);
-  }
-<?php endif; ?>
-  
   $(function() {
-    $("#dialog-review").dialog({
-      autoOpen: false,
-      modal: true,
-      draggable: true,
-      resizable: true,
-      width: document.documentElement.clientWidth * 0.8,
-      height: document.documentElement.clientHeight * 0.8,
-      buttons: {
-        "<?php print _txt('op.ok'); ?>": function() {
-          $(this).dialog("close");
-        }
-      }
-    })
-    
     $("#sponsors").autocomplete({
-      source: "<?php print $this->Html->url(array('controller' => 'co_people', 'action' => 'find', 'co' => $cur_co['Co']['id'], 'mode' => PeoplePickerModeEnum::Sponsor)); ?>",
+      source: "<?php
+        // We inject the Petition ID and token into the request in case we need
+        // autocomplete for new enrollees (unregistered users)
+        $sponsorurl = array(
+          'controller' => 'co_people',
+          'action' => 'find',
+          'co' => $cur_co['Co']['id'],
+          'mode' => PeoplePickerModeEnum::Sponsor,
+          'petitionid' => $vv_co_petition_id,
+          'token' => $vv_petition_token
+        );
+        
+        print $this->Html->url($sponsorurl);
+      ?>",
       minLength: 3,
       select: function(event, ui) {
         $("#sponsors").val(ui.item.label);
@@ -152,8 +67,43 @@
       $("#sponsors").focus();
     });
 
-  });
+    $("#managers").autocomplete({
+      source: "<?php
+        // We inject the Petition ID and token into the request in case we need
+        // autocomplete for new enrollees (unregistered users)
+        $managerurl = array(
+          'controller' => 'co_people',
+          'action' => 'find',
+          'co' => $cur_co['Co']['id'],
+          'mode' => PeoplePickerModeEnum::Manager,
+          'petitionid' => $vv_co_petition_id,
+          'token' => $vv_petition_token
+        );
+        
+        print $this->Html->url($managerurl);
+      ?>",
+      minLength: 3,
+      select: function(event, ui) {
+        $("#managers").val(ui.item.label);
+        $("#EnrolleeCoPersonRoleManagerCoPersonId").val(ui.item.value);
+        return false;
+      }
+    });
 
+    // Used in inline-edit mode for Manager
+    $("#cm-ief-button-remove-EnrolleeCoPersonRoleManagerCoPersonId").click(function() {
+      reset_manager();
+      $(this).closest(".cm-ief-val").hide();
+      $(this).closest(".cm-inline-editable-field").find(".cm-ief-widget").removeClass('hidden');
+      $("#managers").focus();
+    });
+  });
+  
+  function reset_manager() {
+    $("#managers").val("");
+    $("#EnrolleeCoPersonRoleManagerCoPersonId").val(null);
+  }
+  
   function reset_sponsor() {
     $("#sponsors").val("");
     $("#EnrolleeCoPersonRoleSponsorCoPersonId").val(null);
@@ -161,6 +111,13 @@
 </script>
 
 <div class="fields">
+  <?php
+  // Render conclusion text for new petitions
+  if(!empty($vv_introduction_text_pa)) {
+    print '<div class="modelbox d-flex"><div class="petition-attr-introduction">' . $vv_introduction_text_pa . "</div></div>";
+  }
+  ?>
+
   <?php
     // Render introductory text for new petitions
     
@@ -170,7 +127,7 @@
     
     // If a token was passed in, submit it as part of the form
     if(!empty($vv_petition_token)) {
-      print $this->Form->hidden('token', array('default' => $vv_petition_token)) . "\n";
+      print $this->Form->hidden('token', array('default' => $vv_petition_token)) . PHP_EOL;
     }
   ?>
 
@@ -210,7 +167,7 @@
     
     // Use isset() instead of !empty() here since some default values are 0.
     if(isset($ea['default'])) {
-      print $this->Form->hidden($fieldName, array('default' => $ea['default'])) . "\n";
+      print $this->Form->hidden($fieldName, array('default' => $ea['default'])) . PHP_EOL;
     }
   }
 
@@ -245,9 +202,13 @@
 
           // Is the MVPA required? We'll just check the first attribute since they
           // should all be the same.
-          if(($mvpa && $coe_attributes[0]['mvpa_required'] && $this->action != 'view')
-              || (!$mvpa && $coe_attributes[0]['CoEnrollmentAttribute']['required'])) {
-            print "<span class=\"required\">*</span>\n";
+          if(($mvpa 
+              && isset($coe_attributes[0]['mvpa_required'])
+              && $coe_attributes[0]['mvpa_required'] 
+              && $this->action != 'view')
+             || 
+             (!$mvpa && $coe_attributes[0]['CoEnrollmentAttribute']['required'])) {
+            print '<span class="required">*</span>' . PHP_EOL;
           }
           
           // Only print the description once if it's the same for all items
@@ -267,20 +228,21 @@
           }
           
           if($mvpa
-             && !$coe_attributes[0]['mvpa_required']
+             && (!isset($coe_attributes[0]['mvpa_required'])
+                 || !$coe_attributes[0]['mvpa_required'])
              // For attributes that are popup/checklist only, this warning doesn't make sense.
              // There's not a good way to figure out which from the configuration, so we
              // just hardcode a list here.
              && ($coe_attributes[0]['attribute'] != 'g:co_group_member'
              && strncmp($coe_attributes[0]['attribute'], 'i:identifier:', 13))) {
-            print "<br /><span class=\"required\">" . _txt('fd.pt.required') . "</span>\n";
+            print '<br /><span class="required">' . _txt('fd.pt.required') . '</span>' . PHP_EOL;
           }
           
           if(!empty($ea['CoEnrollmentAttribute']['co_enrollment_attribute_id'])) {
-            print "<br /><span class=\"required\">" . _txt('fd.pt.archived') . "</span>\n";
+            print '<br /><span class="required">' . _txt('fd.pt.archived') . '</span>' . PHP_EOL;
           } elseif(isset($ea['CoEnrollmentAttribute']['deleted'])
                    && $ea['CoEnrollmentAttribute']['deleted']) {
-            print "<br /><span class=\"required\">" . _txt('fd.pt.deleted') . "</span>\n";
+            print '<br /><span class="required">' . _txt('fd.pt.deleted') . '</span>' . PHP_EOL;
           }
         ?>
       </div>
@@ -300,7 +262,7 @@
             $hfieldName = $ea['model'] . '.' . $ea['field'];
             $fieldName = $hfieldName . "-disabled";
 
-            print $this->Form->hidden($hfieldName, array('default' => $ea['default'])) . "\n";
+            print $this->Form->hidden($hfieldName, array('default' => $ea['default'])) . PHP_EOL;
           } else {
             $fieldName = $ea['model'] . '.' . $ea['field'];
           }
@@ -320,7 +282,7 @@
             switch($ruleType) {
             case 'inList':
               // This is a select
-              print '<div class="mdl-selectfield">';
+              print '<div class="form-group">';
               print "\n";
 
               $args = array();
@@ -335,7 +297,7 @@
                 $ea['required'] = !($ea['allow_empty'] && $vv_allow_empty_cou);
               }
               $args['empty'] = !$ea['required'];
-              $args['class'] = 'co-selectfield';
+              $args['class'] = 'co-selectfield form-control';
               $args['aria-label'] = $m;
 
               // Add focusFirst class if the first field
@@ -346,26 +308,27 @@
               // Render the form field, label, and error (if any)
               print $this->Form->select($fieldName, $ea['select'], $args);
               // We use only the aria-label attribute on select boxes. A label would look like this:
-              // print $this->Form->label($fieldName, $m, array('class' => 'mdl-selectfield__label'));
+              // print $this->Form->label($fieldName, $m, array('class' => ''));
               if($this->Form->isFieldError($fieldName)) {
-                print $this->Form->error($fieldName, array('class' => 'mdl-selectfield__error'));
+                print $this->Form->error($fieldName, array('class' => 'is-invalid'));
               }
 
               print "</div>\n";
               break;
+            case 'date':
             case 'validateTimestamp':
               // Handle dates specially to generate the popup calendar
-              print '<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">';
+              print '<div class="form-group">';
 
               $args = array();
 
               // Add starting classes
-              $args['class'] = 'mdl-textfield__input';
+              $args['class'] = 'form-control';
 
               if($ea['field'] == 'valid_from') {
                 $args['class'] .= ' datepicker-f';
-              } elseif($ea['field'] == 'valid_until') {
-                $args['class'] .= ' datepicker-c';
+              } elseif($ea['field'] == 'valid_through') {
+                $args['class'] .= ' datepicker-u';
               } else {
                 $args['class'] .= ' datepicker';
               }
@@ -381,7 +344,7 @@
               }
 
               // Render the form field, label, and error (if any)
-              print $this->Form->label($fieldName, $ea['label'], array('class' => 'mdl-textfield__label'));
+              print $this->Form->label($fieldName, $ea['label']);
               print $this->Form->text($fieldName, $args);
               /* XXX CO-1329: field errors on text fields are output by default; check to see if
                  an error is being properly produced for dates and if this next statement is needed. */
@@ -393,7 +356,7 @@
               break;
             default:
               // Use default field - a text input
-              print '<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">';
+              print '<div class="form-group">';
 
               $args = array();
               // An attribute is required if (1) it is part of an MVPA that is required
@@ -415,7 +378,7 @@
               }
 
               // Add starting classes
-              $args['class'] = 'mdl-textfield__input';
+              $args['class'] = 'form-control';
 
               // Add focusFirst class if the first field
               if ($coe_attribute_index == 0) {
@@ -489,13 +452,20 @@
                   if ($inlineEditableFields['sponsor-val']['set']) {
                     $iefClasses .= " hidden";
                   }
+                  $requiredHtml = "";
+                  $requiredLabel = "";
+                  if($args['required']) {
+                    $requiredHtml = ' required="required"';
+                    $requiredLabel = '<span class="required">*</span>';
+                  }
 
                   print '<div class="' . $iefClasses . '">';
-                  print ' <label for="sponsors" class="mdl-textfield__label">'
+                  print ' <label for="sponsors">'
                         .   filter_var($m,FILTER_SANITIZE_SPECIAL_CHARS)
+                        .   $requiredLabel
                         . '</label>
                            <div class="ui-widget">
-                             <input id="sponsors" type="text" class="mdl-textfield__input"/>'
+                             <input id="sponsors" type="text" class="form-control"' . $requiredHtml . '/>'
                         . $this->Form->hidden($fieldName,
                                               array(
                                                 // We don't support two sponsors, but if we did this id would break
@@ -510,23 +480,83 @@
                   print '</div>'; // cm-ief-widget
                   print '</div>'; // cm-inline-editable-field
                   // We need to unlock the field for autocomplete manipulation
-                  $this->Form->unlockField('EnrolleeCoPersonRole.sponsor_co_person_id');
+                  $this->Form->unlockField($fieldName);
                 } elseif(!empty($vv_default_sponsor)) {
                   // Just print out the name
                   print generateCn($vv_default_sponsor['PrimaryName']);
                 }
+              } elseif($fieldName == 'EnrolleeCoPersonRole.manager_co_person_id') {
+                // Manager always uses a people picker
+                
+                if($ea['modifiable']) {
+                  // Use a people picker
+                  print '<div class="cm-inline-editable-field">';
+                  $inlineEditableFields['manager-val']['set'] = false;
+
+                  if(!empty($vv_default_manager)) {
+                    $inlineEditableFields['manager-val']['set'] = true;
+
+                    print '<div class="cm-ief-val">';
+                    print generateCn($vv_default_manager['PrimaryName']);
+                    print $this->element('inlineEditControls', array(
+                      'fieldName' => 'EnrolleeCoPersonRoleManagerCoPersonId',
+                      'actions' => array('remove'),
+                      'visible' => true
+                    ));
+                    print '</div>';
+                  }
+
+                  $iefClasses = "cm-ief-widget";
+                  if ($inlineEditableFields['manager-val']['set']) {
+                    $iefClasses .= " hidden";
+                  }
+                  $requiredHtml = "";
+                  $requiredLabel = "";
+                  if($args['required']) {
+                    $requiredHtml = ' required="required"';
+                    $requiredLabel = '<span class="required">*</span>';
+                  }
+
+                  print '<div class="' . $iefClasses . '">';
+                  print ' <label for="managers">'
+                        .   filter_var($m,FILTER_SANITIZE_SPECIAL_CHARS)
+                        .   $requiredLabel
+                        . '</label>
+                           <div class="ui-widget">
+                             <input id="sponsors" type="text" class="form-control"' . $requiredHtml . '/>'
+                        . $this->Form->hidden($fieldName,
+                                              array(
+                                                // We don't support two managers, but if we did this id would break
+                                                'id'      => 'EnrolleeCoPersonRoleManagerCoPersonId',
+                                                'default' => (isset($ea['default']) ? $ea['default'] : null)
+                                              ))
+                        . '</div>
+                           <div class="field-desc">
+                             <span class="ui-icon ui-icon-info co-info"></span>
+                             <em>' . _txt('fd.manager.desc') . '</em>
+                           </div>';
+                  print '</div>'; // cm-ief-widget
+                  print '</div>'; // cm-inline-editable-field
+                  // We need to unlock the field for autocomplete manipulation
+                  $this->Form->unlockField($fieldName);
+                } elseif(!empty($vv_default_manager)) {
+                  // Just print out the name
+                  print generateCn($vv_default_manager['PrimaryName']);
+                }
               } else {
                 if($fieldName == 'EnrolleeCoPersonRole.sponsor_co_person_id-disabled') {
                   $args['value'] = generateCn($vv_default_sponsor['PrimaryName']);
+                } elseif($fieldName == 'EnrolleeCoPersonRole.manager_co_person_id-disabled') {
+                  $args['value'] = generateCn($vv_default_manager['PrimaryName']);
                 }
                 
                 // Render the form field, label, and error (if any)
                 // error is output by default with class "error-message"
-                print $this->Form->label($fieldName, filter_var($ea['label'],FILTER_SANITIZE_SPECIAL_CHARS) . $requiredSymbol, array('class' => 'mdl-textfield__label'));
+                print $this->Form->label($fieldName, filter_var($ea['label'],FILTER_SANITIZE_SPECIAL_CHARS) . $requiredSymbol);
                 print $this->Form->input($fieldName, $args);
               }
 
-              print "</div>\n";
+              print "</div>" . PHP_EOL;
 
               if ($matchable) {
                 print '<div class="matchable-output" id="' . $matchableInfoId . '">';
@@ -535,13 +565,13 @@
               break;
             }
 
-            print "\n";
+            print PHP_EOL;
 
             // If there is a description for the field, render it under the field and label
             if(isset($ea['description'])
               && !$groupDesc
               && $ea['description'] != "") {
-              print "\n<div class=\"desc\">" . $ea['description'] . "</div>\n";
+              print PHP_EOL . '<div class="desc">' . $ea['description'] . '</div>' . PHP_EOL;
             }
           } else {
 
@@ -580,14 +610,37 @@
                   print $co_petition_attribute_values[ $ea['id'] ][ $ea['field'] ];
                 }
                 break;
+              case 'date':
               case 'validateTimestamp':
-                print $this->Time->nice($co_petition_attribute_values[ $ea['id'] ][ $ea['field'] ], $vv_tz);
+                // Not all fields should render with timezone adjustment.
+                // In particular, date_of_birth is referenced independent of timezones.
+                // There may be others over time, but for now we just hardcode it.
+
+                if($ea['field'] == 'date_of_birth') {
+                  print $this->Time->format($co_petition_attribute_values[ $ea['id'] ][ $ea['field'] ], '%F');
+                } else {
+                  // CO-2573 We *should* adjust for timezone here but we don't.
+                  // CoPetition was never updated to adjust valid_from/valid_through dates
+                  // for timezones on save (even though CoPersonRoles was). As such, the
+                  // attribute saved was in the browser local timezone and not UTC.
+                  // Fixing the save at this point will result in inconsistent attributes
+                  // depending on when the petition was created, so we simply drop the
+                  // timezone adjustment here and render the original value, which in most
+                  // cases will be good enough. (And the operational value in CoPersonRoles
+                  // is correct, so the actual impact of this is minimal.)
+                  // This shoud be fixed in PE, however.
+                  print $this->Time->nice($co_petition_attribute_values[ $ea['id'] ][ $ea['field'] ]); //$vv_tz);
+                }
                 break;
               default:
                 if($ea['field'] == 'sponsor_co_person_id'
                    && !empty($co_petition_attribute_values[ $ea['id'] ]['sponsorPrimaryName'])) {
                   // Special case the sponsor
                   print $co_petition_attribute_values[ $ea['id'] ]['sponsorPrimaryName'];
+                } elseif($ea['field'] == 'manager_co_person_id'
+                   && !empty($co_petition_attribute_values[ $ea['id'] ]['managerPrimaryName'])) {
+                  // Special case the manager
+                  print $co_petition_attribute_values[ $ea['id'] ]['managerPrimaryName'];
                 } else {
                   // Otherwise just print out the field value
                   print $co_petition_attribute_values[ $ea['id'] ][ $ea['field'] ];
@@ -605,87 +658,11 @@
       <span class="clearfix"></span>
     </div><!-- modelbox -->
   <?php endforeach; // foreach ($coea_model as $m => $coe_attributes): ?>
-
-  <?php if(!empty($vv_terms_and_conditions)): ?>
-    <?php if($this->action == 'view'): ?>
-    <div class="modelbox">
-      <div class="box-title">
-        <?php print _txt('ct.co_terms_and_conditions.1'); ?>
-      </div>
-      <div class="box-data">
-        <?php
-          // We link to T&C because T&C are not considered part of the petition.
-
-          print $this->Html->link(_txt('op.tc.review.pt'),
-                                  array('controller' => 'co_terms_and_conditions',
-                                        'action' => 'review',
-                                        'copersonid' => $co_petitions[0]['CoPetition']['enrollee_co_person_id'],
-                                        'co' => $co_petitions[0]['CoPetition']['co_id']),
-                                  array('class' => 'linkbutton'));
-        ?>
-      </div>
-    </div>
-    <?php elseif($vv_tandc_mode == TAndCEnrollmentModeEnum::ExplicitConsent
-                 || $vv_tandc_mode == TAndCEnrollmentModeEnum::ImpliedConsent): // action == view ?>
-    <div class="ui-widget modelbox">
-      <div class="tc-title">
-        <strong><?php print _txt('op.tc.agree'); ?></strong><br />
-        <?php if($vv_tandc_mode == TAndCEnrollmentModeEnum::ExplicitConsent): ?>
-        <span class="descr"><?php print _txt('fd.tc.agree.desc'); ?></span>
-        <?php elseif($vv_tandc_mode == TAndCEnrollmentModeEnum::ImpliedConsent): ?>
-        <span class="descr"><?php print _txt('fd.tc.agree.impl'); ?></span>
-        <?php endif; // vv_tandc_mode ?>
-      </div>
-      <ul id="co_petition_tandc">
-        <?php foreach($vv_terms_and_conditions as $t): ?>
-          <li class="line<?php print ($l % 2); $l++; ?>">
-              <strong><?php print filter_var($t['CoTermsAndConditions']['description'],FILTER_SANITIZE_SPECIAL_CHARS); ?></strong><br/>
-              <button class="checkbutton"
-                      type="button"
-                      onClick="open_tandc('<?php print addslashes($t['CoTermsAndConditions']['description']); ?>',
-                        '<?php print addslashes($t['CoTermsAndConditions']['url']); ?>',
-                        '<?php print addslashes($t['CoTermsAndConditions']['id']); ?>')">
-                <?php print _txt('op.tc.review'); ?>
-              </button>
-              <?php
-                
-                $fieldName = "CoTermsAndConditions." . $t['CoTermsAndConditions']['id'];
-                $args = array();
-                // Note that if authorization is set to "None", this will be empty
-                // and the Controller will received the value "on" instead.
-                $args['value'] = $this->Session->read('Auth.User.username');
-                
-                if($vv_tandc_mode == TAndCEnrollmentModeEnum::ExplicitConsent) {
-                  // Explicit consent, render a checkbox
-                  $args['onClick'] = "maybe_enable_submit()";
-                } elseif($vv_tandc_mode == TAndCEnrollmentModeEnum::ImpliedConsent) {
-                  // Implicit consent, render as hidden fields instead
-                  $args['checked'] = true;
-                  // Disabling the checkbox prevents the value from POSTing, and there
-                  // is no READONLY attribute on a checkbox. A hack is to use javascript.
-                  // A better options would be to use a hidden field here, but that is
-                  // triggering a blackhole on submit. Processing entirely server side
-                  // is also problematic in the edge case where a new T&C is added after
-                  // the form is rendered.
-                  //$args['disabled'] = true;
-                  $args['onClick'] = "return false";
-                }
-                print '<span class="tc-checkbox-and-label">';
-                print $this->Form->checkbox($fieldName, $args);
-                print $this->Form->label($fieldName, _txt('op.tc.agree.i'));
-                print '</span>';
-              ?>
-          </li>
-        <?php endforeach; ?>
-      </ul>
-    </div>
-    <?php endif; // action == view ?>
-  <?php endif; // T&C ?>
   
   <?php
     // Render conclusion text for new petitions
     if(!empty($vv_conclusion_text)) {
-      print '<div class="modelbox">' . $vv_conclusion_text . "</div>";
+      print '<div class="modelbox d-flex">' . $vv_conclusion_text . "</div>";
     }
   ?>
 
@@ -700,42 +677,6 @@
     </div>
   <?php endif; ?>
   <span class="clearfix"></span>
-</div>
-<?php if($this->action == 'view'): ?>
-  <a href="#tabs-history" class="fieldGroupName">
-    <em class="material-icons">indeterminate_check_box</em>
-    <?php print _txt('fd.history.pt'); ?>
-  </a>
-  <ul id="tabs-history" class="fields data-list data-table">
-    <li>
-      <div class="table-container">
-        <table id="<?php print $this->action; ?>_co_petition_attrs">
-          <tbody>
-            <tr>
-              <th><?php print _txt('fd.action'); ?></th>
-              <th><?php print _txt('fd.actor'); ?></th>
-              <th><?php print _txt('fd.comment'); ?></th>
-              <th><?php print _txt('fd.timestamp.tz', array($vv_tz)); ?></th>
-            </tr>
-
-            <?php foreach ($co_petitions[0]['CoPetitionHistoryRecord'] as $hr): ?>
-            <tr class="line<?php print ($l % 2); $l++; ?>">
-              <td><?php print $hr['action']; ?></td>
-              <td><?php print (!empty($hr['ActorCoPerson']['PrimaryName']) ? filter_var(generateCn($hr['ActorCoPerson']['PrimaryName']),FILTER_SANITIZE_SPECIAL_CHARS) : _txt('fd.actor.self')); ?></td>
-              <td><?php print $hr['comment']; ?></td>
-              <td><?php print $this->Time->nice($hr['created'], $vv_tz); ?></td>
-            </tr>
-            <?php endforeach; // CoPetitionHistoryRecord ?>
-          </tbody>
-        </table>
-      </div>
-    </li>
-  </ul>
-<?php endif; // action == view ?>
-
-<div id="dialog-review" title="<?php print _txt('ct.co_terms_and_conditions.1'); ?>">
-  <iframe id="tandc_content" title="<?php print _txt('ct.co_terms_and_conditions.1'); ?>">
-  </iframe>
 </div>
 
 <script type="text/javascript">

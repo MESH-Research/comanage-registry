@@ -49,7 +49,7 @@
     maybe_enable_submit();
   }
 </script>
-<div class="co-info-topbox">
+<div class="co-info-topbox lightbox-info">
   <em class="material-icons">info</em>
   <?php print _txt('op.relink.role.confirm'); ?>
 </div>
@@ -88,17 +88,33 @@
     }
   ?>
   </ul>
-  
-  <p>
+
+  <div class="checkbox">
     <?php
       print $this->Form->checkbox('confirm', array('onClick' => "maybe_enable_submit()"));
       print $this->Form->label('confirm', _txt('op.confirm.box'));
     ?>
-  </p>
+  </div>
   
   <p>
     <?php
-      print $this->Form->submit(_txt('op.relink'));
+      $loader = $this->Html->tag(
+        'span',
+        '',
+        array(
+          'class' => 'spinner-grow spinner-grow-sm mr-1 align-middle invisible btn-submit-with-loader',
+          'escape' => false,
+          'role' => 'status',
+          'aria-hidden' => true
+        )
+      );
+
+      print $this->Form->button($loader . _txt('op.relink'),array(
+        'type' => 'submit',
+        'class' => 'btn btn-primary',
+        'disabled' => true,
+        'onclick' => 'javascript:showBtnSpinnerLightbox()'
+      ));
     ?>
   </p>
 </div>

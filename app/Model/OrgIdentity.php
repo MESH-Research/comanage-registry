@@ -77,6 +77,7 @@ class OrgIdentity extends AppModel {
     "EmailAddress" => array('dependent' => true),
     // It's probably not right to delete history records, but generally org identities shouldn't be deleted
     "HistoryRecord" => array('dependent' => true),
+    "CoJobHistoryRecord" => array('dependent' => true),
     // A person can have many identifiers within an organization
     "Identifier" => array('dependent' => true),
     "Name" => array('dependent' => true),
@@ -122,14 +123,17 @@ class OrgIdentity extends AppModel {
     ),
     'affiliation' => array(
       'content' => array(
-        'rule' => array('inList', array(AffiliationEnum::Faculty,
-                                        AffiliationEnum::Student,
-                                        AffiliationEnum::Staff,
-                                        AffiliationEnum::Alum,
-                                        AffiliationEnum::Member,
-                                        AffiliationEnum::Affiliate,
-                                        AffiliationEnum::Employee,
-                                        AffiliationEnum::LibraryWalkIn)),
+        'rule' => array('validateExtendedType',
+                        // We intentionally piggyback on CoPersonRole
+                        array('attribute' => 'CoPersonRole.affiliation',
+                              'default' => array(AffiliationEnum::Faculty,
+                                                 AffiliationEnum::Student,
+                                                 AffiliationEnum::Staff,
+                                                 AffiliationEnum::Alum,
+                                                 AffiliationEnum::Member,
+                                                 AffiliationEnum::Affiliate,
+                                                 AffiliationEnum::Employee,
+                                                 AffiliationEnum::LibraryWalkIn))),
         'required' => false,
         'allowEmpty' => true
       )
@@ -143,6 +147,7 @@ class OrgIdentity extends AppModel {
     ),
     'o' => array(
       'content' => array(
+        // Note we perform additional checks in beforeSave, see that function for details
         'rule' => array('validateInput'),
         'required' => false,
         'allowEmpty' => true
@@ -157,6 +162,7 @@ class OrgIdentity extends AppModel {
     ),*/
     'ou' => array(
       'content' => array(
+        // Note we perform additional checks in beforeSave, see that function for details
         'rule' => array('validateInput'),
         'required' => false,
         'allowEmpty' => true
@@ -164,6 +170,7 @@ class OrgIdentity extends AppModel {
     ),
     'title' => array(
       'content' => array(
+        // Note we perform additional checks in beforeSave, see that function for details
         'rule' => array('validateInput'),
         'required' => false,
         'allowEmpty' => true
@@ -174,21 +181,35 @@ class OrgIdentity extends AppModel {
         'rule' => array('validateTimestamp'),
         'required' => false,
         'allowEmpty' => true
-      )
+      ),
+      'precedes' => array(
+        'rule' => array('validateTimestampRange', "valid_through", "<"),
+      ),
     ),
     'valid_through' => array(
       'content' => array(
         'rule' => array('validateTimestamp'),
         'required' => false,
         'allowEmpty' => true
+      ),
+      'follows' => array(
+        'rule' => array("validateTimestampRange", "valid_from", ">"),
+      ),
+    ),
+    'manager_identifier' => array(
+      'content' => array(
+        'rule' => array('validateInput'),
+        'required' => false,
+        'allowEmpty' => true
+      )
+    ),
+    'sponsor_identifier' => array(
+      'content' => array(
+        'rule' => array('validateInput'),
+        'required' => false,
+        'allowEmpty' => true
       )
     )
-  );
-  
-  // Enum type hints
-  
-  public $cm_enum_txt = array(
-    'affiliation' => 'en.co_person_role.affiliation'
   );
   
   /**
@@ -197,7 +218,32 @@ class OrgIdentity extends AppModel {
    * @since  COmanage Registry v2.0.0
    */
   
-  public function beforeSave($options = array()) {    
+  public function beforeSave($options = array()) {
+    // Verify the Attribute Enumeration values for issuing_authority, if any.
+    // Because the logic is more complicated than the Cake 2 validation framework
+    // can handle, we do it here where we (generally) have full access to the record.
+    // Mostly this is a sanity check in case someone tries to bypass the UI, since
+    // ordinarily it shouldn't be possible to send an unpermitted value.
+    
+    // On saveField, we'll only have id. On all other actions, we'll have co_id.
+    $coId = null;
+    
+    if(!empty($this->data[$this->alias]['co_id'])) {
+      $coId = $this->data[$this->alias]['co_id'];
+    } elseif(!empty($this->data[$this->alias]['id'])) {
+      $coId = $this->findCoForRecord($this->data[$this->alias]['id']);
+    }
+    
+    if($coId) {
+      foreach(array('o', 'ou', 'title') as $a) {
+        if(!empty($this->data[$this->alias][$a])) {
+          $this->validateEnumeration($coId,
+                                     'OrgIdentity.'.$a, 
+                                     $this->data[$this->alias][$a]);
+        }
+      }
+    }
+    
     // Possibly convert the requested timestamps to UTC from browser time.
     // Do this before the strtotime/time calls below, both of which use UTC.
     
@@ -220,6 +266,8 @@ class OrgIdentity extends AppModel {
         $this->data['OrgIdentity']['valid_through'] = strftime("%F %T", $offsetDT->getTimestamp());
       }
     }
+    
+    return true;
   }
   
   /**

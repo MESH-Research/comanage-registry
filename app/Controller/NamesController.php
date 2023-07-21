@@ -50,7 +50,20 @@ class NamesController extends MVPAController {
                            'PrimaryName'),
     'SourceName'
   );
-  
+
+  // Use the lightbox layout for view
+  public function view($id) {
+    parent::view($id);
+    if(!isset($this->request->params["named"]["render"])
+       || $this->request->params["named"]["render"] !== 'norm') {
+      $req = $this->modelClass;
+      $model = $this->$req;
+      $modelpl = Inflector::tableize($req);
+      $this->set('title_for_layout', _txt('ct.' . $modelpl . '.1'));
+      $this->layout = 'lightbox';
+    }
+  }
+
   /**
    * Callback to set relevant tab to open when redirecting to another page
    *
@@ -156,6 +169,8 @@ class NamesController extends MVPAController {
     $orgidentityid = null;
     $HistoryRecord = null;
     $cn = "";
+    $actorCoPersonId = $this->request->is('restful') ? null : $this->Session->read('Auth.User.co_person_id');
+    $actorApiUserId = $this->request->is('restful') ? $this->Auth->User('id') : null;
     
     // Find some pointers according to the data
     if(isset($newdata['Name']['co_person_id'])) {
@@ -181,33 +196,41 @@ class NamesController extends MVPAController {
         $HistoryRecord->record($copersonid,
                                null,
                                $orgidentityid,
-                               $this->Session->read('Auth.User.co_person_id'),
+                               $actorCoPersonId,
                                ActionEnum::NameAdded,
-                               _txt('rs.added-a2', array(_txt('ct.names.1'), $cn)));
+                               _txt('rs.added-a2', array(_txt('ct.names.1'), $cn)),
+                               null, null, null,
+                               $actorApiUserId);
         break;
       case 'delete':
         $HistoryRecord->record($copersonid,
                                null,
                                $orgidentityid,
-                               $this->Session->read('Auth.User.co_person_id'),
+                               $actorCoPersonId,
                                ActionEnum::NameDeleted,
-                               _txt('rs.deleted-a2', array(_txt('ct.names.1'), $cn)));
+                               _txt('rs.deleted-a2', array(_txt('ct.names.1'), $cn)),
+                               null, null, null,
+                               $actorApiUserId);
         break;
       case 'edit':
         $HistoryRecord->record($copersonid,
                                null,
                                $orgidentityid,
-                               $this->Session->read('Auth.User.co_person_id'),
+                               $actorCoPersonId,
                                ActionEnum::NameEdited,
-                               _txt('rs.updated-a2', array(_txt('ct.names.1'), $cn)));
+                               _txt('rs.updated-a2', array(_txt('ct.names.1'), $cn)),
+                               null, null, null,
+                               $actorApiUserId);
         break;
       case 'primary':
         $HistoryRecord->record($copersonid,
                                null,
                                $orgidentityid,
-                               $this->Session->read('Auth.User.co_person_id'),
+                               $actorCoPersonId,
                                ActionEnum::NamePrimary,
-                               _txt('rs.nm.primary-a', array($cn)));
+                               _txt('rs.nm.primary-a', array($cn)),
+                               null, null, null,
+                               $actorApiUserId);
         break;
     }
     

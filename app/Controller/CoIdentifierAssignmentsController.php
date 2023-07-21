@@ -56,7 +56,7 @@ class CoIdentifierAssignmentsController extends StandardController {
     
     try {
       $jobid = $this->CoJob->register($this->cur_co['Co']['id'],
-                                      'IdAssigner',
+                                      'CoreJob.IdAssign',
                                       null,
                                       "",
                                       // Update with CO-1729
@@ -109,6 +109,35 @@ class CoIdentifierAssignmentsController extends StandardController {
     $vrule[1]['coid'] = $this->cur_co['Co']['id'];
     
     $this->CoIdentifierAssignment->validator()->getField('identifier_type')->getRule('content')->rule = $vrule;
+    
+    $vrule = $this->CoIdentifierAssignment->validate['email_type']['content']['rule'];
+    $vrule[1]['coid'] = $this->cur_co['Co']['id'];
+    
+    $this->CoIdentifierAssignment->validator()->getField('email_type')->getRule('content')->rule = $vrule;
+  }
+  
+  /**
+   * Callback before views are rendered.
+   * - precondition: None
+   * - postcondition: content and permissions for menu are set
+   *
+   * @since  COmanage Registry v4.1.0
+   */
+  
+  function beforeRender() {
+    parent::beforeRender();
+    
+    $this->set('plugins', $this->loadAvailablePlugins('identifierassigner'));
+    
+    if(!$this->request->is('restful')) {
+      $args = array();
+      $args['conditions']['CoGroup.co_id'] = $this->cur_co['Co']['id'];
+      $args['conditions']['CoGroup.status'] = SuspendableStatusEnum::Active;
+      $args['order'] = array('CoGroup.name ASC');
+      $args['contain'] = false;
+
+      $this->set('vv_available_groups', $this->CoIdentifierAssignment->CoGroup->find("list", $args));
+    }
   }
   
   /**

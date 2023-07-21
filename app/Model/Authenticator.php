@@ -37,7 +37,8 @@ class Authenticator extends AppModel {
   
   // Association rules from this model to other models
   public $belongsTo = array(
-    "Co"
+    "Co",
+    "CoMessageTemplate"
   );
   
   public $hasMany = array(
@@ -81,7 +82,12 @@ class Authenticator extends AppModel {
         )
       ),
       'required' => true
-    )
+    ),
+    'co_message_template_id' => array(
+      'rule' => 'numeric',
+      'required' => false,
+			'allowEmpty' => true
+		)
   );
   
   public $_targetid = null;
@@ -132,6 +138,37 @@ class Authenticator extends AppModel {
   }
   
   /**
+   * Determine which Authenticators are available for Self Service Reset.
+   * 
+   * @since  COmanage Registry v4.1.0
+   * @param  int $coId  CO ID
+   * @return array      Array of Authenticators in list format
+   */
+
+  public function getSelfServiceEnabled($coId) {
+    $ret = array();
+
+    // Determine the set of available Authenticators
+    $args = array();
+    $args['conditions']['co_id'] = $coId;
+    $args['conditions']['status'] = SuspendableStatusEnum::Active;
+    $args['order'] = array('Authenticator.description ASC');
+    $args['contain'] = false;
+
+    $authenticators = $this->find('all', $args);
+
+    foreach($authenticators as $a) {
+      $plugin = ClassRegistry::init($a['Authenticator']['plugin'] . "." . $a['Authenticator']['plugin']);
+
+      if(isset($plugin->enableSSR) && $plugin->enableSSR) {
+        $ret[ $a['Authenticator']['id'] ] = $a['Authenticator']['description'];
+      }
+    }
+
+    return $ret;
+  }
+
+  /**
    * Lock an Authenticator for a CO Person.
    * 
    * @since  COmanage Registry v3.1.0
@@ -145,10 +182,100 @@ class Authenticator extends AppModel {
   
   public function lock($id, $coPersonId, $actorCoPersonId) {
     // Just let any exceptions pass up the stack
+    
+    // Give the backend a chance to do something
+    $plugin = $this->field('plugin', array('Authenticator.id'=> $id));
+    $this->$plugin->lock($id, $coPersonId);
+    
     $this->AuthenticatorStatus->setStatus($id, $coPersonId, $actorCoPersonId, true);
     $this->provision($coPersonId);
     
     return true;
+  }
+  
+  /**
+   * Marshall provisioning data for all Authenticators associated with a CO Person.
+   *
+   * @since  COmanage Registry v4.0.0
+   * @param  integer $coId       CO ID
+   * @param  integer $coPersonId CO Person ID
+   * @return array               Authenticator data
+   */
+  
+  public function marshallProvisioningData($coId, $coPersonId) {
+    // Pull the set of authenticators and then pull their model data. Note we
+    // assume FooAuthenticator, where Foo is the corresponding model.
+    
+    $ret = array();
+    
+    $authplugins = preg_grep('/.*Authenticator$/', CakePlugin::loaded());
+    
+    foreach($authplugins as $authplugin) {
+      // $authplugin = (eg) PasswordAuthenticator
+      // $authmodel = (eg) Password
+      $authmodel = substr($authplugin, 0, -13);
+      
+      // Make sure we at least return an empty set, indicating the model is
+      // available even if it has no records
+      $ret[$authmodel] = array();
+      
+      // A plugin can be multiply instantiated, so first find those. Note we have
+      // to manually bind the association.
+      $this->bindModel(array('hasOne' => array($authplugin.'.'.$authplugin => array('dependent' => true))));
+      
+      $args = array();
+      $args['conditions']['Authenticator.co_id'] = $coId;
+      $args['conditions']['Authenticator.plugin'] = $authplugin;
+      $args['conditions']['Authenticator.status'] = SuspendableStatusEnum::Active;
+      $args['contain'] = $authplugin;
+      
+      $authenticators = $this->find('all', $args);
+      
+      // For each instantiation, request the current() data if the authenticator
+      // is not locked
+      
+      foreach($authenticators as $a) {
+        // Is this Authenticator locked? Note this only examines default lock
+        // behavior. Plugins can override this. If they do so and do not write
+        // an AuthenticatorStatus record, then their data will be provisioned
+        // (if returned by current()).
+        $args = array(
+          'AuthenticatorStatus.authenticator_id' => $a['Authenticator']['id'],
+          'AuthenticatorStatus.co_person_id' => $coPersonId
+        );
+        
+        $locked = $this->AuthenticatorStatus->field('locked', $args);
+        
+        if(!$locked) {
+          // Ask the plugin for the current data associated with the Authenticator
+          try {
+            $objects = $this->$authplugin->current($a['Authenticator']['id'],
+                                                   $a[$authplugin]['id'],
+                                                   $coPersonId);
+            
+            if(!empty($objects)) {
+              // We'll have an array of the form 0.Password.data (find all), but
+              // we need to return it as Password.0.data (find first, as used by
+              // ProvisionerBehavior and CoreApi). Note we can have multiple
+              // types of records if the Authenticator supports more than one.
+              
+              foreach($objects as $o) {
+                foreach(array_keys($o) as $k) {
+                  $ret[$k][] = $o[$k];
+                }
+              }
+            }
+          }
+          catch(Exception $e) {
+            // We'll get a RuntimeException if the plugin doesn't implement
+            // current(), but it's not clear what to do with it, so we just
+            // ignore the error and keep trying. In PE, we should log this.
+          }
+        }
+      }
+    }
+    
+    return $ret;
   }
   
   /**
@@ -244,6 +371,11 @@ class Authenticator extends AppModel {
   
   public function unlock($id, $coPersonId, $actorCoPersonId) {
     // Just let any exceptions pass up the stack    
+    
+    // Give the backend a chance to do something
+    $plugin = $this->field('plugin', array('Authenticator.id'=> $id));
+    $this->$plugin->unlock($id, $coPersonId);
+    
     $this->AuthenticatorStatus->setStatus($id, $coPersonId, $actorCoPersonId, false);
     $this->provision($coPersonId);
     

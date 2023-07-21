@@ -51,6 +51,8 @@ $cm_password_authenticator_texts['en_US'] = array(
   'er.passwordauthenticator.len.max'   => 'Password cannot be more than %1$s characters',
   'er.passwordauthenticator.len.min'   => 'Password must be at least %1$s characters',
   'er.passwordauthenticator.source'    => 'Password Authenticator is not configured for source type %1$s',
+  'er.passwordauthenticator.ssr.cfg'   => 'Configuration not supported for Self Service Reset',
+  'er.passwordauthenticator.token.notfound' => 'Reset token not found',
   
   // Plugin texts
   'pl.passwordauthenticator.hash.crypt'     => 'Store as Crypt',
@@ -74,6 +76,6 @@ $cm_password_authenticator_texts['en_US'] = array(
   'pl.passwordauthenticator.password_source' => 'Password Source',
   'pl.passwordauthenticator.reset'          => 'Password "%1$s" Reset',
   'pl.passwordauthenticator.saved'          => 'Password "%1$s" Set',
-  'pl.passwordauthenticator.token.confirm'  => 'Are you sure you wish to generate a new token?',
-  'pl.passwordauthenticator.token.gen'      => 'Generate Token'
+  'pl.passwordauthenticator.ssr.for'        => 'Select a new password for %1$s.',
+  'pl.passwordauthenticator.token.ssr'      => 'Self Service Password Reset'
 );

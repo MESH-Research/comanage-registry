@@ -52,12 +52,17 @@
   }
 
 ?>
-<?php if($cur_co['Co']['id'] == 1): ?>
+  <script type="text/javascript">
+    $(function() {
+      validate_date_input('<?php print _txt('er.validation') ?>', '<?php print _txt('er.validation.date') ?>');
+    });
+  </script>
+<?php if($cur_co['Co']['name'] == DEF_COMANAGE_CO_NAME): ?>
 <div class="co-info-topbox">
   <em class="material-icons">info</em>
   <?php print _txt('in.api.cmp'); ?>
 </div>
-<?php endif; // co_id == 1 ?>
+<?php endif; // co name == DEF_COMANAGE_CO_NAME ?>
 <ul id="<?php print $this->action; ?>_api_users" class="fields form-list">
   <li>
     <div class="field-name">
@@ -242,7 +247,8 @@
       <div class="field-desc"><?php print _txt('fd.api.priv.desc'); ?></div>
     </div>
     <div class="field-info">
-      <?php print $this->Form->input('privileged'); ?>
+      <?php print $e ? $this->Form->input('privileged')
+                     : ($api_users[0]['ApiUser']['privileged'] ? _txt('fd.true') : _txt('fd.false')); ?>
     </div>
   </li>
   <?php else: // co > 1 ?>

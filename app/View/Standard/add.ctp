@@ -46,6 +46,9 @@
   }
   
   print $this->element("pageTitleAndButtons", $params);
+  if(file_exists(APP . "View/" . $model . "/tabs.inc")) {
+    include(APP . "View/" . $model . "/tabs.inc");
+  }
 
   $submit_label = _txt('op.add');
   
@@ -60,13 +63,13 @@
   );
   
   if(!empty($this->plugin)) {
-    if(file_exists(APP . "Plugin/" . $this->plugin . "/View/" . $model . "/fields.inc")) {
-      include(APP . "Plugin/" . $this->plugin . "/View/" . $model . "/fields.inc");
-    } elseif(file_exists(LOCAL . "Plugin/" . $this->plugin . "/View/" . $model . "/fields.inc")) {
-      include(LOCAL . "Plugin/" . $this->plugin . "/View/" . $model . "/fields.inc");
+    if(file_exists(APP . "Plugin/" . $this->plugin . "/View/" . $this->viewPath . "/fields.inc")) {
+      include(APP . "Plugin/" . $this->plugin . "/View/" . $this->viewPath . "/fields.inc");
+    } elseif(file_exists(LOCAL . "Plugin/" . $this->plugin . "/View/" . $this->viewPath . "/fields.inc")) {
+      include(LOCAL . "Plugin/" . $this->plugin . "/View/" . $this->viewPath . "/fields.inc");
     }
   } else {
-    include(APP . "View/" . $model . "/fields.inc");
+    include(APP . "View/" . $this->viewPath . "/fields.inc");
   }
   
   print $this->Form->end();

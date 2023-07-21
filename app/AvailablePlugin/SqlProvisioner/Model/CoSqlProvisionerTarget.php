@@ -29,7 +29,7 @@ App::uses("CoProvisionerPluginTarget", "Model");
 
 // App::import doesn't handle this correctly
 require(APP . '/Vendor/adodb5/adodb.inc.php');
-require(APP . '/Vendor/adodb5/adodb-xmlschema03.inc.php');
+require_once(APP . '/Vendor/adodb5/adodb-xmlschema03.inc.php');
 
 class CoSqlProvisionerTarget extends CoProvisionerPluginTarget {
   // Define class name for cake
@@ -39,7 +39,7 @@ class CoSqlProvisionerTarget extends CoProvisionerPluginTarget {
   public $actsAs = array('Containable');
   
   // Association rules from this model to other models
-  public $belongsTo = array("CoProvisioningTarget");
+  public $belongsTo = array("CoProvisioningTarget", "Server");
   
   // Default display field for cake generated views
   public $displayField = "server_id";
@@ -54,70 +54,74 @@ class CoSqlProvisionerTarget extends CoProvisionerPluginTarget {
       'required' => true
     ),
     'server_id' => array(
-      'rule' => 'numeric',
-      'required' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => true,
+        'unfreeze' => 'CO'
+      )
     )
   );
   
   // The models we currently synchronize, not including CO Person, in the order
-  // we want to process them.
+  // we want to process them. Note when adding a model here, it may need to be
+  // added to the contains clause in syncPerson.
   public $models = array(
     array(
-      'table'  => 'sp_names',
+      'table'  => 'names',
       'name'   => 'SpName',
       'source' => 'Name',
       'parent' => 'CoPerson'
     ),
     array(
-      'table'  => 'sp_identifiers',
+      'table'  => 'identifiers',
       'name'   => 'SpIdentifier',
       'source' => 'Identifier',
       'parent' => 'CoPerson'
     ),
     array(
-      'table'  => 'sp_email_addresses',
+      'table'  => 'email_addresses',
       'name'   => 'SpEmailAddress',
       'source' => 'EmailAddress',
       'parent' => 'CoPerson'
     ),
     array(
-      'table'  => 'sp_urls',
+      'table'  => 'urls',
       'name'   => 'SpUrl',
       'source' => 'Url',
       'parent' => 'CoPerson'
     ),
     array(
-      'table'  => 'sp_co_t_and_c_agreements',
+      'table'  => 'co_t_and_c_agreements',
       'name'   => 'SpCoTAndCAgreement',
       'source' => 'CoTAndCAgreement',
       'parent' => 'CoPerson'
     ),
     array(
-      'table'  => 'sp_co_group_members',
+      'table'  => 'co_group_members',
       'name'   => 'SpCoGroupMember',
       'source' => 'CoGroupMember',
       'parent' => 'CoPerson'
     ),
     array(
-      'table'  => 'sp_co_person_roles',
+      'table'  => 'co_person_roles',
       'name'   => 'SpCoPersonRole',
       'source' => 'CoPersonRole',
       'parent' => 'CoPerson'
     ),
     array(
-      'table'  => 'sp_addresses',
+      'table'  => 'addresses',
       'name'   => 'SpAddress',
       'source' => 'Address',
       'parent' => 'CoPersonRole'
     ),
     array(
-      'table'  => 'sp_telephone_numbers',
+      'table'  => 'telephone_numbers',
       'name'   => 'SpTelephoneNumber',
       'source' => 'TelephoneNumber',
       'parent' => 'CoPersonRole'
     ),
     array(
-      'table'  => 'sp_ad_hoc_attributes',
+      'table'  => 'ad_hoc_attributes',
       'name'   => 'SpAdHocAttribute',
       'source' => 'AdHocAttribute',
       'parent' => 'CoPersonRole'
@@ -127,14 +131,14 @@ class CoSqlProvisionerTarget extends CoProvisionerPluginTarget {
   // The primary/parent models being provisioned
   public $parentModels = array(
     'CoGroup' => array(
-      'table'  => 'sp_co_groups',
+      'table'  => 'co_groups',
       'name'   => 'SpCoGroup',
       'source' => 'CoGroup',
       'source_table' => 'co_groups',
       'parent' => 'Co'
     ),
     'CoPerson' => array(
-      'table'  => 'sp_co_people',
+      'table'  => 'co_people',
       'name'   => 'SpCoPerson',
       'source' => 'CoPerson',
       'source_table' => 'co_people',
@@ -145,19 +149,26 @@ class CoSqlProvisionerTarget extends CoProvisionerPluginTarget {
   // Models holding reference data (that ordinarily isn't provisioned)
   public $referenceModels = array(
     array(
-      'table'  => 'sp_cous',
+      'table'  => 'cous',
       'name'   => 'SpCou',
       'source' => 'Cou',
       'source_table' => 'cous',
       'parent' => 'Co'
     ),
     array(
-      'table'  => 'sp_co_terms_and_conditions',
+      'table'  => 'co_terms_and_conditions',
       // Ordinarily we'd call this SpCoTermsAndConditions, but it's not worth
       // fighting cake's inflector
       'name'   => 'SpCoTermsAndCondition',
       'source' => 'CoTermsAndConditions',
       'source_table' => 'co_terms_and_conditions',
+      'parent' => 'Co'
+    ),
+    array(
+      'table'  => 'org_identity_sources',
+      'name'   => 'SpOrgIdentitySource',
+      'source' => 'OrgIdentitySource',
+      'source_table' => 'org_identity_sources',
       'parent' => 'Co'
     )
   );
@@ -173,88 +184,20 @@ class CoSqlProvisionerTarget extends CoProvisionerPluginTarget {
 
   public function afterSave($created, $options = Array()) {
     if(!empty($this->data['CoSqlProvisionerTarget']['server_id'])) {
-      // Pull the Server configuration and apply the database schema
-      
-      $args = array();
-      $args['conditions']['Server.id'] = $this->data['CoSqlProvisionerTarget']['server_id'];
-      $args['contain'] = array('SqlServer');
-      
-      $srvr = $this->CoProvisioningTarget->Co->Server->find('first', $args);
-      
-      $db_driverName = null;
-      
-      switch($srvr['SqlServer']['type']) {
-        case SqlServerEnum::Mysql:
-          $db_driverName = 'mysqli';
-          break;
-        case SqlServerEnum::Postgres:
-          $db_driverName = 'postgres';
-          break;
-        case SqlServerEnum::SqlServer:
-          $db_driverName = 'mssql';
-          break;
-        default:
-          throw new InvalidArgumentException(_txt('er.unknown', array($srvr['Server']['server_type'])));
-          break;
-      }
-      
-      $dbc = ADONewConnection($db_driverName);
+      $prefix = (!empty($this->data['CoSqlProvisionerTarget']['table_prefix'])
+                 ? $this->data['CoSqlProvisionerTarget']['table_prefix']
+                 : "sp_");
 
-      if(!$dbc->Connect($srvr['SqlServer']['hostname'],
-                       $srvr['SqlServer']['username'],
-                       $srvr['SqlServer']['password'],
-                       $srvr['SqlServer']['databas'])) {
-        throw new RuntimeException(_txt('er.db.connect', array($dbc->ErrorMsg())));
-      }
+      // Apply the database schema
+      $this->applySchema($this->data['CoSqlProvisionerTarget']['server_id'],
+                         $prefix);
       
-      $schemaFile = LOCAL . DS . 'Plugin' . DS . 'SqlProvisioner' . DS . 'Config' . DS . 'Schema' . DS . 'schema-target.xml';
-      
-      if(!is_readable($schemaFile)) {
-        throw new RuntimeException(_txt('er.file.read', array($schemaFile)));
-      }
-      
-      $schema = new adoSchema($dbc);
-//        $schema->setPrefix($db->config['prefix']);
-      // ParseSchema is generating bad SQL for Postgres. eg:
-      //  ALTER TABLE cm_cos ALTER COLUMN id SERIAL
-      // which (1) should be ALTER TABLE cm_cos ALTER COLUMN id TYPE SERIAL
-      // and (2) SERIAL isn't usable in an ALTER TABLE statement
-      // So we continue on error
-      $schema->ContinueOnError(true);
-      
-      // Parse the database XML schema from file unless we are targeting MySQL
-      // in which case we use an XSL style sheet to first modify the schema
-      // so that boolean columns are cast to TINYINT(1) and the cakePHP
-      // automagic works. See
-      //
-      // https://bugs.internet2.edu/jira/browse/CO-175
-      //
-      if($srvr['SqlServer']['type'] != SqlServerEnum::Mysql) {
-        $sql = $schema->ParseSchema($schemaFile);
-      } else {
-        $xml = new DOMDocument;
-        $xml->load($schemaFile);
-
-        $xsl = new DOMDocument;
-        $xsl->load(APP . '/Config/Schema/boolean_mysql.xsl');
-
-        $proc = new XSLTProcessor;
-        $proc->importStyleSheet($xsl);
-
-        $sql = $schema->ParseSchemaString($proc->transformToXML($xml));
-      }
-
-      if($schema->ExecuteSchema($sql) != 2) { // !!!
-        // We should throw an error here, but AdoDB doesn't reliably detect
-        // the application of the schema after the first run.
-      }
-
-      $dbc->Disconnect();
-      
-      // Now populate (or update) the referece data
+      // Now populate (or update) the referece data, for which we need the current CO
       
       // Just let any exceptions bubble up the stack
-      $this->CoProvisioningTarget->Co->Server->SqlServer->connect($this->data['CoSqlProvisionerTarget']['server_id'], "targetdb");
+      $this->CoProvisioningTarget->Co->Server->SqlServer->connect($this->data['CoSqlProvisionerTarget']['server_id'],
+                                                                  "targetdb",
+                                                                  $prefix);
       
       $coId = $this->CoProvisioningTarget->field('co_id', array('CoProvisioningTarget.id' => $this->data['CoSqlProvisionerTarget']['co_provisioning_target_id']));
       
@@ -270,17 +213,117 @@ class CoSqlProvisionerTarget extends CoProvisionerPluginTarget {
   }
   
   /**
+   * Apply the Target Database Schema.
+   *
+   * @since  COmanage Registry v4.0.0
+   * @param  integer $serverId    Server ID
+   * @param  string  $tablePrefix Table Name Prefix
+   * @throws InvalidArgumentException
+   * @throws RuntimeException
+   */
+  
+  public function applySchema($serverId, $tablePrefix) {
+    // Pull the Server configuration and apply the database schema
+    
+    $args = array();
+    $args['conditions']['Server.id'] = $serverId;
+    $args['contain'] = array('SqlServer');
+    
+    $srvr = $this->CoProvisioningTarget->Co->Server->find('first', $args);
+    
+    $db_driverName = null;
+    
+    switch($srvr['SqlServer']['type']) {
+      case SqlServerEnum::Mysql:
+        $db_driverName = 'mysqli';
+        break;
+      case SqlServerEnum::Postgres:
+        $db_driverName = 'postgres';
+        break;
+      case SqlServerEnum::SqlServer:
+        $db_driverName = 'mssql';
+        break;
+      default:
+        throw new InvalidArgumentException(_txt('er.unknown', array($srvr['Server']['server_type'])));
+        break;
+    }
+    
+    $dbc = ADONewConnection($db_driverName);
+
+    if(!$dbc->Connect($srvr['SqlServer']['hostname'],
+                     $srvr['SqlServer']['username'],
+                     $srvr['SqlServer']['password'],
+                     $srvr['SqlServer']['databas'])) {
+      throw new RuntimeException(_txt('er.db.connect', array($dbc->ErrorMsg())));
+    }
+    
+    $schemaFile = LOCAL . DS . 'Plugin' . DS . 'SqlProvisioner' . DS . 'Config' . DS . 'Schema' . DS . 'schema-target.xml';
+    
+    if(!is_readable($schemaFile)) {
+      throw new RuntimeException(_txt('er.file.read', array($schemaFile)));
+    }
+    
+    $prefix = (!empty($tablePrefix) && $tablePrefix != "") ? $tablePrefix : "sp_";
+
+    $schema = new adoSchema($dbc);
+    $schema->setPrefix($prefix);
+    // ParseSchema is generating bad SQL for Postgres. eg:
+    //  ALTER TABLE cm_cos ALTER COLUMN id SERIAL
+    // which (1) should be ALTER TABLE cm_cos ALTER COLUMN id TYPE SERIAL
+    // and (2) SERIAL isn't usable in an ALTER TABLE statement
+    // So we continue on error
+    $schema->ContinueOnError(true);
+    
+    // Parse the database XML schema from file unless we are targeting MySQL
+    // in which case we use an XSL style sheet to first modify the schema
+    // so that boolean columns are cast to TINYINT(1) and the cakePHP
+    // automagic works. See
+    //
+    // https://bugs.internet2.edu/jira/browse/CO-175
+    //
+    if($srvr['SqlServer']['type'] != SqlServerEnum::Mysql) {
+      $sql = $schema->ParseSchema($schemaFile);
+    } else {
+      $xml = new DOMDocument;
+      $xml->load($schemaFile);
+
+      $xsl = new DOMDocument;
+      $xsl->load(APP . '/Config/Schema/transform_mysql.xsl');
+
+      $proc = new XSLTProcessor;
+      $proc->importStyleSheet($xsl);
+
+      $sql = $schema->ParseSchemaString($proc->transformToXML($xml));
+    }
+
+    // A long standing issue in ADOdb is that it doesn't handle table prefixes
+    // in REFERENCES clause. As a hack, we modify the generated SQL. This isn't
+    // a great approach and probably shouldn't be applied to the main schema
+    // (since that one's much more complicated) but it should be good enough here.
+    // The long term fix is to migrate to DBAL (in PE).
+
+    $sql = preg_replace("/REFERENCES /", "REFERENCES $prefix", $sql);
+
+    if($schema->ExecuteSchema($sql) != 2) { // !!!
+      // We should throw an error here, but AdoDB doesn't reliably detect
+      // the application of the schema after the first run.
+    }
+
+    $dbc->Disconnect();
+  }
+  
+  /**
    * Remove a group from the target database, following a delete group operation.
    *
    * @since  COmanage Registry v3.3.0
-   * @param  Array $provisioningData Array of provisioning data
+   * @param  Array   $provisioningData Array of provisioning data
    */
   
   protected function deleteGroup($provisioningData) {
     // We shouldn't need to delete CoGroupMemberships, but just in case...
     
     $Model = new Model(array(
-      'table' => 'sp_co_group_members',
+      'table' => 'co_group_members',
       'name'  => 'SpCoGroupMember',
       'ds'    => 'targetdb'
     ));
@@ -302,39 +345,25 @@ class CoSqlProvisionerTarget extends CoProvisionerPluginTarget {
    * Remove a person from the target database, following a delete person operation.
    *
    * @since  COmanage Registry v3.3.0
-   * @param  Array $provisioningData Array of provisioning data
+   * @param  Array   $provisioningData Array of provisioning data
    */
   
   protected function deletePerson($provisioningData) {
-    // We need to walk the model array backwards (ie: so we delete Addresses
-    // before we delete CoPersonRoles)
+    // Build a mostly empty array regardless of what was passed to us,
+    // in case we get related data or other noise. We want syncPerson to
+    // see no related models and so delete them all.
+
+    $deleteData = array(
+      'CoPerson' => array(
+        'id'      => $provisioningData['CoPerson']['id'],
+        'co_id'   => $provisioningData['CoPerson']['co_id'],
+        'status'  => StatusEnum::Deleted
+      )
+    );
     
-    foreach(array_reverse($this->models) as $m) {
-      $Model = new Model(array(
-        'table' => $m['table'],
-        'name'  => $m['name'],
-        'ds'    => 'targetdb'
-      ));
-      
-      if($m['parent'] == 'CoPersonRole') {
-        foreach($provisioningData['CoPersonRole'] as $pr) {
-          if(!empty($pr[ $m['source'] ])) {
-            foreach($pr[ $m['source'] ] as $r) {
-              $Model->delete($r['id'], false);
-            }
-          }
-        }
-      } else {
-        if(!empty($provisioningData[ $m['source'] ])) {
-          foreach($provisioningData[ $m['source'] ] as $r) {
-            $Model->delete($r['id'], false);
-          }
-        }
-      }
-    }
+    $this->syncPerson($deleteData, $tablePrefix);
     
-    // Finally delete the CO Person record itself.
-    
+    // Then delete the CO Person record itself.
     $SpCoPerson = new Model(array(
       'table'  => $this->parentModels['CoPerson']['table'],
       'name'   => $this->parentModels['CoPerson']['name'],
@@ -392,7 +421,13 @@ class CoSqlProvisionerTarget extends CoProvisionerPluginTarget {
     }
     
     // Just let any exceptions bubble up the stack
-    $this->CoProvisioningTarget->Co->Server->SqlServer->connect($coProvisioningTargetData['CoSqlProvisionerTarget']['server_id'], "targetdb");
+    $prefix = (!empty($this->data['CoSqlProvisionerTarget']['table_prefix'])
+                ? $this->data['CoSqlProvisionerTarget']['table_prefix']
+                : "sp_");
+    
+    $this->CoProvisioningTarget->Co->Server->SqlServer->connect($coProvisioningTargetData['CoSqlProvisionerTarget']['server_id'],
+                                                                "targetdb",
+                                                                $prefix);
     
     // Start a transaction
     $dbc = $this->getDataSource('targetdb');
@@ -423,14 +458,21 @@ class CoSqlProvisionerTarget extends CoProvisionerPluginTarget {
    * Sync all CO Groups. Intended to be called from afterSave to do an initial population.
    *
    * @since  COmanage Registry v3.3.0
-   * @param  Integer $coId CO ID to sync groups for
+   * @param  integer $coId CO ID to sync groups for
+   * @param  string  $dataSource DataSource label
    */
   
-  public function syncAllGroups($coId) {
+  public function syncAllGroups($coId, $dataSource='targetdb') {
     $Model = new Model(array(
       'table' => $this->parentModels['CoGroup']['table'],
       'name'  => $this->parentModels['CoGroup']['name'],
-      'ds'    => 'targetdb'
+      'ds'    => $dataSource
+    ));
+    
+    $GModel = new Model(array(
+      'table' => 'co_group_members',
+      'name'  => 'SpCoGroupMember',
+      'ds'    => $dataSource
     ));
     
     // Instantiate the core (source) model and pull the records associated with this CO ID
@@ -451,6 +493,16 @@ class CoSqlProvisionerTarget extends CoProvisionerPluginTarget {
       // Remove any deleted records (those remaining in the reference table
       // that were not in $records)
       
+      // As a bit of an edge case (CO-2173), if the server is not in Automatic
+      // mode and any Groups were deleted, those Group Memberships will still
+      // be present, and this delete will fail due to foreign keys still pointing
+      // here. Clear those out first.
+      
+      $GModel->deleteAll(array(
+        'NOT' => array('co_group_id' => Hash::extract($records, '{n}.'.$this->parentModels['CoGroup']['source'].'.id'))
+      ),
+      false);
+      
       $Model->deleteAll(array(
         'NOT' => array('id' => Hash::extract($records, '{n}.'.$this->parentModels['CoGroup']['source'].'.id'))
       ), 
@@ -460,13 +512,15 @@ class CoSqlProvisionerTarget extends CoProvisionerPluginTarget {
   
   /**
    * Sync all reference data. Intended to be called from the Event listener,
-   * which doesn't have an CO Provisioning Target context.
+   * which doesn't have an CO Provisioning Target context, but also used for
+   * manual resync.
    *
    * @since  COmanage Registry v3.3.0
-   * @param  Integer $coId CO ID to sync reference data for
+   * @param  int     $coId       CO ID to sync reference data for
+   * @param  boolean $syncGroups Also sync Group reference data
    */
   
-  public function syncAllReferenceData($coId) {
+  public function syncAllReferenceData($coId, $syncGroups=false) {
     // Pull all SqlProvisioner configurations for the CO
     
     $args = array();
@@ -481,6 +535,10 @@ class CoSqlProvisionerTarget extends CoProvisionerPluginTarget {
     
     // Loop through each configuration, instantiating a DataSource, then
     // performing the sync
+
+    $prefix = (!empty($this->data['CoSqlProvisionerTarget']['table_prefix'])
+            ? $this->data['CoSqlProvisionerTarget']['table_prefix']
+            : "sp_");
     
     if(!empty($targets)) {
       foreach($targets as $t) {
@@ -488,9 +546,16 @@ class CoSqlProvisionerTarget extends CoProvisionerPluginTarget {
         $sourceLabel = 'targetdb' . $t['CoSqlProvisionerTarget']['server_id'];
         
         // Just let any exceptions bubble up the stack
-        $this->CoProvisioningTarget->Co->Server->SqlServer->connect($t['CoSqlProvisionerTarget']['server_id'], $sourceLabel);
+        $this->CoProvisioningTarget->Co->Server->SqlServer->connect($t['CoSqlProvisionerTarget']['server_id'], 
+                                                                    $sourceLabel,
+                                                                    $prefix);
         
-        $this->syncReferenceData($coId, $sourceLabel);
+        $this->syncReferenceData($coId,
+                                 $sourceLabel);
+        
+        if($syncGroups) {
+          $this->syncAllGroups($coId, $sourceLabel);
+        }
       }
     }
   }
@@ -499,10 +564,12 @@ class CoSqlProvisionerTarget extends CoProvisionerPluginTarget {
    * Sync a group to the target database, following a save group operation.
    *
    * @since  COmanage Registry v3.3.0
-   * @param  Array $provisioningData Array of provisioning data
+   * @param  array  $provisioningData Array of provisioning data
+   * @param  string $tablePrefix Table Name Prefix    
+   * @param  string $dataSource DataSource label
    */
   
-  protected function syncGroup($provisioningData) {
+  protected function syncGroup($provisioningData, $dataSource='targetdb') {
     $SpCoGroup = new Model(array(
       'table'  => $this->parentModels['CoGroup']['table'],
       'name'   => $this->parentModels['CoGroup']['name'],
@@ -526,11 +593,40 @@ class CoSqlProvisionerTarget extends CoProvisionerPluginTarget {
    * Sync a person to the target database, following a save person operation.
    *
    * @since  COmanage Registry v3.3.0
-   * @param  Array $provisioningData Array of provisioning data
+   * @param  Array   $provisioningData Array of provisioning data
    */
   
   protected function syncPerson($provisioningData) {
-    // Start with CO Person
+    if(empty($provisioningData['CoPerson'])) {
+      return;
+    }
+
+    // Before we do anything, pull the OrgIdentity set for use in populating
+    // org_identity_source_id references. Note the provisioning data does have
+    // limited OrgIdentity data, but we'll need the full set of associated
+    // models to dereference the source keys correctly.
+    
+    $orgIds = Hash::extract($provisioningData, 'CoOrgIdentityLink.{n}.org_identity_id');
+    $orgIdentities = array();
+    
+    if(!empty($orgIds)) {
+      $args = array();
+      $args['conditions']['OrgIdentity.id'] = $orgIds;
+      $args['contain'] = array(
+        'Address',
+        'AdHocAttribute',
+        'EmailAddress',
+        'Identifier',
+        'Name',
+        'OrgIdentitySourceRecord',
+        'TelephoneNumber',
+        'Url'
+      );
+      
+      $orgIdentities = $this->CoProvisioningTarget->Co->OrgIdentity->find('all', $args);
+    }
+    
+    // Start populating the target tables with CO Person
 
     $SpCoPerson = new Model(array(
       'table'  => $this->parentModels['CoPerson']['table'],
@@ -549,6 +645,8 @@ class CoSqlProvisionerTarget extends CoProvisionerPluginTarget {
 
     // Loop through the models and sync the data
     
+    $affilmap = $this->CoProvisioningTarget->Co->CoExtendedType->affiliationMap($provisioningData['Co']['id']);
+
     foreach($this->models as $m) {
       $Model = new Model(array(
         'table' => $m['table'],
@@ -564,31 +662,72 @@ class CoSqlProvisionerTarget extends CoProvisionerPluginTarget {
       $parentids = array();
       
       if($m['parent'] == 'CoPersonRole') {
-        $records = Hash::extract($provisioningData['CoPersonRole'], '{n}.' . $m['source'] . '.{n}');
+        if(!empty($provisioningData['CoPersonRole'])) {
+          $records = Hash::extract($provisioningData['CoPersonRole'], '{n}.' . $m['source'] . '.{n}');
+          $parentids = array_unique(Hash::extract($provisioningData['CoPersonRole'], '{n}.co_person_role_id'));
+        }
         $parentfk = 'co_person_role_id';
-        $parentids = array_unique(Hash::extract($provisioningData['CoPersonRole'], '{n}.co_person_role_id'));
       } else {
-        $records = $provisioningData[ $m['source'] ];
+        if(!empty($provisioningData[ $m['source'] ])) {
+          $records = $provisioningData[ $m['source'] ];
+        }
         $parentids[] = $provisioningData['CoPerson']['id'];
       }
       
       if(!empty($parentids)) {
-        foreach($records as $d) {
-          $Model->clear();
+        if(!empty($records)) {
+          foreach($records as $d) {
+            $Model->clear();
+            
+            // Since we're copying the source table's id column, we don't have to
+            // check for an existing record. Cake will effectively upsert for us.
           
-          // Since we're copying the source table's id column, we don't have to
-          // check for an existing record. Cake will effectively upsert for us.
-        
-          $data = array(
-            $m['name'] => $d
-          );
-          
-          // XXX Should we filter records where source_*_id is not null? eg for name?
-          // No, not for now since they are part of the CO person record, though maybe
-          // we should add the source metadata or offer a "filter duplicate values" option.
+            $data = array(
+              $m['name'] => $d
+            );
+            
+            // Determine if this record came from an Org Identity Source.
+            // If so, we want to add a foreign key.
+            
+            $sourceKey = "source_" . Inflector::underscore($m['source']) . "_id";
+            $sourceOrgIdentityId = null;
+            
+            if(!empty($d[$sourceKey])) {
+              // This record came from a source, find the associated Org Identity
+              // record based on the $sourceKey
+              
+              $sourceRecord = Hash::extract($orgIdentities, '{n}.'.$m['source'].'.{n}[id='.$d[$sourceKey].']');
+              
+              if(!empty($sourceRecord[0]['org_identity_id'])) {
+                $sourceOrgIdentityId = $sourceRecord[0]['org_identity_id'];
+              }
+            } elseif(!empty($d['source_org_identity_id'])) {
+              // CoPersonRole and CoGroupMember have direct fks to source_org_identity_id
+              
+              $sourceOrgIdentityId = $d['source_org_identity_id'];
+            }
+            
+            if($sourceOrgIdentityId) {
+              $oisRecord = Hash::extract($orgIdentities, '{n}.OrgIdentitySourceRecord[org_identity_id='.$sourceOrgIdentityId.']');
+              
+              // We finally have the OIS ID, inject it into the data to save
+              $data[ $m['name'] ]['org_identity_source_id'] = $oisRecord[0]['org_identity_source_id'];
+            }
 
-          // No need to validate anything, though we also don't have any validation rules
-          $Model->save($data, false);
+            if($m['name'] == 'SpCoPersonRole') {
+              // Map eduPersonAffiliation.
+              if(!empty($data[ $m['name'] ]['affiliation'])) {
+                $affil = $data[ $m['name'] ]['affiliation'];
+
+                if(!empty($affilmap[$affil])) {
+                  $data[ $m['name'] ]['eduperson_affiliation'] = $affilmap[$affil];
+                }
+              }
+            }
+            
+            // No need to validate anything, though we also don't have any validation rules
+            $Model->save($data, false);
+          }
         }
         
         // Now delete any records belonging to the parent record that aren't in
@@ -637,16 +776,16 @@ class CoSqlProvisionerTarget extends CoProvisionerPluginTarget {
    * Synchronize reference data to the target database.
    *
    * @since  COmanage Registry v3.3.0
-   * @param  Integer $coId       CO ID
-   * @param  string  $dataSource DataSource label
+   * @param  Integer $coId        CO ID
+   * @param  string  $dataSource  DataSource label
    */
   
   protected function syncReferenceData($coId, $dataSource='targetdb') {
     foreach($this->referenceModels as $m) {
       $Model = new Model(array(
-        'table' => $m['table'],
-        'name'  => $m['name'],
-        'ds'    => $dataSource
+        'table'       => $m['table'],
+        'name'        => $m['name'],
+        'ds'          => $dataSource
       ));
       
       // Instantiate the core (source) model and pull the records associated with this CO ID

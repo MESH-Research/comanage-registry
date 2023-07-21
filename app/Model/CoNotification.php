@@ -96,9 +96,12 @@ class CoNotification extends AppModel {
       'allowEmpty' => true
     ),
     'resolver_co_person_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'action' => array(
       'rule' => array('maxLength', 4),
@@ -219,13 +222,15 @@ class CoNotification extends AppModel {
    * @param  integer $id                  CO Notification ID
    * @param  string  $role                One of 'actor', 'recipient', or 'resolver'
    * @param  integer $expungerCoPersonId  CO Person ID of person performing expunge
+   * @param  integer $expungerApiUserId   API User ID performing expunge
    * @return boolean True on success
    * @throws InvalidArgumentException
    */
   
   public function expungeParticipant($id,
                                      $role,
-                                     $expungerCoPersonId) {
+                                     $expungerCoPersonId,
+                                     $expungerApiUserId = null) {
     $this->id = $id;
     
     $subjectCoPersonId = $this->field('subject_co_person_id');
@@ -238,7 +243,11 @@ class CoNotification extends AppModel {
                                                   null,
                                                   $expungerCoPersonId,
                                                   ActionEnum::NotificationParticipantExpunged,
-                                                  _txt('rs.nt.expunge', array($id, $role)));
+                                                  _txt('rs.nt.expunge', array($id, $role)),
+                                                  null,
+                                                  null,
+                                                  null,
+                                                  $expungerApiUserId);
     }
     // else subject can be null if (eg) a group provisioner failed and a notification
     // is sent to the admins. In that case, don't bother with the history record
@@ -525,6 +534,7 @@ class CoNotification extends AppModel {
    * @param  String  $bodyTemplate      Body template for notification email (if null, default body using $comment and $source is sent)
    * @param  String  $cc                Comma separated list of addresses to cc
    * @param  String  $bcc               Comma separated list of addresses to bcc
+   * @param  String  $format            Message Body format type it can be txt, html or both
    * @return Array CO Notification ID(s)
    * @throws InvalidArgumentException
    * @throws RuntimeException
@@ -543,7 +553,8 @@ class CoNotification extends AppModel {
                            $subjectTemplate=null,
                            $bodyTemplate=null,
                            $cc=null,
-                           $bcc=null) {
+                           $bcc=null,
+                           $format=MessageFormatEnum::Plaintext) {
     // Create the notification. Perhaps this should be embedded in a transaction.
     
     $n = array();
@@ -644,7 +655,8 @@ class CoNotification extends AppModel {
                                $subjectTemplate,
                                $bodyTemplate,
                                $cc,
-                               $bcc);
+                               $bcc,
+                               $format);
           
           // We get an array back but it should only have one entry
           $ids[] = $r[0];
@@ -752,7 +764,8 @@ class CoNotification extends AppModel {
                              $fromAddress,
                              false,
                              $cc,
-                             $bcc);
+                             $bcc,
+                             $format);
           }
           catch(Exception $e) {
             throw new RuntimeException($e->getMessage());
@@ -894,6 +907,7 @@ class CoNotification extends AppModel {
    * @param  Boolean $resolution        If true, store a copy of the subject and email as the resolution message for the specified CO Notification (otherwise store as notification)
    * @param  String  $cc                Comma separated list of addresses to cc
    * @param  String  $bcc               Comma separated list of addresses to bcc
+   * @param  String  $format            Message Body format type it can be txt, html or both
    * @throws RuntimeException
    */
   
@@ -908,7 +922,8 @@ class CoNotification extends AppModel {
                                $fromAddress=null,
                                $resolution=false,
                                $cc=null,
-                               $bcc=null) {
+                               $bcc=null,
+                               $format=MessageFormatEnum::Plaintext) {
     // Create the message subject and body based on the templates.
     
     $msgBody = "";
@@ -948,17 +963,45 @@ class CoNotification extends AppModel {
       
       // Add cc and bcc if specified
       if($cc) {
-        $email->cc(explode(',', $cc));
+        $email->cc(array_map('trim', explode(',', $cc)));
       }
       
       if($bcc) {
-        $email->bcc(explode(',', $bcc));
+        $email->bcc(array_map('trim', explode(',', $bcc)));
       }
-      
-      $email->emailFormat('text')
-            ->to($recipient)
-            ->subject($msgSubject)
-            ->send($msgBody);
+
+      if($format === MessageFormatEnum::PlaintextAndHTML
+         && is_array($msgBody)) {
+        $viewVariables = array(
+          MessageFormatEnum::Plaintext  => $msgBody[MessageFormatEnum::Plaintext],
+          MessageFormatEnum::HTML => $msgBody[MessageFormatEnum::HTML],
+        );
+        $msgBody = $msgBody[MessageFormatEnum::Plaintext];
+      } elseif($format === MessageFormatEnum::HTML
+               && is_array($msgBody)) {
+        $viewVariables = array(
+          MessageFormatEnum::HTML => $msgBody[MessageFormatEnum::HTML],
+        );
+        $msgBody = $msgBody[MessageFormatEnum::HTML];
+      } else {
+        if(is_array($msgBody)) {
+          $viewVariables = array(
+            MessageFormatEnum::Plaintext => $msgBody[MessageFormatEnum::Plaintext],
+          );
+          $msgBody = $msgBody[MessageFormatEnum::Plaintext];
+        } else {
+          $viewVariables = array(
+            MessageFormatEnum::Plaintext => $msgBody,
+          );
+        }
+      }
+
+      $email->template('custom', 'basic')
+        ->emailFormat($format)
+        ->to($recipient)
+        ->viewVars($viewVariables)
+        ->subject($msgSubject);
+      $email->send();
       
       // Store a copy of this message in the appropriate place
       
@@ -980,7 +1023,7 @@ class CoNotification extends AppModel {
     }
     catch(Exception $e) {
       // Should we really abort all notifications if a send fails? Probably not...
-      throw new RuntimeException($e->getMessage());
+      throw new RuntimeException($e->getMessage() . PHP_EOL . _txt('er.nt.send-a', array($recipient)));
     }
   }
 }

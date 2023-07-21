@@ -81,7 +81,80 @@ class OrgIdentitiesController extends StandardController {
     'TelephoneNumber',
     'Url'
   );
-  
+
+  /**
+   * Alphabet Search Bar configuration
+   *
+   * @since  COmanage Registry v4.0.0
+   */
+
+  public function alphabetSearchConfig($action)
+  {
+    $supported_views = array('index', 'find');
+    if(in_array($action, $supported_views)) {
+      return array(
+        'search.familyNameStart' => array(
+          'label' => _txt('me.alpha.label'),
+        ),
+      );
+    }
+  }
+
+  /**
+   * Search Block fields configuration
+   *
+   * @since  COmanage Registry v4.0.0
+   */
+
+  public function searchConfig($action) {
+    $supported_views = array('index', 'find');
+    if(in_array($action, $supported_views)) {
+      return array(
+        'search.givenName' => array(              // 1st row, left column
+          'label' => _txt('fd.name.given'),
+          'type' => 'text',
+        ),
+        'search.organization' => array(          // 1st row, right column
+          'label' => _txt('fd.o'),
+          'type' => 'text',
+        ),
+        'search.familyName' => array(           // 2nd row, left column
+          'label' => _txt('fd.name.family'),
+          'type' => 'text',
+        ),
+        'search.orgIdentitySource' => array(    // 2nd row, right column
+          'label' => _txt('ct.org_identity_sources.1'),
+          'type' => 'select',
+          'empty'   => _txt('op.select.all'),
+          'options' => $this->viewVars['vv_org_id_sources'],
+        ),
+        'search.mail' => array(                // 3rd row, left column
+          'label' => _txt('fd.email_address.mail'),
+          'type' => 'text',
+        ),
+        'search.department' => array(          // 3rd row, right column
+          'label' => _txt('fd.ou'),
+          'type' => 'text',
+        ),
+        'search.identifier' => array(          // 4th row, left column
+          'label' => _txt('fd.identifier.identifier'),
+          'type' => 'text',
+        ),
+        'search.affiliation' => array(         // 4th row, right column
+          'label' => _txt('fd.affiliation'),
+          'type' => 'select',
+          'empty'   => _txt('op.select.all'),
+          'options' => _txt('en.org_identity.affiliation'),
+        ),
+        'search.title' => array(              // 5th row, left column
+          'label' => _txt('fd.title'),
+          'type' => 'text',
+        ),
+      );
+    }
+  }
+
+
   /**
    * Callback before other controller methods are invoked or views are rendered.
    * - postcondition: requires_co possibly set
@@ -113,22 +186,41 @@ class OrgIdentitiesController extends StandardController {
     $coId = null;
     
     if($this->requires_co) {
-      $coId = $this->cur_co['Co']['id'];
+      $coId = isset($this->cur_co['Co']['id']) ? $this->cur_co['Co']['id'] : -1;
     }
     
-    $enums_o = $this->AttributeEnumeration->active($coId, "OrgIdentity.o");
-    $this->set('vv_enums_o', $enums_o);
+    $enums = array();
     
-    $enums_ou = $this->AttributeEnumeration->active($coId, "OrgIdentity.ou");
-    $this->set('vv_enums_ou', $enums_ou);
+    $enums_o = $this->AttributeEnumeration->enumerations($coId, "OrgIdentity.o");
     
-    $enums_title = $this->AttributeEnumeration->active($coId, "OrgIdentity.title");
-    $this->set('vv_enums_title', $enums_title);
+    if(!empty($enums_o)) {
+      $enums['OrgIdentity.o'] = $enums_o;
+    }
+    
+    $enums_ou = $this->AttributeEnumeration->enumerations($coId, "OrgIdentity.ou");
+    
+    if(!empty($enums_ou)) {
+      $enums['OrgIdentity.ou'] = $enums_ou;
+    }
+    
+    $enums_title = $this->AttributeEnumeration->enumerations($coId, "OrgIdentity.title");
+    
+    if(!empty($enums_title)) {
+      $enums['OrgIdentity.title'] = $enums_title;
+    }
+    
+    $this->set('vv_enums', $enums);
     
     if(!empty($this->viewVars['vv_tz'])) {
       // Set the current timezone, primarily for beforeSave
       $this->OrgIdentity->setTimeZone($this->viewVars['vv_tz']);
     }
+    
+    // Dynamically adjust validation rules to include the current CO ID for dynamic types.
+
+    $vrule = $this->OrgIdentity->validate['affiliation']['content']['rule'];
+    $vrule[1]['coid'] = isset($this->cur_co['Co']['id']) ? $this->cur_co['Co']['id'] : -1;
+    $this->OrgIdentity->validator()->getField('affiliation')->getRule('content')->rule = $vrule;
   }
   
   /**
@@ -146,7 +238,7 @@ class OrgIdentitiesController extends StandardController {
     $args = array();
     $args['conditions']['OrgIdentitySource.status'] = SuspendableStatusEnum::Active;
     if(!$this->viewVars['pool_org_identities']) {
-      $args['conditions']['OrgIdentitySource.co_id'] = $this->cur_co['Co']['id'];
+      $args['conditions']['OrgIdentitySource.co_id'] = isset($this->cur_co['Co']['id']) ? $this->cur_co['Co']['id'] : -1;
     }
     $args['fields'] = array('id', 'description');
     $args['contain'] = false;
@@ -179,6 +271,25 @@ class OrgIdentitiesController extends StandardController {
       $args['contain'] = false;
       
       $this->set('vv_co_person_roles', $this->OrgIdentity->PipelineCoPersonRole->find('first', $args));
+      
+      // Pull the list of linkable CO IDs from the model, then filter list according to
+      // current user being CMP admin or CO admin
+      
+      $cos = array();
+      
+      if($this->Role->identifierIsCmpAdmin($this->Session->read('Auth.User.username'))) {
+        // CMP Admins can do any linking, at least for now
+        
+        $cos = $this->OrgIdentity->linkableCos($this->request->params['pass'][0]);
+      } else {
+        foreach($this->OrgIdentity->linkableCos($this->request->params['pass'][0]) as $coid => $coname) {
+          if($this->Role->isCoAdmin($this->Session->read('Auth.User.co_person_id'), $coid)) {
+            $cos[$coid] = $coname;
+          }
+        }
+      }
+      
+      $this->set('vv_linkable_cos', $cos);
     }
     
     if(!$this->request->is('restful') && !empty($this->cur_co['Co']['id'])) {
@@ -188,6 +299,8 @@ class OrgIdentitiesController extends StandardController {
       $this->set('vv_identifiers_types', $this->OrgIdentity->Identifier->types($this->cur_co['Co']['id'], 'type'));
       $this->set('vv_telephone_numbers_types', $this->OrgIdentity->TelephoneNumber->types($this->cur_co['Co']['id'], 'type'));
       $this->set('vv_urls_types', $this->OrgIdentity->Url->types($this->cur_co['Co']['id'], 'type'));
+      // We intentionally use CoPersonRole types
+      $this->set('vv_affiliation_types', $this->OrgIdentity->types($this->cur_co['Co']['id'], 'affiliation'));
     }
     
     parent::beforeRender();
@@ -243,44 +356,6 @@ class OrgIdentitiesController extends StandardController {
     
     return true;
   }
-
-  /**
-   * Generate the edit view.
-   * - precondition: <id> must exist
-   * - postcondition: $<object>s set (with one member) if found
-   * - postcondition: HTTP status returned (REST)
-   * - postcondition: Session flash message updated (HTML) on suitable error
-   *
-   * @since  COmanage Registry v0.9.1
-   * @param  Integer Org Identity identifier
-   */
-  
-  public function edit($id) {
-    // We mostly want the standard behavior, but we need to determine if the org
-    // identity is eligible to be linked into any CO and if so provide that info
-    // to the view.
-    
-    parent::edit($id);
-    
-    // Pull the list of linkable CO IDs from the model, then filter list according to
-    // current user being CMP admin or CO admin
-    
-    $cos = array();
-    
-    if($this->Role->identifierIsCmpAdmin($this->Session->read('Auth.User.username'))) {
-      // CMP Admins can do any linking, at least for now
-      
-      $cos = $this->OrgIdentity->linkableCos($id);
-    } else {
-      foreach($this->OrgIdentity->linkableCos($id) as $coid => $coname) {
-        if($this->Role->isCoAdmin($this->Session->read('Auth.User.co_person_id'), $coid)) {
-          $cos[$coid] = $coname;
-        }
-      }
-    }
-    
-    $this->set('vv_linkable_cos', $cos);
-  }
   
   /**
    * Find an organizational identity to add to the co $coid.  This method doesn't add or
@@ -295,7 +370,8 @@ class OrgIdentitiesController extends StandardController {
   
   function find() {
     $coid = null;
-    
+
+    // Query required for the title construction
     if(!empty($this->request->params['named']['copersonid'])) {
       // Find the CO Person name
       $args = array();
@@ -327,17 +403,53 @@ class OrgIdentitiesController extends StandardController {
     $this->set('cur_co', $this->Co->find('first', $args));
     
     // Use server side pagination
-    
+
+    $local = $this->paginationConditions();
+
+    // XXX We could probaby come up with a better approach than manually enumerating
+    // each field we want to copy...
+    if(!empty($local['conditions'])) {
+      $this->paginate['conditions'] = $local['conditions'];
+    }
+
+    if(!empty($local['fields'])) {
+      $this->paginate['fields'] = $local['fields'];
+    }
+
+    if(!empty($local['group'])) {
+      $this->paginate['group'] = $local['group'];
+    }
+
+    if(!empty($local['joins'])) {
+      $this->paginate['joins'] = $local['joins'];
+    }
+
+    if(isset($local['contain'])) {
+      $this->paginate['contain'] = $local['contain'];
+    } elseif(isset($this->view_contains)) {
+      $this->paginate['contain'] = $this->view_contains;
+    }
+
+    // Used either to enumerate which fields can be used for sorting, or
+    // explicitly naming sortable fields for complex relations (ie: using
+    // linkable behavior).
+    $sortlist = array();
+
+    if(!empty($local['sortlist'])) {
+      $sortlist = $local['sortlist'];
+    }
+
     $this->Paginator->settings = $this->paginate;
-    $this->Paginator->settings['contain'] = $this->view_contains;
-    
+
     if(!isset($this->viewVars['pool_org_identities'])
        || !$this->viewVars['pool_org_identities']) {
       $this->set('org_identities',
-                 $this->Paginator->paginate('OrgIdentity',
-                                      array("OrgIdentity.co_id" => $this->cur_co['Co']['id'])));
+                 $this->Paginator->paginate(
+                   'OrgIdentity',
+                   array("OrgIdentity.co_id" => $this->cur_co['Co']['id']),
+                   $sortlist));
     } else {
-      $this->set('org_identities', $this->Paginator->paginate('OrgIdentity'));
+      $this->set('org_identities', $this->Paginator->paginate('OrgIdentity', array(), $sortlist));
     }
   }
   
@@ -390,33 +502,42 @@ class OrgIdentitiesController extends StandardController {
    */
   
   public function generateHistory($action, $newdata, $olddata) {
+    $actorCoPersonId = $this->request->is('restful') ? null : $this->Session->read('Auth.User.co_person_id');
+    $actorApiUserId = $this->request->is('restful') ? $this->Auth->User('id') : null;
+
     switch($action) {
       case 'add':
         $this->OrgIdentity->HistoryRecord->record(null,
                                                   null,
                                                   $this->OrgIdentity->id,
-                                                  $this->Session->read('Auth.User.co_person_id'),
-                                                  ActionEnum::OrgIdAddedManual);
+                                                  $actorCoPersonId,
+                                                  ActionEnum::OrgIdAddedManual,
+                                                  null, null, null, null,
+                                                  $actorApiUserId);
         break;
       case 'delete':
         $this->OrgIdentity->HistoryRecord->record(null,
                                                   null,
                                                   $this->OrgIdentity->id,
-                                                  $this->Session->read('Auth.User.co_person_id'),
-                                                  ActionEnum::OrgIdDeletedManual);
+                                                  $actorCoPersonId,
+                                                  ActionEnum::OrgIdDeletedManual,
+                                                  null, null, null, null,
+                                                  $actorApiUserId);
         break;
       case 'edit':
+        $comment = _txt('en.action', null, ActionEnum::OrgIdEditedManual)
+          . ": "
+          . $this->OrgIdentity->changesToString(
+            $newdata, $olddata, (!empty($this->cur_co['Co']['id']) ? $this->cur_co['Co']['id'] : null)
+          );
         $this->OrgIdentity->HistoryRecord->record(null,
                                                   null,
                                                   $this->OrgIdentity->id,
-                                                  $this->Session->read('Auth.User.co_person_id'),
+                                                  $actorCoPersonId,
                                                   ActionEnum::OrgIdEditedManual,
-                                                  _txt('en.action', null, ActionEnum::OrgIdEditedManual) . ": " .
-                                                  $this->OrgIdentity->changesToString($newdata,
-                                                                                      $olddata,
-                                                                                      (!empty($this->cur_co['Co']['id'])
-                                                                                       ? $this->cur_co['Co']['id']
-                                                                                       : null)));
+                                                  $comment,
+                                                  null, null, null,
+                                                  $actorApiUserId);
         break;
     }
     
@@ -543,12 +664,12 @@ class OrgIdentitiesController extends StandardController {
       
       // Delete an existing Org Identity?
       $p['delete'] = ($roles['cmadmin']
-                      || ($managed && ($roles['coadmin'] || $roles['couadmin'])));
+                      || $roles['coadmin'] || ($managed && $roles['couadmin']));
       
       // Edit an existing Org Identity?
       $p['edit'] = !$readOnly
                    && ($roles['cmadmin']
-                       || ($managed && ($roles['coadmin'] || $roles['couadmin'])));
+                       || $roles['coadmin'] || ($managed && $roles['couadmin']));
       
       // Find an Org Identity to add to a CO?
       $p['find'] = ($roles['cmadmin'] || $roles['coadmin'] || $roles['couadmin']);
@@ -560,7 +681,7 @@ class OrgIdentitiesController extends StandardController {
       
       // View history? This correlates with HistoryRecordsController
       $p['history'] = ($roles['cmadmin']
-                       || ($managed && ($roles['coadmin'] || $roles['couadmin'])));
+                       || $roles['coadmin'] || ($managed && $roles['couadmin']));
       
       // View all existing Org Identity?
       $p['index'] = ($roles['cmadmin'] || $roles['coadmin'] || $roles['couadmin']);
@@ -583,7 +704,7 @@ class OrgIdentitiesController extends StandardController {
       
       // View petitions?
       $p['petitions'] = ($roles['cmadmin']
-                         || ($managed && ($roles['coadmin'] || $roles['couadmin'])));
+                         || $roles['coadmin'] || ($managed && $roles['couadmin']));
       
       // Run a pipeline? This correlates with CoPipelinesController
       // For now, this is only available to CMP and CO admins
@@ -591,12 +712,12 @@ class OrgIdentitiesController extends StandardController {
       
       // View an existing Org Identity?
       $p['view'] = ($roles['cmadmin']
-                    || ($managed && ($roles['coadmin'] || $roles['couadmin']))
+                    || $roles['coadmin'] || ($managed && $roles['couadmin'])
                     || $self);
       
       // View a Org Identity Source Record? (Matches OrgIdentitySourceRecordsController)
       $p['viewsource'] = ($roles['cmadmin']
-                          || ($managed && ($roles['coadmin'] || $roles['couadmin'])));
+                          || $roles['coadmin'] || ($managed && $roles['couadmin']));
     }
     
     $this->set('permissions', $p);
@@ -623,73 +744,90 @@ class OrgIdentitiesController extends StandardController {
     }
 
     // Filter by given name
-    if(!empty($this->params['named']['Search.givenName'])) {
-      $searchterm = strtolower($this->params['named']['Search.givenName']);
+    if(!empty($this->request->params['named']['search.givenName'])) {
+      $searchterm = $this->request->params['named']['search.givenName'];
+      $searchterm = strtolower(str_replace(urlencode("/"), "/", $searchterm));
       $pagcond['conditions']['LOWER(PrimaryName.given) LIKE'] = "%$searchterm%";
     }
 
     // Filter by Family name
-    if(!empty($this->params['named']['Search.familyName'])) {
-      $searchterm = strtolower($this->params['named']['Search.familyName']);
+    if(!empty($this->request->params['named']['search.familyName'])) {
+      $searchterm = $this->request->params['named']['search.familyName'];
+      $searchterm = strtolower(str_replace(urlencode("/"), "/", $searchterm));
       $pagcond['conditions']['LOWER(PrimaryName.family) LIKE'] = "%$searchterm%";
     }
 
+    // Filter by start of Primary Family name (starts with searchterm)
+    if(!empty($this->request->params['named']['search.familyNameStart'])) {
+      $searchterm = strtolower($this->request->params['named']['search.familyNameStart']);
+      $searchterm = str_replace(urlencode("/"), "/", $searchterm);
+      $pagcond['conditions']['LOWER(PrimaryName.family) LIKE'] = "$searchterm%";
+    }
+
     // Filter by Organization
-    if(!empty($this->params['named']['Search.organization'])) {
-      $searchterm = strtolower($this->params['named']['Search.organization']);
-      $pagcond['conditions']['LOWER(OrgIdentity.o) LIKE'] = "%$searchterm%";
+    if(!empty($this->request->params['named']['search.organization'])) {
+      // XXX CO-2171
+      // XXX Temporary solution which will be removed in v5.0.0
+      $searchterm = $this->request->params['named']['search.organization'];
+      $dbc = $this->OrgIdentity->getDataSource();
+      if ($dbc->config['datasource'] === 'Database/Postgres') {
+        $pagcond['conditions']['OrgIdentity.o iLIKE'] = "%$searchterm%";
+      } else {
+        // XXX In MySQL, SQL patterns are case-insensitive by default
+        // Note that SQLite LIKE operator is case-insensitive. It means "A" LIKE "a" is true.
+        $pagcond['conditions']['OrgIdentity.o LIKE'] = "%$searchterm%";
+      }
     }
 
     // Filter by Department
-    if(!empty($this->params['named']['Search.department'])) {
-      $searchterm = strtolower($this->params['named']['Search.department']);
+    if(!empty($this->request->params['named']['search.department'])) {
+      $searchterm = strtolower($this->request->params['named']['search.department']);
+      $searchterm = str_replace(urlencode("/"), "/", $searchterm);
       $pagcond['conditions']['LOWER(OrgIdentity.ou) LIKE'] = "%$searchterm%";
     }
 
     // Filter by title
-    if(!empty($this->params['named']['Search.title'])) {
-      $searchterm = strtolower($this->params['named']['Search.title']);
+    if(!empty($this->request->params['named']['search.title'])) {
+      $searchterm = strtolower($this->request->params['named']['search.title']);
+      $searchterm = str_replace(urlencode("/"), "/", $searchterm);
       $pagcond['conditions']['LOWER(OrgIdentity.title) LIKE'] = "%$searchterm%";
     }
 
     // Filter by affiliation
-    if(!empty($this->params['named']['Search.affiliation'])) {
-      $searchterm = strtolower($this->params['named']['Search.affiliation']);
+    if(!empty($this->request->params['named']['search.affiliation'])) {
+      $searchterm = strtolower($this->request->params['named']['search.affiliation']);
+      $searchterm = str_replace(urlencode("/"), "/", $searchterm);
       $pagcond['conditions']['OrgIdentity.affiliation LIKE'] = "%$searchterm%";
     }
-    
+
+    $jcnt = 0;
     // Filter by email address
-    if(!empty($this->params['named']['Search.mail'])) {
-      $searchterm = strtolower($this->params['named']['Search.mail']);
+    if(!empty($this->request->params['named']['search.mail'])) {
+      $searchterm = strtolower($this->request->params['named']['search.mail']);
+      $searchterm = str_replace(urlencode("/"), "/", $searchterm);
       $pagcond['conditions']['LOWER(EmailAddress.mail) LIKE'] = "%$searchterm%";
-      $pagcond['joins'][] = array(
-        'table' => 'email_addresses',
-        'alias' => 'EmailAddress',
-        'type' => 'INNER',
-        'conditions' => array(
-          'EmailAddress.org_identity_id=OrgIdentity.id' 
-        )
-      );
+      $pagcond['joins'][$jcnt]['table'] = 'email_addresses';
+      $pagcond['joins'][$jcnt]['alias'] = 'EmailAddress';
+      $pagcond['joins'][$jcnt]['type'] = 'INNER';
+      $pagcond['joins'][$jcnt]['conditions'][0] = 'EmailAddress.org_identity_id=OrgIdentity.id';
+      $jcnt++;
     }
     
     // Filter by identifier
-    if(!empty($this->params['named']['Search.identifier'])) {
-      $searchterm = strtolower($this->params['named']['Search.identifier']);
+    if(!empty($this->request->params['named']['search.identifier'])) {
+      $searchterm = strtolower($this->request->params['named']['search.identifier']);
+      $searchterm = str_replace(urlencode("/"), "/", $searchterm);
       $pagcond['conditions']['LOWER(Identifier.identifier) LIKE'] = "%$searchterm%";
-      $pagcond['joins'][] = array(
-        'table' => 'identifiers',
-        'alias' => 'Identifier',
-        'type' => 'INNER',
-        'conditions' => array(
-          'Identifier.org_identity_id=OrgIdentity.id' 
-        )
-      );
+      $pagcond['joins'][$jcnt]['table'] = 'identifiers';
+      $pagcond['joins'][$jcnt]['alias'] = 'Identifier';
+      $pagcond['joins'][$jcnt]['type'] = 'INNER';
+      $pagcond['joins'][$jcnt]['conditions'][0] = 'Identifier.org_identity_id=OrgIdentity.id';
     }
     
     // Filter by org identity source
-    if(!empty($this->params['named']['Search.orgIdentitySource'])) {
+    if(!empty($this->request->params['named']['search.orgIdentitySource'])) {
       // Cake will auto-join the table
-      $pagcond['conditions']['OrgIdentitySourceRecord.org_identity_source_id'] = $this->params['named']['Search.orgIdentitySource'];
+      $pagcond['conditions']['OrgIdentitySourceRecord.org_identity_source_id'] = $this->request->params['named']['search.orgIdentitySource'];
     }
     
     return $pagcond;
@@ -719,28 +857,36 @@ class OrgIdentitiesController extends StandardController {
    * Insert search parameters into URL for index.
    * - postcondition: Redirect generated
    *
+   * @todo Duplicate CoPeopleController/move to StandardController
    * @since  COmanage Registry v0.8
    */
   
   function search() {
-    // the page we will redirect to
-    $url['action'] = 'index';
-     
-    // build a URL will all the search elements in it
-    // the resulting URL will be 
-    // example.com/registry/org_identities/index/Search.givenName:albert/Search.familyName:einstein
-    foreach ($this->data['Search'] as $field=>$value){
-      if(!empty($value))
-        $url['Search.'.$field] = $value; 
+    // Construct the URL based on the action mode we're in (find, index)
+    $action = key($this->data['RedirectAction']);
+
+    $url['action'] = $action;
+    foreach($this->data[$action] as $key => $value) {
+      // pass parameters
+      if(is_int($key) && isset($value['pass'])) {
+        array_push($url, filter_var($value['pass'], FILTER_SANITIZE_SPECIAL_CHARS));
+      } else {
+        foreach ($value as $knamed => $vnamed) {
+          $url[$knamed] = filter_var($vnamed, FILTER_SANITIZE_SPECIAL_CHARS);
+        }
+      }
     }
 
-    if($this->requires_co) {
-      // Include CO
-      $url['co'] = $this->cur_co['Co']['id'];
-    } else {
-      // We need a final parameter so email addresses don't get truncated as file extensions (CO-1271)
-      $url['op'] = 'search';
+    // Append the URL with all the search elements; the resulting URL will be similar to
+    // example.com/registry/co_people/index/search.givenName:albert/search.familyName:einstein
+    foreach($this->data['search'] as $field=>$value){
+      if(!empty($value)) {
+        $url['search.'.$field] = $value;
+      }
     }
+
+    // We need a final parameter so email addresses don't get truncated as file extensions (CO-1271)
+    $url = array_merge($url, array('op' => 'search'));
     
     // redirect the user to the url
     $this->redirect($url, null, true);

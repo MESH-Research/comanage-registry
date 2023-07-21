@@ -53,6 +53,17 @@
   <?php print _txt('in.orgid.co'); ?>
 </div>
 
+<?php // Load the top search bar
+// Search Block
+if(!empty($vv_search_fields)) {
+  print $this->element('search', array('vv_search_fields' => $vv_search_fields));
+}
+// Alphabet Search quick access bar
+if(!empty($vv_alphabet_search)) {
+  print $this->element('alphabetSearch', array('vv_alphabet_search_config' => $vv_alphabet_search));
+}
+?>
+
 <div class="table-container">
   <table id="org_identities">
     <thead>
@@ -100,14 +111,14 @@
                                                'action' => 'link',
                                                filter_var($this->request->params['named']['copersonid'],FILTER_SANITIZE_SPECIAL_CHARS),
                                                'orgidentityid' => $p['OrgIdentity']['id']),
-                                         array('class' => 'linkbutton'));
+                                         array('class' => 'linkbutton spin lightbox'));
             } else {
               print $this->Html->link(_txt('op.inv'),
                                          array('controller' => 'co_people',
                                                'action' => 'invite',
                                                'orgidentityid' => $p['OrgIdentity']['id'],
                                                'co' => $cur_co['Co']['id']),
-                                         array('class' => 'invitebutton'));
+                                         array('class' => 'invitebutton spin'));
             }
           }
         ?></td>

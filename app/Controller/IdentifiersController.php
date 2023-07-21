@@ -43,6 +43,7 @@ class IdentifiersController extends MVPAController {
     'CoDepartment',
     'CoPerson' => array('PrimaryName'),
     'CoProvisioningTarget',
+    'Organization',
     'OrgIdentity' => array('PrimaryName')
   );
 
@@ -50,6 +51,7 @@ class IdentifiersController extends MVPAController {
     'CoDepartment',
     'CoPerson' => array('PrimaryName'),
     'CoProvisioningTarget',
+    'Organization',
     'OrgIdentity' => array('OrgIdentitySourceRecord' => array('OrgIdentitySource'),
                            'PrimaryName'),
     'SourceIdentifier'
@@ -67,8 +69,11 @@ class IdentifiersController extends MVPAController {
   function assign() {
     $objType = null; // "CoDepartment", "CoGroup", or "CoPerson"
     $objId = null;   // $objType::id
+    $actorCoPersonId = null;
+    $actorApiUserId = null;
     
     if($this->request->is('restful')) {
+      $actorApiUserId = $this->Auth->User('id');
       $this->Api->parseRestRequestDocument();
       
       $reqdata = $this->Api->getData();
@@ -89,19 +94,21 @@ class IdentifiersController extends MVPAController {
       
       $coid = $this->cur_co['Co']['id'];
     } else {
+      // Set the actor to the current user id
+      $actorCoPersonId = $this->Session->read('Auth.User.co_person_id');
       // While the controller doesn't require_co, this method does.
-      
-      // parseCOID (via calculateImpliedCoId) will use copersonid, cogroupid, or deptid to map the coid
-      $coid = $this->parseCOID($this->request->data);
-      if(!empty($this->request->params['named']['copersonid'])) {
-        $objType = 'CoPerson';
-        $objId = filter_var($this->request->params['named']['copersonid'],FILTER_SANITIZE_SPECIAL_CHARS);
-      } elseif(!empty($this->request->params['named']['cogroupid'])) {
-        $objType = 'CoGroup';
-        $objId = filter_var($this->request->params['named']['cogroupid'],FILTER_SANITIZE_SPECIAL_CHARS);
-      } elseif(!empty($this->request->params['named']['codeptid'])) {
-        $objType = 'CoDepartment';
-        $objId = filter_var($this->request->params['named']['codeptid'],FILTER_SANITIZE_SPECIAL_CHARS);
+      $coid = $this->cur_co['Co']['id'];
+      $named_param_list = array(
+        'CoGroup' => 'cogroupid',
+        'CoPerson' => 'copersonid',
+        'CoDepartment' => 'codeptid',
+      );
+      foreach($named_param_list as $mdl => $nparam_val) {
+        if(!empty($this->request->params['named'][$nparam_val])) {
+          $objType = $mdl;
+          $objId = filter_var($this->request->params['named'][$nparam_val],FILTER_SANITIZE_SPECIAL_CHARS);
+          break;
+        }
       }
     }
 
@@ -109,9 +116,10 @@ class IdentifiersController extends MVPAController {
       // Assign the identifiers, then walk through the result array and generate a flash message
       $res = $this->Identifier->assign($objType,
                                        $objId,
-                                       $this->Session->read('Auth.User.co_person_id'),
+                                       $actorCoPersonId,
                                        // CoDepartment is not currently provisioned
-                                       ($objType != 'CoDepartment'));
+                                       ($objType != 'CoDepartment'),
+                                       $actorApiUserId);
       
       if(!empty($res)) {
         // Loop through the results and build result messages
@@ -120,15 +128,23 @@ class IdentifiersController extends MVPAController {
         $errArray = array();    // ... and as an array for the API
         $assigned = array();    // Identifiers that were assigned
         $existed = array();     // Identifiers that already existed
+        $ineligible = array();  // Identifiers that are not eligible to be assigned
         
         foreach(array_keys($res) as $type) {
-          if($res[$type] == 2) {
-            $existed[] = $type;
-          } elseif($res[$type] == 1) {
-            $assigned[] = $type;
-          } else {
-            $errs .= $type . ": " . $res[$type] . "<br />\n";
-            $errArray[$type] = $res[$type];
+          switch($res[$type]) {
+            case 1:
+              $assigned[] = $type;
+              break;
+            case 2:
+              $existed[] = $type;
+              break;
+            case 3:
+              $ineligible[] = $type;
+              break;
+            default:
+              $errs .= $type . ": " . $res[$type] . "<br />\n";
+              $errArray[$type] = $res[$type];
+              break;
           }
         }
         
@@ -151,6 +167,11 @@ class IdentifiersController extends MVPAController {
           
           if(!empty($existed)) {
             $this->Flash->set(_txt('er.ia.already') . " (" . implode(',', $existed) . ")",
+                              array('key' => 'information'));
+          }
+          
+          if(!empty($ineligible)) {
+            $this->Flash->set(_txt('er.ia.gr.mem') . " (" . implode(',', $ineligible) . ")",
                               array('key' => 'information'));
           }
         }

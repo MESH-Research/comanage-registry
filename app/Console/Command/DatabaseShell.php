@@ -30,7 +30,7 @@
 
   // App::import doesn't handle this correctly
   require(APP . '/Vendor/adodb5/adodb.inc.php');
-  require(APP . '/Vendor/adodb5/adodb-xmlschema03.inc.php');
+  require_once(APP . '/Vendor/adodb5/adodb-xmlschema03.inc.php');
   
   // On some installs, AppController isn't loaded by App::import
   require(APP . '/Controller/AppController.php');
@@ -57,6 +57,12 @@
       }
 
       $dbc = ADONewConnection($db_driverName);
+      if (Configure::read('debug') >= 2) {
+        $dbc->debug = true;
+      }
+      if(isset($db->config['port'])) {
+        $dbc->port = (int)$db->config['port'];
+      }
       
       if($dbc->Connect($db->config['host'],
                        $db->config['login'],
@@ -118,7 +124,7 @@
             $xml->load($schemaFile);
   
             $xsl = new DOMDocument;
-            $xsl->load(APP . '/Config/Schema/boolean_mysql.xsl');
+            $xsl->load(APP . '/Config/Schema/transform_mysql.xsl');
   
             $proc = new XSLTProcessor;
             $proc->importStyleSheet($xsl);

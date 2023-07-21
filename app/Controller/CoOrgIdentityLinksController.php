@@ -134,14 +134,19 @@ class CoOrgIdentityLinksController extends StandardController {
    */
   
   public function generateHistory($action, $newdata, $olddata) {
+    $actorCoPersonId = $this->request->is('restful') ? null : $this->Session->read('Auth.User.co_person_id');
+    $actorApiUserId = $this->request->is('restful') ? $this->Auth->User('id') : null;
+
     switch($action) {
       case 'add':
         // We try to record an Org Identity ID, but this will only exist for non-REST operations
         $this->CoOrgIdentityLink->CoPerson->HistoryRecord->record($newdata['CoOrgIdentityLink']['co_person_id'],
                                                                   null,
                                                                   $newdata['CoOrgIdentityLink']['org_identity_id'],
-                                                                  $this->Session->read('Auth.User.co_person_id'),
-                                                                  ActionEnum::CoPersonOrgIdLinked);
+                                                                  $actorCoPersonId,
+                                                                  ActionEnum::CoPersonOrgIdLinked,
+                                                                  null, null, null, null,
+                                                                  $actorApiUserId);
         break;
       case 'delete':
         // In most cases, unlinking preceeds deletion of an identity/person that will therefore
@@ -150,21 +155,27 @@ class CoOrgIdentityLinksController extends StandardController {
         $this->CoOrgIdentityLink->CoPerson->HistoryRecord->record($olddata['CoOrgIdentityLink']['co_person_id'],
                                                                   null,
                                                                   $olddata['CoOrgIdentityLink']['org_identity_id'],
-                                                                  $this->Session->read('Auth.User.co_person_id'),
-                                                                  ActionEnum::CoPersonOrgIdUnlinked);
+                                                                  $actorCoPersonId,
+                                                                  ActionEnum::CoPersonOrgIdUnlinked,
+                                                                  null, null, null, null,
+                                                                  $actorApiUserId);
         break;
       case 'edit':
         // An edit is a relink, or rather an unlink followed by a link.
         $this->CoOrgIdentityLink->CoPerson->HistoryRecord->record($olddata['CoOrgIdentityLink']['co_person_id'],
                                                                   null,
                                                                   $olddata['CoOrgIdentityLink']['org_identity_id'],
-                                                                  $this->Session->read('Auth.User.co_person_id'),
-                                                                  ActionEnum::CoPersonOrgIdUnlinked);
+                                                                  $actorCoPersonId,
+                                                                  ActionEnum::CoPersonOrgIdUnlinked,
+                                                                  null, null, null, null,
+                                                                  $actorApiUserId);
         $this->CoOrgIdentityLink->CoPerson->HistoryRecord->record($newdata['CoOrgIdentityLink']['co_person_id'],
                                                                   null,
                                                                   $newdata['CoOrgIdentityLink']['org_identity_id'],
-                                                                  $this->Session->read('Auth.User.co_person_id'),
-                                                                  ActionEnum::CoPersonOrgIdLinked);
+                                                                  $actorCoPersonId,
+                                                                  ActionEnum::CoPersonOrgIdLinked,
+                                                                  null, null, null, null,
+                                                                  $actorApiUserId);
         break;
     }
     
@@ -224,24 +235,20 @@ class CoOrgIdentityLinksController extends StandardController {
     
     // Determine what operations this user can perform
     
-    // Add a new Person Source?
-    $p['add'] = ($roles['cmadmin']
-                 || ($managed && $roles['coadmin']));
+    // Add a new Org Identity Link?
+    $p['add'] = ($roles['cmadmin'] || $roles['coadmin']);
     
-    // Delete an existing Person Source?
-    $p['delete'] = ($roles['cmadmin']
-                    || ($managed && $roles['coadmin']));
+    // Delete an existing Org Identity Link?
+    $p['delete'] = ($roles['cmadmin'] || $roles['coadmin']);
     
-    // Edit an existing Person Source?
-    $p['edit'] = ($roles['cmadmin']
-                  || ($managed && $roles['coadmin']));
+    // Edit an existing Org Identity Link?
+    $p['edit'] = ($roles['cmadmin'] || $roles['coadmin']);
     
-    // View all existing Person Sources?
-    $p['index'] = $roles['cmadmin'];
-          
-    // View an existing Person Source?
-    $p['view'] = ($roles['cmadmin']
-                  || ($managed && $roles['coadmin']));
+    // View all existing Org Identity Links?
+    $p['index'] = ($roles['cmadmin'] || $roles['coadmin']);
+    
+    // View an existing Org Identity Link?
+    $p['view'] = ($roles['cmadmin'] || $roles['coadmin']);
     
     $this->set('permissions', $p);
     return $p[$this->action];
@@ -271,6 +278,15 @@ class CoOrgIdentityLinksController extends StandardController {
                             'action' => 'canvas',
                             $this->request->data['CoOrgIdentityLink']['co_person_id']));
     } else {
+      if(isset($this->CoOrgIdentityLink->id)
+         && $this->CoOrgIdentityLink->field('deleted')) {
+        // We just unlinked the OrgIdentity from the CO Person. Get us back canvas
+        $this->redirect(array('controller' => 'co_people',
+                          'action' => 'canvas',
+                          $this->CoOrgIdentityLink->field('co_person_id')));
+      }
+
+      // Fallback. If all the rest fail, redirect to MyPopulation
       $this->redirect(array('controller' => 'co_people',
                             'action' => 'index',
                             'co' => filter_var($this->cur_co['Co']['id'],FILTER_SANITIZE_SPECIAL_CHARS)));

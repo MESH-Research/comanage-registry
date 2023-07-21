@@ -83,6 +83,23 @@ class CoGroupNestingsController extends StandardController {
     $args['contain'] = false;
     
     $this->set('vv_available_groups', $this->CoGroupNesting->CoGroup->find('list', $args));
+
+    // Provide the ID of the current group if available
+    if(isset($this->gid)) {
+      $this->set('vv_current_group', $this->gid);
+    }
+  }
+  
+  /**
+   * Generate a display key to be used in messages such as "Item Added".
+   *
+   * @since  COmanage Registry v4.1.0
+   * @param  Array A cached object (eg: from prior to a delete)
+   * @return string A string to be included for display.
+   */
+  function generateDisplayKey($c = null) {
+    // Here it's simplest to return the string "Group"
+    return _txt('ct.co_groups.1');
   }
   
   /**
@@ -119,6 +136,9 @@ class CoGroupNestingsController extends StandardController {
     
     // Construct the permission set for this user, which will also be passed to the view.
     $p = array();
+
+    // Get the groups listing
+    $p['index'] = $roles['cmadmin'] || $roles['coadmin'] || $roles['couadmin'];
     
     // Add a new nested group?
     $p['add'] = !$readOnly && ($roles['cmadmin'] || $roles['coadmin'] || $roles['couadmin']);
@@ -142,7 +162,7 @@ class CoGroupNestingsController extends StandardController {
     
     if(isset($this->gid)) {
       $params = array('controller' => 'co_groups',
-                      'action'     => 'edit',
+                      'action'     => 'nest',
                       $this->gid
                      );
     } else {

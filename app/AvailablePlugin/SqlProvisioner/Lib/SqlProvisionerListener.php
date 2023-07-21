@@ -37,6 +37,8 @@ class SqlProvisionerListener implements CakeEventListener {
 
   public function implementedEvents() {
     return array(
+      // This listener picks up changes to the reference data models (which
+      // normally do not trigger provisioning) in order to update the SP copies
       'Model.afterDelete' => 'syncReferenceData',
       'Model.afterSave'   => 'syncReferenceData'
     );
@@ -68,11 +70,16 @@ class SqlProvisionerListener implements CakeEventListener {
         } else {
           // Look up the CO ID
           $Model = ClassRegistry::init($subject->name);
-          
-          if(!empty($subject->id)) {
-            $coId = $Model->findCoForRecord($subject->id);
-          } elseif(!empty($subject->data[ $subject->name ]['id'])) {
-            $coId = $Model->findCoForRecord($subject->data[ $subject->name ]['id']);
+          try {
+            if(!empty($subject->id)) {
+              $coId = $Model->findCoForRecord($subject->id);
+            } elseif(!empty($subject->data[ $subject->name ]['id'])) {
+              $coId = $Model->findCoForRecord($subject->data[ $subject->name ]['id']);
+            }
+          } catch (Exception $e) {
+            // XXX After the CO hard delete action the findCoForRecord will always
+            //     fail.
+            return;
           }
         }
         

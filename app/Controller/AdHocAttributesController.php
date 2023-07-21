@@ -42,12 +42,14 @@ class AdHocAttributesController extends MVPAController {
   public $edit_contains = array(
     'CoDepartment',
     'CoPersonRole' => array('CoPerson' => 'PrimaryName'),
+    'Organization',
     'OrgIdentity' => array('PrimaryName')
   );
 
   public $view_contains = array(
     'CoDepartment',
     'CoPersonRole' => array('CoPerson' => 'PrimaryName'),
+    'Organization',
     'OrgIdentity' => array('OrgIdentitySourceRecord' => array('OrgIdentitySource'),
                            'PrimaryName'),
     'SourceAdHocAttribute'
@@ -187,15 +189,15 @@ class AdHocAttributesController extends MVPAController {
     
     // Add a new Ad Hoc Attribute?
     $p['add'] = ($roles['cmadmin']
-                 || ($managed && ($roles['coadmin'] || $roles['couadmin'])));
+                 || $roles['coadmin'] || ($managed && $roles['couadmin']));
     
     // Delete an existing Ad Hoc Attribute?
     $p['delete'] = ($roles['cmadmin']
-                    || ($managed && ($roles['coadmin'] || $roles['couadmin'])));
+                    || $roles['coadmin'] || ($managed && $roles['couadmin']));
     
     // Edit an existing Ad Hoc Attribute?
     $p['edit'] = ($roles['cmadmin']
-                  || ($managed && ($roles['coadmin'] || $roles['couadmin'])));
+                  || $roles['coadmin'] || ($managed && $roles['couadmin']));
     
     // View all existing Ad Hoc Attributes?
     // Currently only supported via REST since there's no use case for viewing all
@@ -203,7 +205,7 @@ class AdHocAttributesController extends MVPAController {
     
     // View an existing Ad Hoc Attribute?
     $p['view'] = ($roles['cmadmin']
-                  || ($managed && ($roles['coadmin'] || $roles['couadmin'])));
+                  || $roles['coadmin'] || ($managed && $roles['couadmin']));
     
     $this->set('permissions', $p);
     return $p[$this->action];

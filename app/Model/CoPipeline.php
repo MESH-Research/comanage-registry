@@ -137,14 +137,20 @@ class CoPipeline extends AppModel {
       'allowEmpty' => true
     ),
     'sync_cou_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'sync_replace_cou_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     ),
     'sync_status_on_delete' => array(
       'rule' => array('inList', array(StatusEnum::Deleted,
@@ -154,10 +160,20 @@ class CoPipeline extends AppModel {
       'required'   => false,
       'allowEmpty' => true
     ),
+    'sync_identifier_type' => array(
+      'content' => array(
+        'rule' => array('validateInput'),
+        'required' => false,
+        'allowEmpty' => true
+      )
+    ),
     'co_enrollment_flow_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     )
   );
   
@@ -327,6 +343,7 @@ class CoPipeline extends AppModel {
       }
       
       $coPersonId = $this->syncOrgIdentityToCoPerson($pipeline,
+                                                     $syncAction,
                                                      $orgIdentity,
                                                      $targetIds['co_person_id'],
                                                      $actorCoPersonId,
@@ -376,15 +393,19 @@ class CoPipeline extends AppModel {
         // request. Note we might not actually be updating any relevant attributes, but
         // for the moment this seems like the most logical place to do this.
         
-        $referenceId = $this->Co->OrgIdentity->OrgIdentitySourceRecord->field('reference_identifier',
-                                                                              array('OrgIdentitySourceRecord.id' => $oisRecordId));
+        $args = array();
+        $args['conditions']['OrgIdentitySourceRecord.id'] = $oisRecordId;
+        $args['contain'] = array('OrgIdentitySource');
         
-        if($referenceId) {
+        $oisRecord = $this->Co->OrgIdentity->OrgIdentitySourceRecord->find('first', $args);
+        
+        if(!empty($oisRecord['OrgIdentitySourceRecord']['reference_identifier'])) {
           // We use $referenceId as an indicator that this was a pipeline initiated
           // match request, but don't actually use it in the request.
           
           $this->Co->Server->MatchServer->updateMatchAttributes(
             $pipeline['CoPipeline']['match_server_id'],
+            $oisRecord['OrgIdentitySource']['sor_label'],
             $orgIdentityId
           );
         }
@@ -533,8 +554,22 @@ class CoPipeline extends AppModel {
       // On error, including 202, an exception is thrown and we don't continue.
       // If we get a Reference ID back, look for an existing CO Person with it.
       
+      $args = array();
+      $args['conditions']['OrgIdentity.id'] = $orgIdentityId;
+      $args['contain'] = array('OrgIdentitySourceRecord' => array('OrgIdentitySource'));
+      
+      $orgIdentity = $this->Co->OrgIdentity->find('first', $args);
+      
+      // We shouldn't get an error here since we already pulled the CO ID above.
+      // Maybe just move this call up there?
+      
+      if(empty($orgIdentity['OrgIdentitySourceRecord']['OrgIdentitySource']['sor_label'])) {
+        throw new InvalidArgumentException(_txt('er.match.attr.sor_label'));
+      }
+
       $referenceId = $this->Co->Server->MatchServer->requestReferenceIdentifier(
         $pipeline['CoPipeline']['match_server_id'],
+        $orgIdentity['OrgIdentitySourceRecord']['OrgIdentitySource']['sor_label'],
         $orgIdentityId
       );
       
@@ -581,8 +616,9 @@ class CoPipeline extends AppModel {
       $this->Co->CoPerson->CoOrgIdentityLink->clear();
       
       // CoOrgIdentityLink is not currently provisioner-enabled, but we'll disable
-      // provisioning just in case that changes in the future.
-      if(!$this->Co->CoPerson->CoOrgIdentityLink->save($coOrgLink, array("provision" => false))) {
+      // provisioning just in case that changes in the future. Also, Tell
+      // CoOrgIdentityLink not to run the pipeline since we're already in one.
+      if(!$this->Co->CoPerson->CoOrgIdentityLink->save($coOrgLink, array("provision" => false, "pipeline" => false))) {
         throw new RuntimeException(_txt('er.db.save-a', array('CoOrgIdentityLink')));
       }
       
@@ -596,7 +632,7 @@ class CoPipeline extends AppModel {
                                                  null,
                                                  $orgIdentityId,
                                                  $actorCoPersonId,
-                                                 ActionEnum::CoPersonMatchedPipelne,
+                                                 ActionEnum::CoPersonMatchedPipeline,
                                                  _txt('rs.pi.match', array($pipeline['CoPipeline']['name'],
                                                                            $pipeline['CoPipeline']['id'],
                                                                            _txt('en.match.strategy',
@@ -746,6 +782,7 @@ class CoPipeline extends AppModel {
    *
    * @since  COmanage Registry v2.0.0
    * @param  Array   $coPipeline       Array of CO Pipeline configuration
+   * @param  SyncActionEnum $syncAction Add, Update, or Delete
    * @param  Array   $orgIdentity      Array of Org Identity data and related models
    * @param  Integer $targetCoPersonId Target CO Person ID, if known
    * @param  Integer $actorCoPersonId  CO Person ID of actor
@@ -756,12 +793,13 @@ class CoPipeline extends AppModel {
    */
   
   protected function syncOrgIdentityToCoPerson($coPipeline, 
-                                            $orgIdentity, 
-                                            $targetCoPersonId=null, 
-                                            $actorCoPersonId=null,
-                                            $provision=true,
-                                            $oisRawRecord=null,
-                                            $safeties="on") {
+                                               $syncAction,
+                                               $orgIdentity, 
+                                               $targetCoPersonId=null, 
+                                               $actorCoPersonId=null,
+                                               $provision=true,
+                                               $oisRawRecord=null,
+                                               $safeties="on") {
     $coPersonId = $targetCoPersonId;
     $coPersonRoleId = null;
     $doProvision = false; // We did something provision-worthy
@@ -803,7 +841,10 @@ class CoPipeline extends AppModel {
       
       $this->Co->CoPerson->CoOrgIdentityLink->clear();
       
-      if(!$this->Co->CoPerson->CoOrgIdentityLink->save($orgLink, array("provision" => false, "safeties" => $safeties))) {
+      // Tell CoOrgIdentityLink not to run the pipeline since we're already in one
+      if(!$this->Co->CoPerson->CoOrgIdentityLink->save($orgLink, array("provision" => false, 
+                                                                       "pipeline"  => false,
+                                                                       "safeties" => $safeties))) {
         throw new RuntimeException(_txt('er.db.save-a', array('CoOrgIdentityLink')));
       }
       
@@ -874,15 +915,49 @@ class CoPipeline extends AppModel {
         'CoPersonRole' => array(
           'affiliation' => $affil,
           // Set the cou_id even if null so the diff operates correctly
-          'cou_id'        => $coPipeline['CoPipeline']['sync_cou_id'],
-          'o'             => $orgIdentity['OrgIdentity']['o'],
-          'ou'            => $orgIdentity['OrgIdentity']['ou'],
-          'title'         => $orgIdentity['OrgIdentity']['title'],
-          'valid_from'    => $orgIdentity['OrgIdentity']['valid_from'],
-          'valid_through' => $orgIdentity['OrgIdentity']['valid_through'],
-          'status'        => StatusEnum::Active
+          'cou_id'               => $coPipeline['CoPipeline']['sync_cou_id'],
+          'o'                    => $orgIdentity['OrgIdentity']['o'],
+          'ou'                   => $orgIdentity['OrgIdentity']['ou'],
+          'title'                => $orgIdentity['OrgIdentity']['title'],
+          'valid_from'           => $orgIdentity['OrgIdentity']['valid_from'],
+          'valid_through'        => $orgIdentity['OrgIdentity']['valid_through'],
+          'status'               => StatusEnum::Active,
+          // Note the inbound record will contain 'manager_identifier' and
+          // 'sponsor_identifier'. Those are populated below, these are so
+          // comparison against the CoPersonRole record works.
+          'manager_co_person_id' => null,
+          'sponsor_co_person_id' => null
         )
       );
+      
+      // If manager_identifier and/or sponsor_identifier are set, try to map
+      // them to an existing CO Person ID.
+      
+      foreach(array('manager', 'sponsor') as $r) {
+        if(!empty($orgIdentity['OrgIdentity'][$r.'_identifier'])) {
+          // Try to map the identifier to a CO Person ID
+          
+          $args = array();
+          $args['conditions']['Identifier.identifier'] = $orgIdentity['OrgIdentity'][$r.'_identifier'];
+          $args['conditions']['Identifier.status'] = SuspendableStatusEnum::Active;
+          if(!empty($coPipeline['CoPipeline']['sync_identifier_type'])) {
+            $args['conditions']['Identifier.type'] = $coPipeline['CoPipeline']['sync_identifier_type'];
+          }
+          $args['conditions'][] = 'Identifier.co_person_id IS NOT NULL';
+          $args['conditions']['CoPerson.co_id'] = $orgIdentity['OrgIdentity']['co_id'];
+          // We don't really need CoPerson but it makes it easier to filter on co_id
+          $args['contain'] = array('CoPerson');
+          
+          // The above conditions might match more than one Identifier, so we only
+          // look at the first.
+          $tIdentifier = $this->Co->CoPerson->Identifier->find('first', $args);
+          
+          if(!empty($tIdentifier)) {
+            $newCoPersonRole['CoPersonRole'][$r.'_co_person_id'] = $tIdentifier['Identifier']['co_person_id'];
+          }
+          // else just fail silently and process what we can
+        }
+      }
       
       // Next see if there is a role associated with this OrgIdentity.
       
@@ -894,8 +969,10 @@ class CoPipeline extends AppModel {
         foreach(array('id',
                       'affiliation',
                       'cou_id',
+                      'manager_co_person_id',
                       'o',
                       'ou',
+                      'sponsor_co_person_id',
                       'title',
                       'valid_from',
                       'valid_through',
@@ -921,6 +998,9 @@ class CoPipeline extends AppModel {
         } else {
           // No change, unset $newCoPersonRole to indicate not to bother saving
           $newCoPersonRole = array();
+          
+          // But note the coPersonRoleId so related model diffs calculate correctly.
+          $coPersonRoleId = $orgIdentity['PipelineCoPersonRole']['id'];
         }
       } else {
         // No current person role, so just save as is
@@ -1156,9 +1236,13 @@ class CoPipeline extends AppModel {
         // For email addresses, we generally want to honor the verified status,
         // *unless* we're configured to trigger an Enrollment Flow. In that
         // case, we need an unverified email address for the confirmation to be
-        // sent.
+        // sent, but only for add/relink (as per execute(), above).
         
-        $trustVerified = empty($coPipeline['CoPipeline']['co_enrollment_flow_id']);
+        $trustVerified = true;
+        
+        if($syncAction == SyncActionEnum::Add || $syncAction == SyncActionEnum::Relink) {
+          $trustVerified = empty($coPipeline['CoPipeline']['co_enrollment_flow_id']);
+        }
         
         if(!$model->save($nr, array("provision" => false,
                                     "safeties" => $safeties,

@@ -171,6 +171,23 @@ class CoInvitesController extends AppController {
                                                       filter_var($this->request->params['named']['copersonid'],FILTER_SANITIZE_SPECIAL_CHARS))));
       }
     }
+
+    if($this->action === "verifyEmailAddress" && !empty($this->request->params['named']['email_address_id'])) {
+      // Get CO Person ID from the Email entry
+      $this->EmailAddress->id = $this->request->params['named']['email_address_id'];
+      $co_person_id = $this->EmailAddress->field('co_person_id');
+
+      if($co_person_id) {
+        $coId = $this->EmailAddress->CoPerson->field('co_id', array('id' => $co_person_id));
+        if($coId) {
+          return $coId;
+        } else {
+          throw new InvalidArgumentException(_txt('er.notfound',
+                                                  array(_txt('ct.email_addresses.1'),
+                                                        filter_var($this->request->params['named']['email_address_id'],FILTER_SANITIZE_SPECIAL_CHARS))));
+        }
+      }
+    }
     
     return null;
   }
@@ -253,14 +270,22 @@ class CoInvitesController extends AppController {
     $roles = $this->Role->calculateCMRoles();
     
     $managed = false;
-    
+    $canRequestVerification = false;
+
+    // $managed
     if(!empty($roles['copersonid'])
        && $this->action == 'send'
        && !empty($this->request->params['named']['copersonid'])) {
       $managed = $this->Role->isCoOrCouAdminForCoPerson($roles['copersonid'],
                                                         $this->request->params['named']['copersonid']);
     }
-    
+
+    // $canRequestVerification
+    if(!empty($this->request->params['named']['email_address_id'])
+       && !empty($roles['copersonid'])) {
+      $canRequestVerification = $this->Role->canRequestVerificationOfEmailAddress($roles['copersonid'], $this->request->params['named']['email_address_id']);
+    }
+
     // Construct the permission set for this user, which will also be passed to the view.
     $p = array();
     
@@ -273,6 +298,7 @@ class CoInvitesController extends AppController {
     $p['authconfirm'] = true;
     
     // Verify an email address?
+    // We basically do the same thing as authconfirm().
     $p['authverify'] = true;
 
     // Confirm an invite? (HTML only)
@@ -289,18 +315,15 @@ class CoInvitesController extends AppController {
     
     // Send an invite? (HTML only)
     
-    $p['send'] = ($roles['cmadmin']
-                  || ($managed && ($roles['coadmin'] || $roles['couadmin'])));
+    $p['send'] = $roles['cmadmin']
+                 || $roles['coadmin']
+                 || ($managed && $roles['couadmin']);
     
     // Request verification of an email address?
     // This needs to correlate with EmailAddressesController
-    $p['verifyEmailAddress'] = (!empty($this->request->params['named']['email_address_id'])
-                                ? ($roles['cmadmin']
-                                   ||
-                                   $this->Role->canRequestVerificationOfEmailAddress($roles['copersonid'],
-                                                                                     $this->request->params['named']['email_address_id']))
-                                : false);
-    
+    $p['verifyEmailAddress'] = $roles['cmadmin']             // I am the Platform Administrator
+                               || $canRequestVerification;   // I have been given authorization to request the verification of the Email
+
     $this->set('permissions', $p);
     return $p[$this->action];
   }
@@ -481,24 +504,46 @@ class CoInvitesController extends AppController {
         
         $enrollmentFlow = $this->CoInvite->CoPetition->CoEnrollmentFlow->find('first', $args);
         
-        // Record the view to the petition history as well
-        $this->CoInvite->CoPetition->CoPetitionHistoryRecord->record($invite['CoPetition']['id'],
-                                                                     $invitee['CoPerson']['id'],
-                                                                     PetitionActionEnum::InviteViewed);
+        // Further complicating this code, as of v4.1.0 if the Enrollment Flow has
+        // regenerate_expired_verification set to true, and the invite has
+        // expired, we need to generate a new invitation here. (Normally, the
+        // validation of the invitation will check for the expiration.)
         
-        // Before we do anything else, check the verification mode. If it's Automatic,
-        // we simply redirect into confirm or authconfirm as appropriate. Otherwise,
-        // we want to render the confirmation page. (If the mode is now None, ie: the
-        // admin changed the mode for this enrollment flow, we could probably act like
-        // Automatic mode, but for now we'll leave it as Review.)
-        
-        if(isset($enrollmentFlow['CoEnrollmentFlow']['email_verification_mode'])
-           && $enrollmentFlow['CoEnrollmentFlow']['email_verification_mode'] == VerificationModeEnum::Automatic) {
-          $this->redirect(array(
-            'controller' => 'co_invites',
-            'action'     => $enrollmentFlow['CoEnrollmentFlow']['require_authn'] ? 'authconfirm' : 'confirm',
-            $inviteid
-          ));
+        if($enrollmentFlow['CoEnrollmentFlow']['regenerate_expired_verification']
+           && (time() > strtotime($invite['CoInvite']['expires']))) {
+          // Add a note to the petition history as well
+          $this->CoInvite->CoPetition->CoPetitionHistoryRecord->record($invite['CoPetition']['id'],
+                                                                       $invitee['CoPerson']['id'],
+                                                                       PetitionActionEnum::InviteViewed,
+                                                                       _txt('er.pt.conf.exp'));
+          
+          // This will expire the current invitation
+          $this->CoInvite->CoPetition->sendConfirmation($invite['CoPetition']['id'], $this->Session->read('Auth.User.co_person_id'));
+          
+          // Let the view render, but with a note
+          $this->set('vv_confirmation_expired', true);
+        } else {
+          // Record the view to the petition history as well
+          $this->CoInvite->CoPetition->CoPetitionHistoryRecord->record($invite['CoPetition']['id'],
+                                                                       $invitee['CoPerson']['id'],
+                                                                       PetitionActionEnum::InviteViewed);
+          
+          // Next, check the verification mode. If it's Automatic, we simply redirect
+          // into confirm or authconfirm as appropriate. Otherwise, we want to render
+          // the confirmation page. (If the mode is now None, ie: the admin changed
+          // the mode for this enrollment flow, we could probably act like Automatic
+          // mode, but for now we'll leave it as Review.)
+          
+          if(isset($enrollmentFlow['CoEnrollmentFlow']['email_verification_mode'])
+             && $enrollmentFlow['CoEnrollmentFlow']['email_verification_mode'] == VerificationModeEnum::Automatic) {
+            $this->redirect(array(
+              'controller' => 'co_invites',
+              'action'     => $enrollmentFlow['CoEnrollmentFlow']['require_authn'] ? 'authconfirm' : 'confirm',
+              $inviteid
+            ));
+          }
+          
+          $this->set('vv_confirmation_expired', false);
         }
         
         // Not in Automatic mode, so prep for the view to render
@@ -713,8 +758,7 @@ class CoInvitesController extends AppController {
         {
           if($this->request->is('restful'))
           {
-            // $this->Api->restResultHeader(201, "Sent");
-            $this->Api->restResultHeader(501, "Not Implemented");
+            $this->Api->restResultHeader(HttpStatusCodesEnum::HTTP_CREATED, "Sent");
             $this->set('co_invite_id', $this->CoInvite->id);
           }
           else
@@ -814,7 +858,7 @@ class CoInvitesController extends AppController {
                                     $this->Session->read('Auth.User.co_person_id'),
                                     $ea['EmailAddress']['mail'],
                                     null, // use default from address
-                                    (!empty($this->cur_co['Co']['name']) ? $this->cur_co['Co']['name'] : _txt('er.unknown')),
+                                    (!empty($this->cur_co['Co']['name']) ? $this->cur_co['Co']['name'] : _txt('er.unknown.def')),
                                     _txt('em.invite.subject.ver'),
                                     _txt('em.invite.body.ver'),
                                     $ea['EmailAddress']['id']);

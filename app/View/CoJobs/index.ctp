@@ -33,7 +33,20 @@
   $params['title'] = $title_for_layout;
   print $this->element("pageTitleAndButtons", $params);
 ?>
-
+<?php if(!empty($vv_lock_info)): ?>
+<div class="co-info-topbox">
+  <em class="material-icons">info</em>
+  <?php print _txt('in.job.running', array($vv_lock_info['Lock']['pid'], 
+                                           $vv_lock_info['Lock']['id'],
+                                           $this->Time->niceShort($vv_lock_info['Lock']['created'], $vv_tz))); ?>
+</div>
+<?php endif; // vv_lock_info ?>
+<?php
+  // Search Block
+  if(!empty($vv_search_fields)) {
+    print $this->element('search', array('vv_search_fields' => $vv_search_fields));
+  }
+?>
 <div class="table-container">
   <table id="co_jobs">
     <thead>
@@ -57,12 +70,7 @@
         </td>
         <td>
           <?php 
-            // XXX CO-1310 simplify
-            if(strlen($c['CoJob']['job_type'])==2) {
-              print _txt('en.job.type', null, $c['CoJob']['job_type']);
-            } else {
-              print filter_var($c['CoJob']['job_type'], FILTER_SANITIZE_SPECIAL_CHARS);
-            }
+            print filter_var($c['CoJob']['job_type'], FILTER_SANITIZE_SPECIAL_CHARS);
           ?>
         </td>
         <td><?php print $this->Html->link(_txt('en.status.job', null, $c['CoJob']['status']),

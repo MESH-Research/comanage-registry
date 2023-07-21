@@ -79,6 +79,12 @@
       'controller'    => 'data_filters',
       'action'        => 'index'
     ),
+    _txt('ct.dictionaries.pl') => array(
+      'icon'          => 'book',
+      'permissionKey' => 'dictionaries',
+      'controller'    => 'dictionaries',
+      'action'        => 'index'
+    ),
     _txt('ct.co_enrollment_flows.pl') => array(
       'icon'          => 'forward',
       'permissionKey' => 'coef',
@@ -174,6 +180,12 @@
       'permissionKey' => 'cothemes',
       'controller'    => 'co_themes',
       'action'        => 'index'
+    ),
+    _txt('ct.vetting_steps.pl') => array(
+      'icon'          => 'verified_user',
+      'permissionKey' => 'vettingsteps',
+      'controller'    => 'vetting_steps',
+      'action'        => 'index'
     )
   );
   
@@ -208,6 +220,14 @@
   );
 ?>
 
+<?php
+ $versionString = getenv('COMANAGE_REGISTRY_VERSION');
+ if($versionString === false) {
+  $versionString = chop(file_get_contents(CONFIG . "VERSION"));
+ }
+ print _txt('coordinate.version', array($versionString));
+?>
+
 <section class="inner-content">
   <?php
     // Configuration Dashboard
@@ -235,7 +255,11 @@
           $args['action'] = $cfg['action'];
           $args['co'] = $menuCoId;
 
-          print $this->Html->link($label, $args);
+          $opts = array(
+            'class' => 'spin',
+          );
+
+          print $this->Html->link($label, $args, $opts);
           print "</li>";
         }
       }

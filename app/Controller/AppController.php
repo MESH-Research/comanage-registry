@@ -106,13 +106,13 @@ class AppController extends Controller {
   /**
    * Callback before other controller methods are invoked or views are rendered.
    * - precondition:
-   * - postcondition: Auth component is configured 
+   * - postcondition: Auth component is configured
    * - postcondition:
    *
    * @since  COmanage Registry v0.1
    * @throws UnauthorizedException (REST)
    * @throws InvalidArgumentException
-   */   
+   */
   
   public function beforeFilter() {
     // Load plugin specific texts. We have to do this here because when lang.php is
@@ -123,18 +123,56 @@ class AppController extends Controller {
     // XXX CO-351 Placeholder
     $this->Session->write('Config.language', 'eng');
     Configure::write('Config.language', $this->Session->read('Config.language'));
+
+    // CSRF token should expire along with the Session. This is the default in CAKEPHP 3.7.x+
+    // https://book.cakephp.org/3/en/controllers/middleware.html#csrf-middleware
+    // https://github.com/cakephp/cakephp/issues/13532
+    // - expiry, How long the CSRF token should last. Defaults to browser session.
+    // XXX CO-2135
+    $this->Security->csrfUseOnce = false;
     
     // Tell the Auth module to call the controller's isAuthorized() function.
     $this->Auth->authorize = array('Controller');
     
     // Set the redirect and error message for auth failures. Note that we can generate
     // a stack trace instead of a redirect by setting unauthorizedRedirect to false.
-    $this->Auth->unauthorizedRedirect = "/";
-    $this->Auth->authError = _txt('er.permission');
-    // Default flash key is 'auth', switch to 'error' so it maps to noty's default type
-    $this->Auth->flash = array('key' => 'error');
+    if($this->request->is('ajax')) {
+      // XXX CO-2135 In case of an ajax request throw an exception and return handling to the front end
+      // If set to false a ForbiddenException exception is thrown instead of redirecting.
+      $this->Auth->unauthorizedRedirect = false;
+    } else {
+      $this->Auth->unauthorizedRedirect = "/";
+      $this->Auth->authError = _txt('er.permission');
+      // Default flash key is 'auth', switch to 'error' so it maps to noty's default type
+      $this->Auth->flash = array('key' => 'error');
+    }
     
     if($this->request->is('restful')) {
+      // Do not allow route fallbacks
+      $rparams = $this->request->params;
+      // Keep only the routes related to the current request
+      $request_related_routes = array_filter(
+        Router::$routes,
+        static function ($route) use ($rparams) {
+          return (strpos($route->template, $rparams['controller']) !== false);
+        }
+      );
+
+      // Map each actions to methods
+      $action_method = array();
+      foreach ($request_related_routes as $idx => $params) {
+        $action_method[ $params->defaults['action'] ][] = $params->defaults['[method]'];
+      }
+
+      if(!array_key_exists($this->request->action, $action_method)
+         || !in_array($this->request->method(), $action_method[$this->request->action])) {
+        $this->Api->restResultHeader(404, "Unknown");
+        // We force an exit here to prevent any views from rendering, but also
+        // to prevent Cake from dumping the default layout
+        $this->response->send();
+        exit;
+      }
+
       // Set up basic auth and attempt to login the API user, unless we're already
       // logged in (ie: via a cookie provided via an AJAX initiated REST call)
       
@@ -214,18 +252,20 @@ class AppController extends Controller {
       
       try {
         $coid = $this->parseCOID($this->Api->getData());
-        
-        if($coid != -1) {
-          $this->loadModel('Co');
-          
-          $args = array();
-          $args['conditions']['Co.id'] = $coid;
-          $args['contain'] = false;
-          
-          $this->cur_co = $this->Co->find('first', $args);
+        $roles = $this->Role->calculateCMRoles();
+        if($this->requires_co
+           && $coid === -1
+           && !$roles['cmadmin']) {
+          throw new InvalidArgumentException(_txt('er.co.specify'), HttpStatusCodesEnum::HTTP_UNAUTHORIZED);
         }
-      }
-      catch(RuntimeException $e) {
+        $this->loadModel('Co');
+
+        $args = array();
+        $args['conditions']['Co.id'] = $coid;
+        $args['contain'] = false;
+
+        $this->cur_co = $this->Co->find('first', $args);
+      } catch(RuntimeException $e) {
         // This is probably $id not found... strictly speaking we should somehow
         // check authorization before returning id not found, but we can't really
         // authorize a request for an invalid id.
@@ -272,21 +312,19 @@ class AppController extends Controller {
       // or posted as "Model.co_id".
       
       $coid = $this->parseCOID();
+
+      // Retrieve CO Object.  If this model doesn't have a direct relationship, we'll temporarily bind the model
+
+      $this->Co = ClassRegistry::init('Co');
+      // Load Localizations
+      // If $coid == -1 the Global localizations will be loaded.
+      $this->Co->CoLocalization->load($coid);
       
       if($coid == -1) {
         if($this->requires_co) {
           throw new InvalidArgumentException(_txt('er.co.specify'));
         }
       } else {
-        // Retrieve CO Object.  If this model doesn't have a direct relationship, we'll temporarily bind the model
-        
-        if(!isset($this->Co)) {
-          // There might be a CO object under another object (eg: CoOrgIdentityLink),
-          // but it's easier if we just explicitly load the model
-          
-          $this->loadModel('Co');
-        }
-        
         $args = array();
         $args['conditions']['Co.id'] = $coid;
         $args['contain'] = false;
@@ -295,26 +333,7 @@ class AppController extends Controller {
         
         if(!empty($this->cur_co)) {
           $this->set("cur_co", $this->cur_co);
-          
-          // Load dynamic texts. We do this here because lang.php doesn't have access to models yet.
-          
-          global $cm_texts;
-          global $cm_lang;
-          
-          $this->loadModel('CoLocalization');
-          
-          $args = array();
-          $args['conditions']['CoLocalization.co_id'] = $coid;
-          $args['conditions']['CoLocalization.language'] = $cm_lang;
-          $args['fields'] = array('CoLocalization.lkey', 'CoLocalization.text');
-          $args['contain'] = false;
-          
-          $ls = $this->CoLocalization->find('list', $args);
-          
-          if(!empty($ls)) {
-            $cm_texts[$cm_lang] = array_merge($cm_texts[$cm_lang], $ls);
-          }
-          
+
           // Perform a bit of a sanity check before we get any further
           try {
             $this->verifyRequestedId();
@@ -394,6 +413,7 @@ class AppController extends Controller {
     if(!$this->request->is('restful')) {
       $this->getTheme();
       $this->getUImode();
+      $this->getAppPrefs();
       
       if($this->Session->check('Auth.User.org_identities')) {
         $this->menuAuth();
@@ -499,6 +519,18 @@ class AppController extends Controller {
                                                   array(_txt('ct.co_person_roles.1'),
                                                         filter_var($p['copersonroleid'],FILTER_SANITIZE_SPECIAL_CHARS))));
         }
+      } elseif(!empty($p['organizationid']) && (isset($model->Organization))) {
+        $Organization = $model->Organization;
+        
+        $coId = $Organization->field('co_id', array('id' => $p['organizationid']));
+        
+        if($coId) {
+          return $coId;
+        } else {
+          throw new InvalidArgumentException(_txt('er.notfound',
+                                                  array(_txt('ct.organizations.1'),
+                                                        filter_var($p['organizationid'],FILTER_SANITIZE_SPECIAL_CHARS))));
+        }
       } elseif(!empty($p['orgidentityid'])) {
         if(isset($model->OrgIdentity)) {
           $coId = $model->OrgIdentity->field('co_id', array('id' => $p['orgidentityid']));
@@ -600,6 +632,7 @@ class AppController extends Controller {
     $coprid = $pids['copersonroleid'];
     $codeptid = $pids['codeptid'];
     $cogroupid = $pids['cogroupid'];
+    $orgid = $pids['organizationid'];
     $orgiid = $pids['orgidentityid'];
     $co = null;
     
@@ -618,7 +651,7 @@ class AppController extends Controller {
     {
       $redirect['controller'] = 'co_people';
 
-      $x = $model->CoPerson->findById($copid);
+      $x = $model->CoPerson->field('created', array('CoPerson.id' => $copid));
       
       if(empty($x))
       {
@@ -636,7 +669,7 @@ class AppController extends Controller {
     {
       $redirect['controller'] = 'co_person_roles';
 
-      $x = $model->CoPersonRole->findById($coprid);
+      $x = $model->CoPersonRole->field('created', array('CoPersonRole.id' => $coprid));
       
       if(empty($x))
       {
@@ -656,7 +689,7 @@ class AppController extends Controller {
     {
       $redirect['controller'] = 'co_departments';
 
-      $x = $model->CoDepartment->findById($codeptid);
+      $x = $model->CoDepartment->field('created', array('CoDepartment.id' => $codeptid));
       
       if(empty($x))
       {
@@ -674,7 +707,7 @@ class AppController extends Controller {
     {
       $redirect['controller'] = 'co_groups';
 
-      $x = $model->CoGroup->findById($cogroupid);
+      $x = $model->CoGroup->field('created', array('CoGroup.id' => $cogroupid));
       
       if(empty($x))
       {
@@ -688,11 +721,29 @@ class AppController extends Controller {
         $rc = 1;
       }
     }
+    elseif($orgid != null)
+    {
+      $redirect['controller'] = 'organizations';
+
+      $x = $model->Organization->field('created', array('Organization.id' => $orgid));
+      
+      if(empty($x))
+      {
+        $redirect['action'] = 'index';
+        $rc = -1;
+      }
+      else
+      {
+        $redirect['action'] = 'edit';
+        $redirect[] = $orgid;
+        $rc = 1;
+      }
+    }
     elseif($orgiid != null)
     {
       $redirect['controller'] = 'org_identities';
 
-      $x = $model->OrgIdentity->findById($orgiid);
+      $x = $model->OrgIdentity->field('created', array('OrgIdentity.id' => $orgiid));
       
       if(empty($x))
       {
@@ -721,11 +772,11 @@ class AppController extends Controller {
     } elseif($redirectMode != "calculate") {
       switch($rc) {
         case -1:
-          $this->Flash->set(_txt('er.person.noex'), array('key' => 'error'));            
+          $this->Flash->set(_txt('er.person.noex'), array('key' => 'error'));
           $this->redirect($redirect);
           break;
         case 0:
-          $this->Flash->set(_txt('er.person.none'), array('key' => 'error'));            
+          $this->Flash->set(_txt('er.person.none'), array('key' => 'error'));
           $this->redirect($redirect);
           break;
       }
@@ -858,6 +909,9 @@ class AppController extends Controller {
   protected function getTheme() {
     // Determine if a theme is in use
     $coTheme = null;
+    $cssStack = null;
+    $eof_allow_stack = null;
+    $co_allow_stack = null;
     
     if(!empty($this->cur_co['Co']['id'])) {
       // First see if we're in an enrollment flow
@@ -874,49 +928,72 @@ class AppController extends Controller {
           $args['contain'][] = 'CoTheme';
           
           $efConfig = $this->Co->CoEnrollmentFlow->find('first', $args);
-          
+          $eof_allow_stack = $efConfig['CoEnrollmentFlow']['theme_stacking'];
+
           if(!empty($efConfig['CoTheme']['id'])) {
             $coTheme = $efConfig['CoTheme'];
+            $cssStack = array();
+            $cssStack['c_ef'] = '/*' . $coTheme["name"] . '*/' . PHP_EOL . $coTheme['css'];
           }
         }
       }
-      
-      if(!$coTheme) {
+
+      if(is_null($coTheme)                                              // No Theme
+         || $eof_allow_stack === SuspendableStatusEnum::Active) {       // CO Theme allows stacking
         // See if there is a CO-wide theme in effect
-        
-        $args = array();
-        $args['conditions']['CoSetting.co_id'] = $this->cur_co['Co']['id'];
-        $args['contain'][] = 'CoTheme';
-        
-        $settings = $this->Co->CoSetting->find('first', $args);
-        
-        if(!empty($settings['CoTheme']['id'])) {
-          $coTheme = $settings['CoTheme'];
+        $co_allow_stack = $this->Co->CoSetting->themeStackingEnabled($this->cur_co['Co']['id']);
+        $co_theme_id = $this->Co->CoSetting->getThemeId($this->cur_co['Co']['id']);
+
+        if(!is_null($co_theme_id)) {
+          $args = array();
+          $args['conditions']['CoTheme.id'] = $co_theme_id;
+          $args['contain'] = false;
+          $coThemeCfg = $this->Co->CoSetting->CoTheme->find('first', $args);
+          if(is_null($coTheme)) {
+            $coTheme = $coThemeCfg['CoTheme'];
+            $cssStack = array();
+            $cssStack['b_co'] = '/*' . $coTheme["name"] . '*/' . PHP_EOL . $coTheme['css'];
+          } else {
+            $cssStack['b_co'] = '/*' . $coThemeCfg['CoTheme']["name"] . '*/' . PHP_EOL . $coThemeCfg['CoTheme']['css'];
+          }
         }
       }
     }
-    
-    if(!$coTheme) {
+
+    if(is_null($coTheme)                                       // No Theme
+       || $co_allow_stack === SuspendableStatusEnum::Active    // CO Theme, EF Theme allows stacking
+       || ($eof_allow_stack === SuspendableStatusEnum::Active  // CMP Theme, No CO Theme, EF Theme allows stacking
+           && empty($cssStack['b_co']))) {
       // See if there is a platform theme
       $args = array();
       $args['joins'][0]['table'] = 'cos';
       $args['joins'][0]['alias'] = 'Co';
       $args['joins'][0]['type'] = 'INNER';
       $args['joins'][0]['conditions'][0] = 'CoSetting.co_id=Co.id';
-      $args['conditions']['Co.name'] = 'COmanage';
+      $args['conditions']['Co.name'] = DEF_COMANAGE_CO_NAME;
       $args['conditions']['Co.status'] = TemplateableStatusEnum::Active;
       $args['contain'][] = 'CoTheme';
-      
+
       $this->loadModel('CoSetting');
-      
+
       $settings = $this->CoSetting->find('first', $args);
-      
+
       if(!empty($settings['CoTheme']['id'])) {
-        $coTheme = $settings['CoTheme'];
+        if(is_null($coTheme)) {
+          $coTheme = $settings['CoTheme'];
+          $cssStack = array();
+          $cssStack['a_cmp'] = '/*' . $coTheme["name"] . '*/' . PHP_EOL . $coTheme['css'];
+        } else {
+          $cssStack['a_cmp'] = '/*' . $settings['CoTheme']["name"] . '*/' . PHP_EOL . $settings['CoTheme']['css'];
+        }
       }
     }
       
     if($coTheme) {
+      // Sort the cssStack starting with CMP css to EF css
+      if(!empty($cssStack) && ksort($cssStack)) {
+        $coTheme['css'] = $cssStack;
+      }
       $this->set('vv_theme_hide_title', $coTheme['hide_title']);
       $this->set('vv_theme_hide_footer_logo', $coTheme['hide_footer_logo']);
       
@@ -945,6 +1022,25 @@ class AppController extends Controller {
     if(!$this->Session->check('Auth.User.name')) {
       $this->set('vv_ui_mode', EnrollmentFlowUIMode::Basic);
     }
+  }
+
+  /**
+   * Get a user's Application Preferences
+   * - postcondition: Application Preferences variable set
+   * @since  COmanage Registry v4.0.0
+   */
+  protected function getAppPrefs() {
+
+    $appPrefs = null;
+    $coPersonId = $this->Session->read('Auth.User.co_person_id');
+
+    // Get preferences if we have an Auth.User.co_person_id
+    if(!empty($coPersonId)) {
+      $this->loadModel('ApplicationPreference');
+      $appPrefs = $this->ApplicationPreference->retrieveAll($coPersonId);
+    }
+
+    $this->set('vv_app_prefs', $appPrefs);
   }
 
   /**
@@ -1003,9 +1099,10 @@ class AppController extends Controller {
     $p['menu']['coconfig'] = $roles['cmadmin'] || $roles['coadmin'];
     
     // View CO departments?
-    $p['menu']['codepartments'] = $roles['cmadmin'];
+    $p['menu']['codepartments'] = $roles['cmadmin'] || $roles['coadmin'];;
     
     if(!$roles['cmadmin']
+       && !$roles['coadmin']
        && $roles['user']
        && !empty($this->cur_co['Co']['id'])) {
       // Only render departments link for regular users if departments are defined
@@ -1022,6 +1119,9 @@ class AppController extends Controller {
     
     // Manage CO dashboards?
     $p['menu']['dashboards'] = $roles['cmadmin'] || $roles['coadmin'];
+    
+    // Manage Dictionaries?
+    $p['menu']['dictionaries'] = $roles['cmadmin'] || $roles['coadmin'];
     
     // Select from available enrollment flows?
     $p['menu']['createpetition'] = $roles['user'];
@@ -1102,6 +1202,9 @@ class AppController extends Controller {
     // View/Edit own Demographics profile?
     $p['menu']['nsfdemoprofile'] = $roles['user'];
     
+    // Manage Organizations?
+    $p['menu']['organizations'] = $roles['cmadmin'] || $roles['coadmin'];
+    
     // Manage org identity sources? CO Admins can only do this if org identities are NOT pooled
     $this->loadModel('CmpEnrollmentConfiguration');
     
@@ -1116,6 +1219,17 @@ class AppController extends Controller {
     
     // Manage servers?
     $p['menu']['servers'] = $roles['cmadmin'] || $roles['coadmin'];
+    
+    // Manage vetting steps?
+    $p['menu']['vettingsteps'] = $roles['cmadmin'] || $roles['coadmin'];
+    
+    // View Vetting Requests?
+    // Because of the complex mess of this code, we don't expose the vetting
+    // link via the People menu to non-admins (since doing so will expose other
+    // menu items that don't make sense).
+    $p['menu']['vettingrequests'] = $roles['cmadmin'] 
+                                    || $roles['coadmin']
+                                    || (!empty($roles['copersonid']) && !empty($this->Role->vetterForGroups($roles['copersonid'])));
     
     $this->set('permissions', $p);
   }
@@ -1327,8 +1441,8 @@ class AppController extends Controller {
       $coid = -1;
       
       if($this->request->is('restful')) {
-        $coid = $this->Api->requestedCOID($model, $this->request, $data);
-        
+        $coid = $this->Api->requestedCOID($model, $this->request, $this->Api->getData());
+
         if(!$coid) {
           $coid = -1;
         }
@@ -1387,6 +1501,7 @@ class AppController extends Controller {
     $deptid = null;
     $groupid = null;
     $orgiid = null;
+    $orgid = null;
     
     if(!empty($data['co_person_id']))
       $copid = $data['co_person_id'];
@@ -1408,6 +1523,8 @@ class AppController extends Controller {
       $deptid = $data[$req]['co_department_id'];
     elseif(!empty($data[$req]['co_group_id']))
       $groupid = $data[$req]['co_group_id'];
+    elseif(!empty($data[$req]['organization_id']))
+      $orgid = $data[$req]['organization_id'];
     elseif(!empty($this->request->data[$req]['co_person_id']))
       $copid = $this->request->data[$req]['co_person_id'];
     elseif(!empty($this->request->data[$req]['co_person_role_id']))
@@ -1418,6 +1535,8 @@ class AppController extends Controller {
       $deptid = $this->request->data[$req]['codeptid'];
     elseif(!empty($this->request->data[$req]['co_group_id']))
       $groupid = $this->request->data[$req]['co_group_id'];
+    elseif(!empty($this->request->data[$req]['organization_id']))
+      $orgid = $this->request->data[$req]['organization_id'];
     elseif(!empty($this->request->params['named']['copersonid']))
       $copid = $this->request->params['named']['copersonid'];
     elseif(!empty($this->request->params['named']['copersonroleid']))
@@ -1426,8 +1545,10 @@ class AppController extends Controller {
       $orgiid = $this->request->params['named']['orgidentityid'];
     elseif(!empty($this->request->params['named']['codeptid']))
       $deptid = $this->request->params['named']['codeptid'];
-    elseif(!empty($this->request->params['named']['cogroup']))
-      $groupid = $this->request->params['named']['cogroup'];
+    elseif(!empty($this->request->params['named']['cogroupid']))
+      $groupid = $this->request->params['named']['cogroupid'];
+    elseif(!empty($this->request->params['named']['orgid']))
+      $orgid = $this->request->params['named']['orgid'];
     // XXX Why don't we need to check query for other parameters?
     elseif(!empty($this->request->query['cogroupid']))
       $groupid = $this->request->query['cogroupid'];
@@ -1449,6 +1570,9 @@ class AppController extends Controller {
         case 'Org':
           $orgiid = $this->request->data[$modelcc][0]['Person']['Id'];
           break;
+        case 'Organization':
+          $orgid = $this->request->data[$modelcc][0]['Person']['Id'];
+          break;
       }
     }
     elseif(isset($this->request->data[$modelcc][$req]['Person'])) {
@@ -1468,6 +1592,9 @@ class AppController extends Controller {
           break;
         case 'Org':
           $orgiid = $this->request->data[$modelcc][$req]['Person']['Id'];
+          break;
+        case 'Organization':
+          $orgid = $this->request->data[$modelcc][$req]['Person']['Id'];
           break;
       }
     }
@@ -1495,15 +1622,80 @@ class AppController extends Controller {
         $deptid = $rec[$req]['co_department_id'];
       elseif(isset($rec[$req]['co_group_id']))
         $groupid = $rec[$req]['co_group_id'];
+      elseif(isset($rec[$req]['organization_id']))
+        $orgid = $rec[$req]['organization_id'];
     }
     
     return(array("codeptid" => $deptid,
                  "cogroupid" => $groupid,
                  "copersonid" => $copid,
                  "copersonroleid" => $coprid,
+                 "organizationid" => $orgid,
                  "orgidentityid" => $orgiid));
   }
   
+  /**
+   * Redirects to given $url, after turning off $this->autoRender.
+   * Script execution is halted after the redirect.
+   *
+   * @param string|array $url A string or array-based URL pointing to another location within the app,
+   *     or an absolute URL
+   * @param int|array|null|string $status HTTP status code (eg: 301). Defaults to 302 when null is passed.
+   * @param bool $exit If true, exit() will be called after the redirect
+   * @return CakeResponse|null
+   * @triggers Controller.beforeRedirect $this, array($url, $status, $exit)
+   * @link https://book.cakephp.org/2.0/en/controllers.html#Controller::redirect
+   */
+  public function redirect($url, $status = null, $exit = true) {
+    $this->autoRender = false;
+
+    if (is_array($status)) {
+      extract($status, EXTR_OVERWRITE);
+    }
+    $event = new CakeEvent('Controller.beforeRedirect', $this, array($url, $status, $exit));
+
+    list($event->break, $event->breakOn, $event->collectReturn) = array(true, false, true);
+    $this->getEventManager()->dispatch($event);
+
+    if ($event->isStopped()) {
+      return null;
+    }
+    $response = $event->result;
+    extract($this->_parseBeforeRedirect($response, $url, $status, $exit), EXTR_OVERWRITE);
+
+    // XXX CO-2550, CO-2600
+    foreach ($url as $field => $value) {
+      if(strpos($field, "search.") !== false
+         && strpos($value, "/") !== false) {
+        $url[$field] = str_replace("/", urlencode("/"), $value);
+      }
+    }
+
+    if ($url !== null) {
+      $this->response->header('Location', Router::url($url, true));
+    }
+
+
+    if (is_string($status)) {
+      $codes = array_flip($this->response->httpCodes());
+      if (isset($codes[$status])) {
+        $status = $codes[$status];
+      }
+    }
+
+    if ($status === null) {
+      $status = 302;
+    }
+    $this->response->statusCode($status);
+
+    if ($exit) {
+      $this->response->send();
+      $this->_stop();
+    }
+
+    return $this->response;
+  }
+
   /**
    * Perform a sanity check on on a standard item identifier to verify it is part
    * of the current CO.

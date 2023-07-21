@@ -53,6 +53,9 @@ class OrgIdentitySource extends AppModel {
     "CoProvisioningTarget" => array(
       'foreignKey' => 'provision_co_group_id'
     ),
+    "OrgIdentitySourceFilter" => array(
+      'dependent' => true
+    ),
     "OrgIdentitySourceRecord" => array(
       'dependent' => true
     )
@@ -80,6 +83,11 @@ class OrgIdentitySource extends AppModel {
       'rule' => array('validateInput'),
       'required' => true,
       'allowEmpty' => false
+    ),
+    'sor_label' => array(
+      'rule' => 'notBlank',
+      'required' => false,
+      'allowEmpty' => true
     ),
     'plugin' => array(
       // XXX This should be a dynamically generated list based on available plugins
@@ -135,7 +143,8 @@ class OrgIdentitySource extends AppModel {
       'content' => array(
         'rule' => 'numeric',
         'required' => false,
-        'allowEmpty' => true
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
       )
     ),
     'hash_source_record' => array(
@@ -178,6 +187,43 @@ class OrgIdentitySource extends AppModel {
     return true;
   }
 
+  /**
+   * Actions to take before a save operation is executed.
+   *
+   * @since  COmanage Registry v4.1.0
+   * @throws InvalidArgumentException
+   */
+
+  public function beforeSave($options = array()) {
+    if(empty($this->data['OrgIdentitySource']['co_id'])) {
+      throw new InvalidArgumentException(_txt('er.notprov.id', array('ct.cos.1')));
+    }
+    
+    if(!empty($this->data['OrgIdentitySource']['sor_label'])) {
+      // Make sure sor_label isn't already in use in this CO. This isn't strictly
+      // required for Match Servers, but it is for ApiSource, which needs to map
+      // the SOR Label back to a specific configuration.
+      // XXX note we don't currently crosscheck against Enrollment Flows
+      
+      $args = array();
+      $args['conditions']['OrgIdentitySource.co_id'] = $this->data['OrgIdentitySource']['co_id'];
+      $args['conditions']['OrgIdentitySource.sor_label'] = $this->data['OrgIdentitySource']['sor_label'];
+      // We don't want to test against our own record
+      if(!empty($this->data['OrgIdentitySource']['id'])) {
+        $args['conditions']['OrgIdentitySource.id NOT'] = $this->data['OrgIdentitySource']['id'];
+      }
+      $args['contain'] = false;
+      
+      $recs = $this->find('count', $args);
+      
+      if($recs > 0) {
+        throw new InvalidArgumentException(_txt('er.ois.label.inuse', array($this->data['OrgIdentitySource']['sor_label'])));
+      }
+    }
+    
+    return true;
+  }
+  
   /**
    * Bind the specified plugin's backend model
    *
@@ -263,6 +309,7 @@ class OrgIdentitySource extends AppModel {
    * @throws InvalidArgumentException
    * @throws OverflowException
    * @throws RuntimeException
+   * @throws UnexpectedValueException
    */
   
   public function createOrgIdentity($id,
@@ -296,7 +343,7 @@ class OrgIdentitySource extends AppModel {
     $brec = $this->retrieve($id, $sourceKey);
     
     // This will throw an exception if invalid
-    $this->validateOISRecord($brec);
+    $this->validateOISRecord($brec, $coId);
     
     $orgid = $brec['orgidentity'];
     
@@ -377,7 +424,7 @@ class OrgIdentitySource extends AppModel {
       // CoOrgIdentityLink is not currently provisioner-enabled, but we'll disable
       // provisioning just in case that changes in the future.
       
-      if($this->Co->CoPerson->CoOrgIdentityLink->save($coOrgLink, array("provision" => false))) {
+      if($this->Co->CoPerson->CoOrgIdentityLink->save($coOrgLink, array("provision" => false, "pipeline" => false))) {
         // Create a history record
         try {
           $this->Co->CoPerson->HistoryRecord->record($targetCoPersonId,
@@ -407,6 +454,15 @@ class OrgIdentitySource extends AppModel {
                              $provision,
                              $brec['raw'],
                              $this->OrgIdentitySourceRecord->OrgIdentity->OrgIdentitySourceRecord->id);
+    }
+    catch(UnexpectedValueException $e) {
+      // The pipeline received a 202 response from the Match Server, which we
+      // want to report differently. Note we _still_ rollback here... that
+      // leaves the OrgIdentitySourceRecord in place but not the OrgIdentity
+      // so on the next try we can call createOrgIdentity again.
+      // (OverflowException was already in use...)
+      $dbc->rollback();
+      throw new UnexpectedValueException($e->getMessage());
     }
     catch(Exception $e) {
       $dbc->rollback();
@@ -538,11 +594,11 @@ class OrgIdentitySource extends AppModel {
         $value = null;
         
         if(!empty($ret['orgidentity']['Identifier'])) {
-          foreach($ret['orgidentity']['Identifier'] as $id) {
-            if(!empty($id['type'])) {
-              if($id['type'] == $this->cdata['OrgIdentitySource']['eppn_identifier_type']) {
-                $value = $id['identifier'];
-              } elseif($id['type'] == IdentifierEnum::ePPN) {
+          foreach($ret['orgidentity']['Identifier'] as $identifier) {
+            if(!empty($identifier['type'])) {
+              if($identifier['type'] == $this->cdata['OrgIdentitySource']['eppn_identifier_type']) {
+                $value = $identifier['identifier'];
+              } elseif($identifier['type'] == IdentifierEnum::ePPN) {
                 $existing = true;
                 break;
               }
@@ -573,6 +629,34 @@ class OrgIdentitySource extends AppModel {
       
       if(!empty($ret['raw'])) {
         $ret['hash'] = md5($ret['raw']);
+      }
+    }
+    
+    // Apply Data Filters, if any are configured. We specifically don't want to
+    // filter the raw record (whether or not it is used for hashing).
+    
+    $args = array();
+    $args['conditions']['OrgIdentitySourceFilter.org_identity_source_id'] = $id;
+    $args['order'] = 'OrgIdentitySourceFilter.ordr ASC';
+    $args['contain'] = array('DataFilter');
+
+    $OISFilter = ClassRegistry::init('OrgIdentitySourceFilter');
+    $filters = $OISFilter->find('all', $args);
+
+    if(!empty($filters)) {
+      foreach($filters as $filter) {
+        if(!empty($filter['DataFilter'])
+           && $filter['DataFilter']['status'] == SuspendableStatusEnum::Active) {
+          $pluginModelName = $filter['DataFilter']['plugin'] . "." . $filter['DataFilter']['plugin'];
+
+          $pluginModel = ClassRegistry::init($pluginModelName);
+
+          // We let any exception pass up the stack, since presumably we shouldn't
+          // continue processing if the filter fails for some reason.
+          $ret['orgidentity'] = $pluginModel->filter(DataFilterContextEnum::OrgIdentitySource,
+                                                     $filter['DataFilter']['id'],
+                                                     $ret['orgidentity']);
+        }
       }
     }
     
@@ -678,13 +762,14 @@ class OrgIdentitySource extends AppModel {
    * Sync all Org Identity Sources. Intended primarily for use by JobShell
    *
    * @since  COmanage Registry v2.0.0
-   * @param  integer $coId CO ID
-   * @param  Boolean $force If true, force a sync even if the source record has not changed
+   * @param  integer $coJobId CO Job ID
+   * @param  integer $coId    CO ID
+   * @param  Boolean $force   If true, force a sync even if the source record has not changed
    * @return boolean True on success
    * @throws RuntimeException
    */
   
-  public function syncAll($coId, $force=false) {
+  public function syncAll($coJobId, $coId, $force=false) {
     $errors = array();
     
     // Select all org identity sources where status=active
@@ -692,23 +777,45 @@ class OrgIdentitySource extends AppModel {
     $args = array();
     $args['conditions']['OrgIdentitySource.co_id'] = $coId;
     $args['conditions']['OrgIdentitySource.status'] = SuspendableStatusEnum::Active;
+    // Don't automatically sync sources that are in Manual mode
+    $args['conditions']['OrgIdentitySource.sync_mode !='] = SyncModeEnum::Manual;
     $args['contain'] = false;
     
     $sources = $this->find('all', $args);
+    $doneCnt = 0;
     
     foreach($sources as $src) {
-      // Don't automatically sync sources that are in Manual mode
+      if($this->Co->CoJob->canceled($coJobId)) { return false; }
       
-      if($src['OrgIdentitySource']['sync_mode'] != SyncModeEnum::Manual) {
-        try {
-          $this->syncOrgIdentitySource($src, $force);
-        }
-        catch(Exception $e) {
-          // What do we do with the exception? We don't want to abort the run,
-          // so we'll assemble them and then re-throw them later.
-          $errors[] = $e->getMessage();
-        }
+      try {
+        $this->Co->CoJob->update($coJobId, null, null, _txt('jb.ois.sync.start', array($src['OrgIdentitySource']['description'])));
+        
+        // We don't pass in $coJobId because we want a new Job to be created with
+        // the results just from that source.
+        $this->syncOrgIdentitySource($src, $force);
+        
+        $this->Co->CoJob->CoJobHistoryRecord->record($coJobId,
+                                                     $src['OrgIdentitySource']['id'],
+                                                     _txt('jb.ois.sync.full.finish'),
+                                                     null,
+                                                     null,
+                                                     JobStatusEnum::Complete);
       }
+      catch(Exception $e) {
+        // What do we do with the exception? We don't want to abort the run,
+        // so we'll assemble them and then re-throw them later.
+        $errors[] = $e->getMessage();
+        
+        $this->Co->CoJob->CoJobHistoryRecord->record($coJobId,
+                                                     $src['OrgIdentitySource']['id'],
+                                                     $e->getMessage(),
+                                                     null,
+                                                     null,
+                                                     JobStatusEnum::Failed);
+      }
+      
+      $doneCnt++;
+      $this->Co->CoJob->setPercentComplete($coJobId, floor(($doneCnt * 100)/count($sources)));
     }
     
     if(!empty($errors)) {
@@ -822,7 +929,9 @@ class OrgIdentitySource extends AppModel {
     if($brec) {
       // If we got a record, check that it is valid.
       // This will throw an exception if invalid.
-      $this->validateOISRecord($brec);
+      $coId = $this->findCoForRecord($id);
+      
+      $this->validateOISRecord($brec, $coId);
     }
     
     // Start a transaction
@@ -1241,7 +1350,7 @@ class OrgIdentitySource extends AppModel {
                                  : SyncActionEnum::Update,
                                  $actorCoPersonId,
                                  true,
-                                 $brec['raw'],
+                                 (!empty($brec['raw']) ? $brec['raw'] : null),
                                  $cursrcrec['OrgIdentitySourceRecord']['id']);
         }
         catch(Exception $e) {
@@ -1286,11 +1395,12 @@ class OrgIdentitySource extends AppModel {
    * @since  COmanage Registry v2.0.0
    * @param  Array   $orgIdentitySource Org Identity Source to process
    * @param  Boolean $force             If true, force a sync even if the source record has not changed
+   * @param  integer $coJobId           CO Job ID, if already registered
    * @return boolean                    True on success
    * @throws RuntimeException
    */
   
-  public function syncOrgIdentitySource($orgIdentitySource, $force=false) {
+  public function syncOrgIdentitySource($orgIdentitySource, $force=false, $coJobId=null) {
     // We don't check here that the source is in Manual mode in case an admin
     // wants to manually force a sync. (syncAll honors that setting.)
     
@@ -1304,8 +1414,9 @@ class OrgIdentitySource extends AppModel {
     // Figure out the last time we started a job for this source, primarily for changelist.
     // We use start_time rather than complete_time because it's safer (we might perform an
     // extra sync rather than miss something that updated after the job started processing).
+    // Note lastStart will only examine Jobs that are in Complete status.
     $lastStart = $this->Co->CoJob->lastStart($orgIdentitySource['OrgIdentitySource']['co_id'],
-                                             JobTypeEnum::OrgIdentitySync,
+                                             "CoreJob.Sync",
                                              $orgIdentitySource['OrgIdentitySource']['id']);
     
     // We'll need the set of records associated with this source.
@@ -1320,17 +1431,31 @@ class OrgIdentitySource extends AppModel {
     $orgRecords = $this->OrgIdentitySourceRecord->find('all', $args);
     
     // Register a new CoJob. This will throw an exception if a job is already in progress.
+    // Note we might already have $coJobId, if SyncJob started a single sync (vs sync all).
+    // In that case, update that Job rather than create a new one.
     
-    $jobId = $this->Co->CoJob->register($orgIdentitySource['OrgIdentitySource']['co_id'],
-                                        JobTypeEnum::OrgIdentitySync,
-                                        $orgIdentitySource['OrgIdentitySource']['id'],
-                                        $orgIdentitySource['OrgIdentitySource']['sync_mode'],
-                                        _txt('fd.ois.record.count',
-                                             array($orgIdentitySource['OrgIdentitySource']['description'],
-                                                   count($orgRecords))));
+    $jobId = $coJobId;
     
-    // Flag the Job as started
-    $this->Co->CoJob->start($jobId);
+    if($coJobId) {
+      // We don't want to finish the job later, either
+      $this->Co->CoJob->update($coJobId,
+                               $orgIdentitySource['OrgIdentitySource']['id'],
+                               $orgIdentitySource['OrgIdentitySource']['sync_mode'],
+                               _txt('fd.ois.record.count',
+                                    array($orgIdentitySource['OrgIdentitySource']['description'],
+                                          count($orgRecords))));
+    } else {
+      $jobId = $this->Co->CoJob->register($orgIdentitySource['OrgIdentitySource']['co_id'],
+                                          "CoreJob.Sync",
+                                          $orgIdentitySource['OrgIdentitySource']['id'],
+                                          $orgIdentitySource['OrgIdentitySource']['sync_mode'],
+                                          _txt('fd.ois.record.count',
+                                               array($orgIdentitySource['OrgIdentitySource']['description'],
+                                                     count($orgRecords))));
+      
+      // Flag the Job as started
+      $this->Co->CoJob->start($jobId);
+    }
     
     // Count results of various types
     $resCnt = array(
@@ -1373,8 +1498,10 @@ class OrgIdentitySource extends AppModel {
         catch(Exception $e) {
           // On error, fail the job rather than risk inconsistent sync state
           
-          $this->Co->CoJob->finish($jobId, $e->getMessage(), JobStatusEnum::Failed);
-          return false;
+          if(!$coJobId) {
+            $this->Co->CoJob->finish($jobId, $e->getMessage(), JobStatusEnum::Failed);
+          }
+          throw new RuntimeException($e->getMessage());
         }
       }
       
@@ -1746,8 +1873,12 @@ class OrgIdentitySource extends AppModel {
                                                    null,
                                                    JobStatusEnum::Notice);
     }
-
-    $this->Co->CoJob->finish($jobId, json_encode($resCnt));
+    
+    if(!$coJobId) {
+      $this->Co->CoJob->finish($jobId, json_encode($resCnt));
+    }
+    
+    return true;
   }
   
   /**
@@ -1755,10 +1886,11 @@ class OrgIdentitySource extends AppModel {
    *
    * @since  COmanage Registry v2.0.0
    * @param  Array   $backendRecord Record from OIS Backend
+   * @param  Integer $coId          CO ID
    * @throws InvalidArgumentException
    */
   
-  public function validateOISRecord($backendRecord) {
+  public function validateOISRecord($backendRecord, $coId) {
     // For now, we just check that a primary (given) name is specified.
     // We could plausibly support more complex validation later.
     
@@ -1781,6 +1913,14 @@ class OrgIdentitySource extends AppModel {
     
     // Manually run validation to report fields that won't save()
     
+    // First, in order to support extended types we need to inject the coid into
+    // the potential associated models
+    $this->Co->OrgIdentity->validate['affiliation']['content']['rule'][1]['coid'] = $coId;
+    
+    foreach(array('Address', 'EmailAddress', 'Identifier', 'Name', 'TelephoneNumber', 'Url') as $m) {
+      $this->Co->OrgIdentity->$m->validate['type']['content']['rule'][1]['coid'] = $coId;
+    }
+    
     if(!$this->Co->OrgIdentity->validateAssociated($backendRecord['orgidentity'])) {
       // We can easily get the field names for invalid entries, but it's a bit harder
       // to get a meaningful error message (we just get "content", and don't have
@@ -1792,7 +1932,7 @@ class OrgIdentitySource extends AppModel {
         // This can be a direct key for an OrgIdentity field, or a nested array
         // for a related model
         
-        if(is_array($content[0])) {
+        if(!empty($content[0]) && is_array($content[0])) {
           foreach($content[0] as $key2 => $content2) {
             $err .= $key1 . ":" . $key2 . ",";
           }

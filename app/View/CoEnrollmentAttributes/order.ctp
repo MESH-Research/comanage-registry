@@ -125,7 +125,10 @@
                                             'coef' => $vv_coefid));
             ?>
           </td>
-          <td><?php print $vv_available_attributes[ $c['CoEnrollmentAttribute']['attribute'] ]; ?></td>
+          <td><?php
+            $attrProps = $vv_attributes_properties[ $c['CoEnrollmentAttribute']['attribute'] ];
+            print $attrProps['attrName'] . ' (' . implode(', ', array_slice(array_filter($attrProps), '1')) . ')';
+            ?></td>
         </tr>
       <?php endforeach; ?>
     </tbody>
@@ -152,6 +155,6 @@
                           array('class'  => 'checkbutton right'));
 ?>
 
-<div id="result-dialog" title="<?php print _txt('op.reorder'); ?>">
+<div id="result-dialog" class="co-dialog" title="<?php print _txt('op.reorder'); ?>">
   <p></p>
 </div>

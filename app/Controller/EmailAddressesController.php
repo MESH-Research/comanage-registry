@@ -42,12 +42,14 @@ class EmailAddressesController extends MVPAController {
   public $edit_contains = array(
     'CoDepartment',
     'CoPerson' => array('PrimaryName'),
+    'Organization',
     'OrgIdentity' => array('PrimaryName')
   );
 
   public $view_contains = array(
     'CoDepartment',
     'CoPerson' => array('PrimaryName'),
+    'Organization',
     'OrgIdentity' => array('OrgIdentitySourceRecord' => array('OrgIdentitySource'),
                            'PrimaryName'),
     'SourceEmailAddress'
@@ -161,6 +163,15 @@ class EmailAddressesController extends MVPAController {
           }
         }
         break;
+      case 'index':
+        if(!$this->request->is('restful')
+           || empty($this->request->query['copersonid'])) {
+          break;
+        }
+        if((int)$this->request->query['copersonid'] === $roles['copersonid']) {
+          $self = true;
+        }
+        break;
       }
     }
     
@@ -214,8 +225,10 @@ class EmailAddressesController extends MVPAController {
                   || $selfperms['edit']);
     
     // View all existing Email Addresses?
-    // Currently only supported via REST since there's no use case for viewing all
-    $p['index'] = $this->request->is('restful') && ($roles['cmadmin'] || $roles['coadmin']);
+    // Currently, only supported via REST since there's no use case for viewing all
+    // Self is required for the Email Widget
+    $p['index'] = $this->request->is('restful')
+                  && ($roles['cmadmin'] || $roles['coadmin'] || $self);
     
     // Generate an email verification request?
     // This needs to correlate with CoInvitesController.

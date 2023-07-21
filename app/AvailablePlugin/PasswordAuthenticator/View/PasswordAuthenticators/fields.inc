@@ -50,16 +50,41 @@
       $("#PasswordAuthenticatorMinLength").closest("li").hide('fade');
       $("#crypt_checkbox").show('fade');
       $("#crypt_text").hide('fade');
+      $("#PasswordAuthenticatorEnableSsr").closest("li").hide('fade');
     } else if(source == "<?php print PasswordAuthPasswordSourceEnum::External; ?>") {
       $("#PasswordAuthenticatorMaxLength").closest("li").hide('fade');
       $("#PasswordAuthenticatorMinLength").closest("li").hide('fade');
       $("#crypt_checkbox").show('fade');
       $("#crypt_text").hide('fade');
+      $("#PasswordAuthenticatorEnableSsr").closest("li").hide('fade');
     } else {
       $("#PasswordAuthenticatorMaxLength").closest("li").show('fade');
       $("#PasswordAuthenticatorMinLength").closest("li").show('fade');
       $("#crypt_checkbox").hide('fade');
       $("#crypt_text").show('fade');
+      $("#PasswordAuthenticatorEnableSsr").closest("li").show('fade');
+    }
+    
+    var ssr = document.getElementById('PasswordAuthenticatorEnableSsr').checked;
+    
+    if(ssr && source == "<?php print PasswordAuthPasswordSourceEnum::SelfSelect; ?>") {
+      $("#ssr-url").show('fade');
+      $("#PasswordAuthenticatorRedirectOnSuccessSsr").closest("li").show('fade');
+      $("#PasswordAuthenticatorSsrValidity").closest("li").show('fade');
+      $("#PasswordAuthenticatorCoMessageTemplateId").closest("li").show('fade');
+    } else {
+      $("#ssr-url").hide('fade');
+      $("#PasswordAuthenticatorRedirectOnSuccessSsr").closest("li").hide('fade')
+      $("#PasswordAuthenticatorSsrValidity").closest("li").hide('fade');
+      $("#PasswordAuthenticatorCoMessageTemplateId").closest("li").hide('fade');;
+    }
+
+    var remindMT = document.getElementById('PasswordAuthenticatorUsernameReminderMessageTemplateId').value;
+
+    if(remindMT) {
+      $("#username-reminder-url").show('fade');
+    } else {
+      $("#username-reminder-url").hide('fade');
     }
   }
   
@@ -67,6 +92,7 @@
     fields_update_gadgets();
   }
 </script>
+
 <ul id="<?php print $this->action; ?>_password_authenticator" class="fields form-list form-list-admin">
   <li>
     <div class="field-name">

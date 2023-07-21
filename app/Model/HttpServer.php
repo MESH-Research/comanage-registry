@@ -66,6 +66,13 @@ class HttpServer extends AppModel {
       'required' => false,
       'allowEmpty' => true
     ),
+    'auth_type' => array(
+      'rule' => array('inList', array(HttpServerAuthType::Basic,
+                                      HttpServerAuthType::Bearer,
+                                      HttpServerAuthType::None)),
+      'required' => true,
+      'allowEmpty' => false
+    ),
     'ssl_verify_peer' => array(
       'rule' => array('boolean'),
       'required' => false,
@@ -95,4 +102,35 @@ class HttpServer extends AppModel {
   public function beforeSave($options = array()) {
   }
    */
+
+  /**
+   * Perform HttpServer model upgrade steps for version 4.0.0.
+   * Resizes the password column.
+   * This function should only be called by UpgradeVersionShell.
+   *
+   * @since  COmanage Registry v4.0.0
+   */
+  
+  public function _ug400() {
+    $dbc = $this->getDataSource();
+
+    $db_driver = explode("/", $dbc->config['datasource'], 2);
+
+    if ($db_driver[0] !== 'Database') {
+      throw new RuntimeException("Unsupported db_method: " . $db_driver[0]);
+    }
+
+    $db_driverName = $db_driver[1];
+
+    // Nothing to do if not Postgres
+    if ($db_driverName !== 'Postgres') {
+      return;
+    }
+
+    $dbprefix = $dbc->config['prefix'];
+
+    $sql = "ALTER TABLE " . $dbprefix . "http_servers ALTER COLUMN password TYPE varchar(400)";
+
+    $this->query($sql);
+  }
 }

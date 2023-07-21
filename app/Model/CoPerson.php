@@ -54,6 +54,8 @@ class CoPerson extends AppModel {
   );
   
   public $hasMany = array(
+    "ApplicationPreference" => array('dependent' => true),
+    "AuthenticatorStatus",
     // A person can have one or more groups
     "CoGroupMember" => array('dependent' => true),
     // It's OK to delete notifications where this Person is the subject, but that's it.
@@ -76,8 +78,6 @@ class CoPerson extends AppModel {
     ),
     // A person can have more than one org identity
     "CoOrgIdentityLink" => array('dependent' => true),
-    // A person can have one or more person roles
-    "CoPersonRole" => array('dependent' => true),
     "CoPetitionApprover" => array(
       'className' => 'CoPetition',
       'dependent' => false,
@@ -108,30 +108,49 @@ class CoPerson extends AppModel {
     // A person can have one or more email address
     "EmailAddress" => array('dependent' => true),
     // We allow dependent=true for co_person_id but not for actor_co_person_id (see CO-404).
-    "HistoryRecord" => array(
-      'dependent' => true,
-      'foreignKey' => 'co_person_id'
+    "HistoryRecord" => array('dependent' => true),
+    "CoJobHistoryRecord" => array('dependent' => true),
+    "ManagerCoPerson" => array(
+      'className' => 'CoPersonRole',
+      'foreignKey' => 'manager_co_person_id'
     ),
+    "SponsorCoPerson" => array(
+      'className' => 'CoPersonRole',
+      'foreignKey' => 'sponsor_co_person_id'
+    ),
+    // XXX CoPerson Role HAS TO be deleted after the history records
+    //     since it has many history_records but they are not dependent.
+    //     As a result, if we try to delete the CO Person Role before the
+    //     History Record then we will get a foreign key exception
+    // A person can have one or more person roles
+    "CoPersonRole" => array('dependent' => true),
     "HistoryRecordActor" => array(
       'className' => 'HistoryRecord',
       'foreignKey' => 'actor_co_person_id'
     ),
     // A person can have many identifiers within a CO
     "Identifier" => array('dependent' => true),
+    "IdentityDocument" => array('dependent' => true),
     "Name" => array('dependent' => true),
     // Make this last so it doesn't get recreated by ProvisionerBehavior when
     // deleting a CO person
     "CoProvisioningExport" => array('dependent' => true),
     // A person can have one or more URL
     "Url" => array('dependent' => true),
+    "VettingRequest" => array('dependent' => true)
   );
 
   // Default display field for cake generated views
   public $displayField = "PrimaryName.family";
-  
-  // Default ordering for find operations
-// XXX CO-296 Toss default order?
-//  public $order = array("CoPerson.id");
+
+  // Select clause for the paginator
+  private $paginate_fields = array( "DISTINCT CoPerson.id",
+                                    "PrimaryName.given",
+                                    "PrimaryName.family",
+                                    "CoPerson.status",
+                                    "CoPerson.created",
+                                    "CoPerson.modified"
+                                  );
   
   // Validation rules for table elements
   // Validation rules must be named 'content' for petition dynamic rule adjustment
@@ -155,11 +174,14 @@ class CoPerson extends AppModel {
                                         StatusEnum::Expired,
                                         StatusEnum::GracePeriod,
                                         StatusEnum::Invited,
+                                        StatusEnum::Locked,
                                         StatusEnum::Pending,
                                         StatusEnum::PendingApproval,
                                         StatusEnum::PendingConfirmation,
+                                        StatusEnum::PendingVetting,
                                         StatusEnum::Suspended)),
         'required' => true,
+        'allowEmpty' => false,
         'message' => 'A valid status must be selected'
       )
     ),
@@ -207,13 +229,9 @@ class CoPerson extends AppModel {
     // Manage CO person membership in the CO members group.
     // This is similar to CoPersonRole::reconcileCouMembersGroupMemberships.
     
-    $eligible = false;
-    $isMember = false;
-    
     $provision = (isset($options['provision']) ? $options['provision'] : true);
     
     $coPersonId = $this->id;
-    $coId = $this->field('co_id');
     $status = $this->field('status');
     // This is similar logic to CoPersonRole and CoGroup::reconcileAutomaticGroup
     $activeEligible = ($status == StatusEnum::Active || $status == StatusEnum::GracePeriod);
@@ -221,45 +239,38 @@ class CoPerson extends AppModel {
     
     $this->CoGroupMember->syncMembership(GroupEnum::ActiveMembers, null, $coPersonId, $activeEligible, $provision);
     $this->CoGroupMember->syncMembership(GroupEnum::AllMembers, null, $coPersonId, $allEligible, $provision);
-    
-    // We also need to update any COU members groups. Start by pulling the list of COUs,
-    // in id => name format.
-    
-    $cous = $this->Co->Cou->allCous($coId);
-    
-    if(!empty($cous)) {
-      // We need to pull the COUs this CO Person has a role for (even if not active).
-      // If the Person is not active, then we'll also remove the Role active group(s).
-      
-      $args = array();
-      $args['conditions']['CoPersonRole.co_person_id'] = $coPersonId;
-      $args['conditions'][] = 'CoPersonRole.cou_id IS NOT NULL';
-      // If a person has more than one COU membership, we'll lose all but one of the
-      // role IDs, but currently we don't need them.
-      $args['fields'] = array('CoPersonRole.cou_id', 'CoPersonRole.id');
-      $args['contain'] = false;
-      
-      $roles = $this->CoPersonRole->find('list', $args);
-      
-      // Walk the COUs
-      
-      foreach($cous as $couId => $couName) {
-        // If the CO Person is not $allEligible, then no COU groups are eligible either.
-        if($allEligible && !empty($roles[$couId])) {
-          // The CO Person has at least one role in this COU, so let CoPersonRole sync things.
-          // Note we only need to do this once per COU, as reconcileCouMembersGroupMemberships
-          // will correctly handle multiple roles in the same COU.
-          
-          $this->CoPersonRole->reconcileCouMembersGroupMemberships($roles[$couId],
-                                                                   $this->CoPersonRole->alias,
-                                                                   $provision,
-                                                                   $activeEligible);
-        } else {
-          // Make sure there are no memberships for this COU
-          
-          $this->CoGroupMember->syncMembership(GroupEnum::ActiveMembers, $couId, $coPersonId, false, $provision);
-          $this->CoGroupMember->syncMembership(GroupEnum::AllMembers, $couId, $coPersonId, false, $provision);
-        }
+
+    // We need to pull the COUs this CO Person has a role for (even if not active).
+    // If the Person is not active, then we'll also remove the Role active group(s).
+
+    $args = array();
+    $args['conditions']['CoPersonRole.co_person_id'] = $coPersonId;
+    $args['conditions'][] = 'CoPersonRole.cou_id IS NOT NULL';
+    // If a person has more than one COU membership, we'll lose all but one of the
+    // role IDs, but currently we don't need them.
+    $args['fields'] = array('CoPersonRole.cou_id', 'CoPersonRole.id');
+    $args['contain'] = false;
+
+    $roles = $this->CoPersonRole->find('list', $args);
+
+    // Walk the COUs
+
+  foreach($roles as $couId => $roleId) {
+      // If the CO Person is not $allEligible, then no COU groups are eligible either.
+    if($allEligible) {
+        // The CO Person has at least one role in this COU, so let CoPersonRole sync things.
+        // Note we only need to do this once per COU, as reconcileCouMembersGroupMemberships
+        // will correctly handle multiple roles in the same COU.
+
+      $this->CoPersonRole->reconcileCouMembersGroupMemberships($roleId,
+                                                               $this->CoPersonRole->alias,
+                                                               $provision,
+                                                               $activeEligible);
+      } else {
+        // Make sure there are no memberships for this COU
+
+        $this->CoGroupMember->syncMembership(GroupEnum::ActiveMembers, $couId, $coPersonId, false, $provision);
+        $this->CoGroupMember->syncMembership(GroupEnum::AllMembers, $couId, $coPersonId, false, $provision);
       }
     }
   }
@@ -317,6 +328,9 @@ class CoPerson extends AppModel {
               'conditions' => array('id' => $record[$Model->alias][$Model->primaryKey])
             ));
             if (isset(current($currentRecord)['deleted']) && current($currentRecord)['deleted'] != true) {
+              if(isset($Model->syncNested)) {
+                $Model->syncNested = false;
+              }
               $Model->delete($record[$Model->alias][$Model->primaryKey]);
             }
 					}
@@ -336,13 +350,14 @@ class CoPerson extends AppModel {
    * has a role beyond subject.
    *
    * @since  COmanage Registry v0.8.5
-   * @param  integer Identifier of CO Person
-   * @param  integer Identifier of CO Person performing expunge
+   * @param  integer CO Person ID getting expunged
+   * @param  integer CO Person ID performing expunge
+   * @param  integer API User ID performing expunge
    * @return boolean True on success
    * @throws InvalidArgumentException
    */
   
-  public function expunge($coPersonId, $expungerCoPersonId) {
+  public function expunge($coPersonId, $expungerCoPersonId, $expungerApiUserId = null) {
     $coperson = $this->findForExpunge($coPersonId);
     
     if(!$coperson) {
@@ -388,15 +403,24 @@ class CoPerson extends AppModel {
     // Rewrite any Notification where this person is an actor, recipient, or resolver
     
     foreach($coperson['CoNotificationActor'] as $n) {
-      $this->CoNotificationActor->expungeParticipant($n['id'], 'actor', $expungerCoPersonId);
+      $this->CoNotificationActor->expungeParticipant($n['id'],
+                                                     'actor',
+                                                     $expungerCoPersonId,
+                                                     $expungerApiUserId);
     }
     
     foreach($coperson['CoNotificationRecipient'] as $n) {
-      $this->CoNotificationActor->expungeParticipant($n['id'], 'recipient', $expungerCoPersonId);
+      $this->CoNotificationActor->expungeParticipant($n['id'],
+                                                     'recipient',
+                                                     $expungerCoPersonId,
+                                                     $expungerApiUserId);
     }
     
     foreach($coperson['CoNotificationResolver'] as $n) {
-      $this->CoNotificationActor->expungeParticipant($n['id'], 'resolver', $expungerCoPersonId);
+      $this->CoNotificationActor->expungeParticipant($n['id'],
+                                                     'resolver',
+                                                     $expungerCoPersonId,
+                                                     $expungerApiUserId);
     }
     
     // Rewrite any History Records where this person is an actor but not a recipient
@@ -404,7 +428,9 @@ class CoPerson extends AppModel {
     
     foreach($coperson['HistoryRecordActor'] as $h) {
       if($h['co_person_id'] != $coPersonId) {
-        $this->HistoryRecord->expungeActor($h['id'], $expungerCoPersonId);
+        $this->HistoryRecord->expungeActor($h['id'],
+                                           $expungerCoPersonId,
+                                           $expungerApiUserId);
       }
     }
     
@@ -484,10 +510,21 @@ class CoPerson extends AppModel {
         }
       }
       $args['conditions']['CoPerson.id'] = $coPersonIds;
-      $args['contain'] = array('PrimaryName', 'Identifier', 'EmailAddress');
-      $args['order'] = array('PrimaryName.family ASC', 'PrimaryName.given ASC');
+      $args['contain'] = array(
+        // We can't contain PrimaryName because it results in
+        // redundant results and does not filter on primary_name
+        'Name' => array('conditions' => array('Name.primary_name' => true)),
+        'Identifier',
+        'EmailAddress'
+      );
       
       $ret = $this->find('all', $args);
+
+      if(!empty($ret)) {
+        // This appears to maybe maintain a given name sort within the family name?
+        $ret = Hash::sort($ret, '{n}.Name.0.given', 'asc');
+        $ret = Hash::sort($ret, '{n}.Name.0.family', 'asc');
+      }
     }
     
     return $ret;
@@ -569,7 +606,18 @@ class CoPerson extends AppModel {
     
     return $this->find('all', $args);
   }
-  
+
+  /**
+   * Get paginator Select clause
+   *
+   * @since  COmanage Registry v4.0.3
+   * @return array
+   */
+  public function getPaginateFields()
+  {
+    return $this->paginate_fields;
+  }
+
   /**
    * Obtain the CO Person ID for an identifier (which must be Active).
    *
@@ -723,6 +771,7 @@ class CoPerson extends AppModel {
 
     if(!empty($args)) {
       $args['conditions']['CoPerson.co_id'] = $coId;
+      $args['conditions']['PrimaryName.primary_name'] = true;
       $args['contain'][] = 'PrimaryName';
       $args['contain'][] = 'CoPersonRole';
     } else {
@@ -818,6 +867,33 @@ class CoPerson extends AppModel {
   }
 
   /**
+   * Return number of pages. By default CAKEPHP takes into account
+   * only 'conditions' and ignores 'fields'. As a result DISTINCT is
+   * not part of the count query
+   *
+   * @since  COmanage Registry v4.0.3
+   * @param array $conditions    Where clause conditions
+   * @param integer $recursive
+   * @param array $extra
+   * @return int                 Number of results
+   */
+  public function paginateCount($conditions, $recursive, $extra) {
+    $fields = $this->getPaginateFields();
+    $args = compact('conditions', 'fields');
+    if ($recursive != $this->recursive) {
+      $args['recursive'] = $recursive;
+    }
+    $args = array_merge($args, $extra);
+    // NOTE: According to the documentation:
+    //       Don’t pass fields as an array to find('count').
+    //       You would only need to specify fields for a DISTINCT
+    //       count (since otherwise, the count is always the same,
+    //       dictated by the conditions).
+    $args['fields'] = 'DISTINCT ' . $this->name . '.id';
+    return $this->find('count', $args);
+  }
+
+  /**
    * Recalculate the status of a CO Person based on the attached CO Person Roles.
    *
    * @since  COmanage Registry v0.9.2
@@ -831,7 +907,7 @@ class CoPerson extends AppModel {
     $newStatus = null;
     
     // We rank status by "preference". More "preferred" statuses rank higher.
-    // To faciliate comparison, we'll convert this to an integer value and store
+    // To facilitate comparison, we'll convert this to an integer value and store
     // it in a hash. Most preferred numbers are larger so we can say things like
     // Active > Expired. Possibly this should go somewhere else, if useful. (CO-1360)
     
@@ -890,6 +966,11 @@ class CoPerson extends AppModel {
       // Pull the current value
       $curStatus = $this->field('status');
       
+      // Locked status cannot be recalculated. This isn't an error, per se.
+      if($curStatus == StatusEnum::Locked) {
+        return $curStatus;
+      }
+      
       if($newStatus != $curStatus) {
         $coId = $this->field('co_id');
         
@@ -946,18 +1027,36 @@ class CoPerson extends AppModel {
         
         foreach($cous as $couId) {
           // Find the admin group ID
-          $groupIds[] = $this->Co->CoGroup->adminCoGroupId($coId, $couId);
+          try {
+            $groupIds[] = $this->Co->CoGroup->adminCoGroupId($coId, $couId);
+          }
+          catch(InvalidArgumentException $e) {
+            // Group is inactive or missing for some reason
+          }
         }
         // Fall through, we want the CO Admin group as well
       case SponsorEligibilityEnum::CoAdmin:
         // Find the admin group ID
-        $groupIds[] = $this->Co->CoGroup->adminCoGroupId($coId);
+        try {
+          $groupIds[] = $this->Co->CoGroup->adminCoGroupId($coId);
+        }
+        catch(InvalidArgumentException $e) {
+          // Group is inactive or missing for some reason
+        }
         break; 
       case SponsorEligibilityEnum::CoGroupMember:
         // Find the configured group
         $groupId = $this->Co->CoSetting->getSponsorEligibilityCoGroup($coId);
         
         if($groupId) {
+          // Make sure the group is still Active
+          $gStatus = $this->Co->CoGroup->field('status', array('CoGroup.id' => $groupId));
+          
+          if($gStatus != SuspendableStatusEnum::Active) {
+            // Return an empty array
+            return array();
+          }
+          
           $groupIds[] = $groupId;
         }
         break;
@@ -1027,18 +1126,36 @@ class CoPerson extends AppModel {
         
         foreach($cous as $couId) {
           // Find the admin group ID
-          $groupIds[] = $this->Co->CoGroup->adminCoGroupId($coId, $couId);
+          try {
+            $groupIds[] = $this->Co->CoGroup->adminCoGroupId($coId, $couId);
+          }
+          catch(InvalidArgumentException $e) {
+            // Group is inactive or missing for some reason
+          }
         }
         // Fall through, we want the CO Admin group as well
       case SponsorEligibilityEnum::CoAdmin:
         // Find the admin group ID
-        $groupIds[] = $this->Co->CoGroup->adminCoGroupId($coId);
+        try {
+          $groupIds[] = $this->Co->CoGroup->adminCoGroupId($coId);
+        }
+        catch(InvalidArgumentException $e) {
+          // Group is inactive or missing for some reason
+        }
         break;
       case SponsorEligibilityEnum::CoGroupMember:
         // Find the configured group
         $groupId = $this->Co->CoSetting->getSponsorEligibilityCoGroup($coId);
         
         if($groupId) {
+          // Make sure the group is still Active
+          $gStatus = $this->Co->CoGroup->field('status', array('CoGroup.id' => $groupId));
+          
+          if($gStatus != SuspendableStatusEnum::Active) {
+            // Return an empty array so we don't render the people picker
+            return array();
+          }
+          
           $groupIds[] = $groupId;
         }
         break;

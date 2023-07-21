@@ -43,24 +43,28 @@
     $args['controller'] = 'co_groups';
     $args['action'] = 'index';
     $args['co'] = $cur_co['Co']['id'];
+    $args['search.auto'] = 'f';
+    $args['search.noadmin'] = '1';
     $this->Html->addCrumb(_txt('ct.co_groups.pl'), $args);
   }
-  
-  $args = array();
-  $args['plugin'] = null;
-  $args['controller'] = 'co_groups';
-  $args['action'] = 'edit';
-  $args[] = $this->request->data['CoGroupMember']['co_group_id'];
-  $this->Html->addCrumb(_txt('ct.co_groups.1'), $args);
-  
-  $args = array();
-  $args['plugin'] = null;
-  $args['controller'] = 'co_people';
-  $args['action'] = 'canvas';
-  $args[] = $this->request->data['CoGroupMember']['co_person_id'];
-  $this->Html->addCrumb(_txt('ct.co_people.1'), $args);
-  
-  $this->Html->addCrumb($title_for_layout);
+
+  if($this->request->action != 'view') {
+    $args = array();
+    $args['plugin'] = null;
+    $args['controller'] = 'co_groups';
+    $args['action'] = 'edit';
+    $args[] = $this->request->data['CoGroupMember']['co_group_id'];
+    $this->Html->addCrumb(_txt('ct.co_groups.1'), $args);
+
+    $args = array();
+    $args['plugin'] = null;
+    $args['controller'] = 'co_people';
+    $args['action'] = 'canvas';
+    $args[] = $this->request->data['CoGroupMember']['co_person_id'];
+    $this->Html->addCrumb(_txt('ct.co_people.1'), $args);
+
+    $this->Html->addCrumb($title_for_layout);
+  }
 
   if($e)
   {
@@ -71,6 +75,11 @@
     print $this->Form->hidden('co_person_id', array('default' => $this->request->data['CoGroupMember']['co_person_id'])). "\n";
   }
 ?>
+  <script type="text/javascript">
+    $(function() {
+      validate_date_input('<?php print _txt('er.validation') ?>', '<?php print _txt('er.validation.date') ?>');
+    });
+  </script>
 
 <ul id="<?php print $this->action; ?>_co_group_member" class="fields form-list">
   <li>

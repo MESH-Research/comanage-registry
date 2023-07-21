@@ -29,67 +29,132 @@
 
 <script type="text/javascript">
   $(function() {
+    // Restore fields
+    $("input[id*='ValidFrom'], input[id*='ValidThrough']").focusin(function() {
+      var $valid_from = $("input[id*='ValidFrom'");
+      var $valid_through = $("input[id*='ValidThrough'");
+
+      $valid_through.get(0).setCustomValidity("");
+      $valid_from.get(0).setCustomValidity("");
+      $("input[type='submit']").prop('disabled', false);
+    });
+
+    // Lightbox
+    $('a.lightbox').magnificPopup({
+      type:'ajax',
+      preloader: true,
+      showCloseBtn: true,
+      enableEscapeKey: true,
+      closeOnBgClick: false,
+      tLoading: '',
+      callbacks: {
+        open: function() {
+          // Will fire when this exact popup is opened
+          // this - is Magnific Popup object
+          displaySpinner();
+        },
+        close: function() {
+        },
+        updateStatus: function(data) {
+          // console.log('Status changed', data);
+          // "data" is an object that has two properties:
+          // "data.status" - current status type, can be "loading", "error", "ready"
+          // "data.text" - text that will be displayed (e.g. "Loading...")
+          // you may modify this properties to change current status or its text dynamically
+          if(data.status !== 'loading') {
+            stopSpinner();
+          }
+          if(data.status == 'error') {
+            // discard and show noty
+            this.close();
+            generateFlash(data.text, data.status);
+          }
+        }
+      },
+      ajax: {
+        settings: {
+          cache: false
+        },
+        tError: 'Permission Denied' //  Error message, can contain %curr% and %total% tags if gallery is enabled
+        // tError: '<a href="%url%">View</a> load failed.' //  Error message, can contain %curr% and %total% tags if gallery is enabled
+      }
+    });
+
+    // Handle Action Menu Observers
+    $('.field-actions .dropdown-menu').each( (key, elem) => {
+      add_observer(elem, 'li', 'highlight');
+    });
+    $('.td-field-actions .dropdown-menu').each( (key, elem) => {
+      add_observer(elem, 'tr', 'highlight');
+    });
+
+    $('#user-panel-toggle,#user-notifications,#global-search').on('click', function() {
+      if($(window).width() < 768) {
+        if ($('#navigation-drawer').is(':visible')) {
+          $('#co-hamburger').trigger('click');
+        }
+      }
+    });
+
     // Establish left-side navigation
     $('#main-menu').metisMenu();
-
-    // Never allow MDL to apply "aria-hidden" on the fixed menu drawer (it should always be available to screen readers)
-    $('#navigation-drawer').removeAttr('aria-hidden');
 
     // Focus any designated form element
     $('.focusFirst').focus();
 
-    // MDL prematurely marks all required=true fields with "is-invalid" class.
-    // Remove it. Must be done after MDL scripts have run (hence, window.load)
-    $(window).on('load', function() {
-      $('.mdl-textfield').removeClass('is-invalid');
+    // DESKTOP MENU DRAWER BEHAVIOR
+
+    // Hamburger menu-drawer toggle
+    $('#co-hamburger').click(function () {
+      if($(window).width() < 768) {
+        // Mobile mode
+        $("#navigation-drawer").removeClass("half-closed").toggle();
+      } else {
+        // Desktop mode
+        if ($("#navigation-drawer").hasClass("half-closed")) {
+          $("#navigation-drawer").removeClass("half-closed");
+          $("#main").removeClass("drawer-half-closed");
+          // save user's application preference for drawer state
+          setApplicationPreference("uiDrawerState",{"value":"open"});
+        } else {
+          $("#navigation-drawer").addClass("half-closed");
+          $("#main").addClass("drawer-half-closed");
+          // ensure all the sub-menus collapse when half-closing the menu
+          $("#navigation .metismenu li ul").removeClass("in");
+          $("#navigation .metismenu li").removeClass("active");
+          // save user's application preference for drawer state
+          setApplicationPreference("uiDrawerState",{"value":"half-closed"});
+        }
+      }
     });
 
-    // DESKTOP MENU DRAWER BEHAVIOR
-    // Check the drawer half-closed cookie on first load and set the drawer state appropriately
-    if (Cookies.get("desktop-drawer-state") == "half-closed") {
-      $("#navigation-drawer").addClass("half-closed");
-      $("#main").addClass("drawer-half-closed");
-    } else {
-      // Preserve the state of the most recently selected menu item if it is expandable (a "menuTop" item)
-      // (we only use this behavior when the the drawer is fully-open)
-      var mainMenuSelectedParentId = Cookies.get("main-menu-selected-parent-id");
-      if(mainMenuSelectedParentId != undefined && mainMenuSelectedParentId != "") {
-        $("#" + mainMenuSelectedParentId).addClass("active");
-        $("#" + mainMenuSelectedParentId + " > a.menuTop").attr("aria-expanded","true");
-        $("#" + mainMenuSelectedParentId + " > ul").addClass("in");
-      }
-    }
-
-    // Desktop hamburger menu-drawer toggle
-    $('#desktop-hamburger').click(function () {
-      if( $("#navigation-drawer").hasClass("half-closed")) {
-        $("#navigation-drawer").removeClass("half-closed");
-        $("#main").removeClass("drawer-half-closed");
-        // set a cookie to hold drawer half-open state between requests
-        Cookies.set("desktop-drawer-state", "open");
+    // Catch the edge-case of browser resize causing menu-drawer
+    // to remain hidden and vice versa.
+    $(window).resize(function() {
+      if($( window ).width() > 767) {
+        $("#navigation-drawer").show();
       } else {
-        $("#navigation-drawer").addClass("half-closed");
-        $("#main").addClass("drawer-half-closed");
-        // ensure all the sub-menus collapse when half-closing the menu
-        $("#navigation .metismenu li ul").removeClass("in");
-        $("#navigation .metismenu li").removeClass("active");
-        // set a cookie to hold drawer half-open state between requests
-        Cookies.set("desktop-drawer-state", "half-closed");
+        $("#navigation-drawer").hide();
       }
     });
 
     // Desktop half-closed drawer behavior & expandable menu items
     $('#navigation-drawer a.menuTop').click(function () {
-      if (Cookies.get("desktop-drawer-state") == "half-closed") {
-        $("#navigation-drawer").toggleClass("half-closed");
+      if($("#navigation-drawer").hasClass("half-closed") && $(this).attr("aria-expanded") == "true") {
+        // widen the menu when we open a.menuTop so we can see the menu items
+        $("#navigation-drawer").removeClass("half-closed").addClass("intermediate-open");
+      }
+      if($("#navigation-drawer").hasClass("intermediate-open") && $(this).attr("aria-expanded") == "false") {
+        // close it back down if we're in the intermediate state and we close a.menuTop
+        $("#navigation-drawer").addClass("half-closed").removeClass("intermediate-open");
       }
 
-      // Save the ID of the most recently expanded menuTop item for use on reload
+      // Save the ID of the most recently expanded menuTop item in an Application Preference
       if ($(this).attr("aria-expanded") == "true") {
         var parentId = $(this).parent().attr("id");
-        Cookies.set("main-menu-selected-parent-id", parentId);
+        setApplicationPreference("uiMainMenuSelectedParentId",{"value":parentId});
       } else {
-        Cookies.set("main-menu-selected-parent-id", "");
+        setApplicationPreference("uiMainMenuSelectedParentId",{"value":null});
       }
     });
 
@@ -121,15 +186,28 @@
       }
     });
 
+    // Toggle the notifications panel in the user menu
+    $("#user-notifications").click(function(e) {
+      e.stopPropagation();
+      if ($("#notifications-menu").is(":visible")) {
+        $("#notifications-menu").hide();
+        $(this).attr("aria-expanded","false");
+      } else {
+        $("#notifications-menu").show();
+        $(this).attr("aria-expanded","true");
+      }
+    });
+
     // Hide interface items on click outside
     $(document).on('click', function (e) {
-      if ($(e.target).closest("#user-panel, #global-search-box").length === 0) {
-        $("#user-panel, #global-search-box").hide();
+      if ($(e.target).closest("#user-panel, #global-search-box, #notification-menu").length === 0) {
+        $("#user-panel, #global-search-box, #notifications-menu").hide();
       }
       if ($(e.target).closest(".cm-inline-editable-field").length === 0) {
         $(".cm-inline-editable-field").removeClass('active');
       }
     });
+    // END USER MENU BEHAVIOR
 
     // Toggle the top search filter box
     $("#top-search-toggle, #top-search-toggle button.cm-toggle").click(function(e) {
@@ -147,7 +225,7 @@
     });
 
     // Clear a specific top search filter by clicking the filter button
-    $("#top-search-toggle .top-search-active-filter").click(function(e) {
+    $("#top-search-toggle button.top-search-active-filter").click(function(e) {
       e.preventDefault();
       e.stopPropagation();
       $(this).hide();
@@ -181,8 +259,9 @@
     // Accordion
     $(".accordion").accordion();
 
-    // Make all submit buttons pretty (MDL)
-    $("input:submit").addClass("spin submit-button mdl-button mdl-js-button mdl-button--raised mdl-button--colored mdl-js-ripple-effect");
+    // Add classes to all submit buttons
+    // NOTE: This is not working for the lightbox
+    $("input:submit").addClass("spin submit-button btn btn-primary");
 
     // Other buttons (jQuery)
     $(".addbutton").button({
@@ -255,6 +334,13 @@
       text: true
     });
 
+    $(".trashbutton").button({
+      icons: {
+        primary: 'ui-icon-trash'
+      },
+      text: true
+    });
+
     $(".editbutton").button(
       {  classes: {
       "ui-button": "highlight"
@@ -303,6 +389,13 @@
     $(".lockbutton").button({
       icons: {
         primary: 'ui-icon-locked'
+      },
+      text: true
+    });
+
+    $(".schedulebutton").button({
+      icons: {
+        primary: ' ui-icon-clock'
       },
       text: true
     });
@@ -415,6 +508,13 @@
       text: true
     });
 
+    $(".restorebutton").button({
+      icons: {
+        primary: 'ui-icon-arrowrefresh-1-e'
+      },
+      text: true
+    });
+
     // Datepickers
 
     <?php /* For all calls to datepicker, wrap the calling date field in a
@@ -432,10 +532,7 @@
       numberOfMonths: 1,
       showButtonPanel: false,
       showOtherMonths: true,
-      selectOtherMonths: true,
-      onSelect: function() {
-        $(this).closest('.mdl-textfield').addClass('is-dirty');
-      }
+      selectOtherMonths: true
     }).bind('click',function () {
       $("#ui-datepicker-div").appendTo($(this).closest('.modelbox-data'));
     });
@@ -448,10 +545,7 @@
       numberOfMonths: 1,
       showButtonPanel: false,
       showOtherMonths: true,
-      selectOtherMonths: true,
-      onSelect: function(selectedDate) {
-        $(this).closest('.mdl-textfield').addClass('is-dirty');
-      }
+      selectOtherMonths: true
     }).bind('click',function () {
       $("#ui-datepicker-div").appendTo($(this).closest('.modelbox-data'));
     });
@@ -462,10 +556,7 @@
       numberOfMonths: 1,
       showButtonPanel: false,
       showOtherMonths: true,
-      selectOtherMonths: true,
-      onSelect: function(selectedDate) {
-        $(this).closest('.mdl-textfield').addClass('is-dirty');
-      }
+      selectOtherMonths: true
     }).bind('click',function () {
       $("#ui-datepicker-div").appendTo($(this).closest('.modelbox-data'));
     });
@@ -477,10 +568,7 @@
       numberOfMonths: 1,
       showButtonPanel: false,
       showOtherMonths: true,
-      selectOtherMonths: true,
-      onSelect: function(selectedDate) {
-        $(this).closest('.mdl-textfield').addClass('is-dirty');
-      }
+      selectOtherMonths: true
     }).bind('click',function () {
       $("#ui-datepicker-div").appendTo($(this).closest('.modelbox-data'));
     });
@@ -501,21 +589,25 @@
       }
     });
 
-    // Add a spinner when a form is submitted or when any item is clicked with a "spin" class
-    $("input[type='submit'], .spin").click(function() {
-
-      var spinnerDiv = '<div id="coSpinner"></div>';
-      $("body").append(spinnerDiv);
-
-      var coSpinnerTarget = document.getElementById('coSpinner');
-      // coSpinnerOpts are set in js/comanage.js
-      var coSpinner = new Spinner(coSpinnerOpts).spin(coSpinnerTarget);
-
-      // Test for invalid fields (HTML5) and turn off spinner explicitly if found
-      if(document.querySelectorAll(":invalid").length) {
-        coSpinner.stop();
+    // Add loading animation when a form is submitted or when any item with a "spin" class is clicked.
+    $("input[type='submit'], .spin").click(function(e) {
+      
+      // Start a spinner only if CTRL, CMD, or SHIFT is not pressed (which loads a new tab or window).
+      if(!(e.ctrlKey || e.metaKey || e.shiftKey)) {
+        displaySpinner();
+  
+        // XXX This is a workaround. Currently the sidebar actions in CO Person Canvas
+        //     are part of the form. As a result the spinner is dismissed immediately after
+        if($(this).hasClass('ignore-invalid')) {
+          return;
+        }
+  
+        // Test for invalid fields (HTML5) and turn off spinner explicitly if found.
+        if(document.querySelectorAll(":invalid").length) {
+          stopSpinner();
+        }
       }
-
+      
     });
 
     // Flash Messages
@@ -526,9 +618,47 @@
     ?>
   });
 
+  // Observers list
+  var observer = new Array();
+  // Options for the Dropdown Action Menu Observer
+  const cmActionMenuOptions = {
+    attributes: true,
+    attributeFilter: ['class']
+  };
+
+  // Mutation observer handler for Dropdown action menus
+  // element              - Parent element containing target     (string, required)
+  // target_element       - DOM element to observe               (string, required)
+  // modify_class         - Class name apended to targte_element (string, required)
+  function add_observer(element, target_element, modify_class) {
+    observer[element] = new MutationObserver((mutationList) => {
+      // Use traditional 'for loops' for IE 11
+      for(const mutation of mutationList) {
+        if (mutation.type === 'attributes') {
+          bs_dropdown = mutation.target.parentNode;
+          if($(bs_dropdown).hasClass('show')) {
+            if(target_element === 'tr') {
+              $(bs_dropdown).closest(target_element).prev(target_element).addClass(target_element + '-' + modify_class);
+            }
+            $(bs_dropdown).closest(target_element).addClass(modify_class);
+          } else {
+            if(target_element === 'tr') {
+              $(bs_dropdown).closest(target_element).prev(target_element).removeClass(target_element + '-' + modify_class);
+            }
+            $(bs_dropdown).closest(target_element).removeClass(modify_class);
+          }
+        }
+      }
+    });
+    observer[element].observe(element,cmActionMenuOptions);
+  }
+
   // Define default text for confirm dialog
   var defaultConfirmOk = "<?php print _txt('op.ok'); ?>";
   var defaultConfirmCancel = "<?php print _txt('op.cancel'); ?>";
   var defaultConfirmTitle = "<?php print _txt('op.confirm'); ?>";
-
+  
+  // Define default text for session timeout and unknown errors
+  var defaultHttp500 = "<?php print _txt('er.500'); ?>";
+  var defaultHttp401 = "<?php print _txt('er.timeout'); ?>";
 </script>

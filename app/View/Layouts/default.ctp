@@ -45,7 +45,11 @@
     <!-- <?php
       // Include version number, but only if logged in
       if($this->Session->check('Auth.User')) {
-        print _txt('coordinate.version') . ' ' . chop(file_get_contents(APP . "Config/VERSION"));
+        $versionString = getenv('COMANAGE_REGISTRY_VERSION');
+        if($versionString === false) {
+          $versionString = chop(file_get_contents(CONFIG . "VERSION"));
+        }
+        print _txt('coordinate.version', array($versionString));
       }
     ?> -->
 
@@ -63,23 +67,24 @@
 
     <!-- Load CSS -->
     <?php
-      print $this->Html->css('jquery/jquery-ui-1.12.1.custom/jquery-ui.min') . "\n    ";
-      print $this->Html->css('mdl/mdl-1.3.0/material.min.css') . "\n    ";
+      print $this->Html->css('jquery/jquery-ui-1.13.2.custom/jquery-ui.min') . "\n    ";
+      print $this->Html->css('bootstrap/bootstrap-4.5.3-dist/css/bootstrap.min.css') . "\n    ";
       print $this->Html->css('jquery/metisMenu/metisMenu.min.css') . "\n    ";
-      print $this->Html->css('fonts/Font-Awesome-4.6.3/css/font-awesome.min') . "\n    ";
+      print $this->Html->css('jquery/magnificpopup/magnific-popup') . "\n    ";
+      print $this->Html->css('co-color') . "\n    ";
       print $this->Html->css('co-base') . "\n    ";
       print $this->Html->css('co-responsive') . "\n    ";
-
-      // Until used more broadly, limit loading of Magnific Popup
-      if ($this->controller = 'history_records') {
-        print $this->Html->css('jquery/magnificpopup/magnific-popup');
-      }
+      print $this->Html->css('co-lightbox') . "\n    ";
     ?>
 
     <!-- Load JavaScript -->
-    <?php /* only JQuery here - other scripts at bottom */
+    <?php
+      /* only JQuery, Bootstrap, and Vue here - other scripts at bottom. Note that until
+         jQueryUI is deprecated, it must be loaded after Bootstrap.  */
       print $this->Html->script('jquery/jquery-3.5.1.min.js') . "\n    ";
-      print $this->Html->script('jquery/jquery-ui-1.12.1.custom/jquery-ui.min.js') . "\n    ";
+      print $this->Html->script('bootstrap/bootstrap-4.5.3-dist/js/bootstrap.bundle.min.js') . "\n    ";
+      print $this->Html->script('jquery/jquery-ui-1.13.2.custom/jquery-ui.min.js') . "\n    ";
+      print $this->Html->script('vue/vue-3.2.31.global.prod.js') . "\n    ";
     ?>
 
     <!-- Include external files and scripts -->
@@ -92,7 +97,13 @@
     <!-- Include custom CSS -->
     <?php if(!empty($vv_theme_css)): ?>
       <style type="text/css">
-        <?php print $vv_theme_css; ?>
+        <?php
+        if(is_array($vv_theme_css)) {
+            foreach ($vv_theme_css as $theme_css) {
+              print $theme_css . PHP_EOL . PHP_EOL;
+            }
+        }
+        ?>
       </style>
     <?php endif; ?>
   </head>
@@ -138,7 +149,7 @@
     </div>
 
     <!-- Primary layout -->
-    <div id="comanage-wrapper" class="mdl-layout mdl-js-layout mdl-layout--fixed-drawer">
+    <div id="comanage-wrapper">
 
       <!-- Include custom header -->
       <?php if(!empty($vv_theme_header)): ?>
@@ -151,7 +162,7 @@
 
       <div id="top-menu">
         <?php if($vv_ui_mode === EnrollmentFlowUIMode::Full): ?>
-          <button id="desktop-hamburger" class="cm-toggle" aria-controls="navigation-drawer"><em class="material-icons">menu</em></button>
+          <button id="co-hamburger" class="cm-toggle" aria-controls="navigation-drawer"><em class="material-icons">menu</em></button>
         <?php endif; ?>
         <?php if(!empty($vv_NavLinks) || !empty($vv_CoNavLinks)): ?>
           <div id="user-defined-links-top">
@@ -162,35 +173,33 @@
           <?php print $this->element('menuUser'); ?>
         </nav>
       </div>
-
-      <header id="banner" class="mdl-layout__header mdl-layout__header--scroll">
-        <div class="mdl-layout__header-row">
-          <?php if(!isset($vv_theme_hide_title) || !$vv_theme_hide_title): ?>
-            <div id="collaborationTitle">
-              <?php
-                if(!empty($cur_co['Co']['name'])) {
-                  $args = array();
-                  $args['plugin'] = null;
-                  $args['controller'] = 'co_dashboards';
-                  $args['action'] = 'dashboard';
-                  $args['co'] = $cur_co['Co']['id'];
-                  print $this->Html->link($cur_co['Co']['name'],$args);
-                } else {
-                  print _txt('coordinate');
-                }
-              ?>
-            </div>
-          <?php endif; // $vv_theme_hide_title ?>
+  
+      <?php if(!isset($vv_theme_hide_title) || !$vv_theme_hide_title): ?>
+        <header id="banner">
+          <div id="collaborationTitle">
+            <?php
+              if(!empty($cur_co['Co']['name'])) {
+                $args = array();
+                $args['plugin'] = null;
+                $args['controller'] = 'co_dashboards';
+                $args['action'] = 'dashboard';
+                $args['co'] = $cur_co['Co']['id'];
+                print $this->Html->link($cur_co['Co']['name'],$args);
+              } else {
+                print _txt('coordinate');
+              }
+            ?>
+          </div>
 
           <div id="logo">
             <?php
               $imgFile = 'COmanage-Logo-LG-onBlue.png';
-
+  
               if(is_readable(APP . WEBROOT_DIR . DS . 'img' . DS . 'logo.png')) {
                 // A custom logo has been installed, so use that instead
                 $imgFile = 'logo.png';
               }
-
+  
               // Clicking on the logo will take us to the front page
               print $this->Html->link(
                 $this->Html->image(
@@ -203,88 +212,97 @@
               );
             ?>
           </div>
-        </div>
+        </header>
+      <?php endif; // $vv_theme_hide_title ?>
+      
+      <div id="main-wrapper">
+        <?php if($vv_ui_mode === EnrollmentFlowUIMode::Full): ?>
+          <?php
+            $navigationDrawerClasses = "coNavDrawer";
+            if(!empty($vv_app_prefs['uiDrawerState'])) {
+              $navigationDrawerClasses .= " " . filter_var($vv_app_prefs['uiDrawerState'],FILTER_SANITIZE_STRING);
+            }
+          ?>
+          <div id="navigation-drawer" class="<?php print $navigationDrawerClasses; ?>">
+            <nav id="navigation" aria-label="main menu">
+              <?php print $this->element('menuMain'); ?>
+              <?php if(!empty($vv_NavLinks) || !empty($vv_CoNavLinks)): ?>
+                <div id="user-defined-links-left">
+                  <?php print $this->element('links'); // XXX allow user to set this location (e.g. top or side) ?>
+                </div>
+              <?php endif; ?>
+            </nav>
+          </div>
+        <?php endif ?>
 
-      </header>
-
-      <?php if($vv_ui_mode === EnrollmentFlowUIMode::Full): ?>
-        <div id="navigation-drawer" class="mdl-layout__drawer">
-          <nav id="navigation" aria-label="main menu" class="mdl-navigation">
-            <?php print $this->element('menuMain'); ?>
-            <?php if(!empty($vv_NavLinks) || !empty($vv_CoNavLinks)): ?>
-              <div id="user-defined-links-left">
-                <?php print $this->element('links'); // XXX allow user to set this location (e.g. top or side) ?>
-              </div>
-            <?php endif; ?>
-          </nav>
-        </div>
-      <?php endif ?>
-
-      <?php
-        $mainCssClasses = 'cm-main-full mdl-layout__content';
-        if(!empty($vv_ui_mode)) {
-          if($vv_ui_mode === EnrollmentFlowUIMode::Basic) {
-            $mainCssClasses = 'cm-main-basic';
-          }
-        }
-      ?>
-      <main id="main" class="<?php print $mainCssClasses; ?>">
-
-        <div id="content" class="mdl-grid">
         <?php
-
-          // display the view content
-          if(!empty($sidebarButtons) || !empty($enrollmentFlowSteps)) {
-            print '<div id="content-inner" class="mdl-cell mdl-cell--9-col">';
-          } else {
-            print '<div id="content-inner" class="mdl-cell mdl-cell--12-col">';
-          }
-
-          // insert breadcrumbs on all but the homepage
-          if( $vv_ui_mode === EnrollmentFlowUIMode::Full
-              && $this->request->here !== $this->request->webroot) {
-            print '<div id="breadcrumbs">' . $this->Html->getCrumbs(' &gt; ', _txt('bc.home')) . "</div>";
-          }
-
-          // insert the anchor that is the target of accessible "skip to content" link
-          print '<a id="content-start"></a>';
-
-          // insert the page internal content
-          print $this->fetch('content');
-          print '</div>'; // end #content-inner
-
-          if(!empty($sidebarButtons) || !empty($enrollmentFlowSteps)) {
-            print '<div id="right-sidebar" class="mdl-cell mdl-cell--3-col mdl-cell--9-col-tablet mdl-cell--9-col-phone">';
-
-            // insert the sidebar buttons if they exist
-            $sidebarButtons = $this->get('sidebarButtons');
-            if (!empty($sidebarButtons)) {
-              print $this->element('sidebarButtons');
+          $mainCssClasses = 'cm-main-full';
+          if(!empty($vv_ui_mode)) {
+            if($vv_ui_mode === EnrollmentFlowUIMode::Basic) {
+              $mainCssClasses = 'cm-main-basic';
             }
-
-            // display enrollment flow steps when they exist
-            $enrollmentFlowSteps = $this->get('enrollmentFlowSteps');
-            if (!empty($enrollmentFlowSteps)) {
-              print $this->element('enrollmentFlowSteps');
-            }
-            print "</div>";
+          }
+          if(!empty($vv_app_prefs['uiDrawerState'])) {
+            $mainCssClasses .= " drawer-" . filter_var($vv_app_prefs['uiDrawerState'],FILTER_SANITIZE_STRING);
           }
         ?>
-        </div>
+        <main id="main" class="<?php print $mainCssClasses; ?>">
 
-        <!-- Include custom footer -->
-        <?php if(!empty($vv_theme_footer)): ?>
-          <footer id="customFooter">
-            <?php print $vv_theme_footer; ?>
-          </footer>
-        <?php endif; ?>
+          <?php
+            // display the view content
+            if(!empty($sidebarButtons) || !empty($enrollmentFlowSteps)) {
+              print '<div id="content" class="with-sidebar">';
+            } else {
+              print '<div id="content">';
+            }
+            print '<div id="content-inner">';
 
-        <?php if(Configure::read('debug') > 0): ?>
-          <div id="debug" class="mdl-grid">
-            <?php print $this->element('sql_dump'); ?>
-          </div>
-        <?php endif; ?>
-      </main>
+            // insert breadcrumbs on all but the homepage
+            if( $vv_ui_mode === EnrollmentFlowUIMode::Full
+                && $this->request->here !== $this->request->webroot) {
+              print '<div id="breadcrumbs">' . $this->Html->getCrumbs(' &gt; ', _txt('bc.home')) . "</div>";
+            }
+
+            // insert the anchor that is the target of accessible "skip to content" link
+            print '<a id="content-start"></a>';
+
+            // insert the page internal content
+            print $this->fetch('content');
+            print '</div>'; // end #content-inner
+
+            if(!empty($sidebarButtons) || !empty($enrollmentFlowSteps)) {
+              print '<div id="right-sidebar">';
+
+              // insert the sidebar buttons if they exist
+              $sidebarButtons = $this->get('sidebarButtons');
+              if (!empty($sidebarButtons)) {
+                print $this->element('sidebarButtons');
+              }
+
+              // display enrollment flow steps when they exist
+              $enrollmentFlowSteps = $this->get('enrollmentFlowSteps');
+              if (!empty($enrollmentFlowSteps)) {
+                print $this->element('enrollmentFlowSteps');
+              }
+              print "</div>"; // end #right-sidebar
+              print "</div>"; // end #content
+            }
+          ?>
+
+          <!-- Include custom footer -->
+          <?php if(!empty($vv_theme_footer)): ?>
+            <footer id="customFooter">
+              <?php print $vv_theme_footer; ?>
+            </footer>
+          <?php endif; ?>
+
+          <?php if(Configure::read('debug') > 0): ?>
+            <div id="debug">
+              <?php print $this->element('sql_dump'); ?>
+            </div>
+          <?php endif; ?>
+        </main>
+      </div>
 
       <?php if(!isset($vv_theme_hide_footer_logo) || !$vv_theme_hide_footer_logo): ?>
         <footer id="co-footer">
@@ -296,14 +314,9 @@
 
     <!-- Load JavaScript -->
     <?php
-      print $this->Html->script('mdl/mdl-1.3.0/material.min.js') . "\n    ";
       print $this->Html->script('jquery/metisMenu/metisMenu.min.js') . "\n    ";
       print $this->Html->script('js-cookie/js.cookie-2.1.3.min.js') . "\n    ";
-      print $this->Html->script('jquery/spin.min.js') . "\n    ";
-      if ($this->controller = 'history_records') {
-        // Until used more broadly, limit loading of Magnific Popup
-        print $this->Html->script('jquery/magnificpopup/jquery.magnific-popup.min.js') . "\n    ";
-      }
+      print $this->Html->script('jquery/magnificpopup/jquery.magnific-popup.min.js') . "\n    ";
       print $this->Html->script('comanage.js') . "\n    ";
     ?>
 
@@ -318,7 +331,7 @@
     </script>
 
 
-    <?php if($this->here != '/registry/pages/eds/index'):
+    <?php if($this->here != $this->Html->url('/') .'pages/eds/index'):
       // Don't load the following scripts when loading the Shib EDS. ?>
 
       <!-- noty scripts -->
@@ -338,7 +351,23 @@
           <span id="dialog-text"><?php print _txt('op.proceed.ok'); ?></span>
         </p>
       </div>
+
+      <!-- Dialog Form -->
+      <div id="form-dialog" class="co-dialog">
+        <form method="post" action="" >
+          <fieldset>
+            <legend id="form-dialog-legend"><?php print _txt('js.input.provide');?></legend>
+            <p>
+              <label id="form-dialog-input-lbl" for="form-dialog-text"><?php print _txt('js.text');?></label>
+              <input id="form-dialog-text" type="text"/>
+            </p>
+          </fieldset>
+        </form>
+      </div>
     <?php endif // !eds ?>
+
+    <!-- loading animation -->
+    <div id="co-loading"><span></span><span></span><span></span></div>
 
   </body>
 </html>

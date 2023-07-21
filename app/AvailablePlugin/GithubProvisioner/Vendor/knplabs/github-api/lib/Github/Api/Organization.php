@@ -2,8 +2,11 @@
 
 namespace Github\Api;
 
+use Github\Api\Organization\Actions\Secrets;
+use Github\Api\Organization\Actions\Variables;
 use Github\Api\Organization\Hooks;
 use Github\Api\Organization\Members;
+use Github\Api\Organization\OutsideCollaborators;
 use Github\Api\Organization\Teams;
 
 /**
@@ -53,15 +56,27 @@ class Organization extends AbstractApi
      * @param string $organization the user name
      * @param string $type         the type of repositories
      * @param int    $page         the page
+     * @param string $sort         sort by
+     * @param string $direction    direction of sort, asc or desc
      *
      * @return array the repositories
      */
-    public function repositories($organization, $type = 'all', $page = 1)
+    public function repositories($organization, $type = 'all', $page = 1, $sort = null, $direction = null)
     {
-        return $this->get('/orgs/'.rawurlencode($organization).'/repos', [
+        $parameters = [
             'type' => $type,
             'page' => $page,
-        ]);
+        ];
+
+        if ($sort !== null) {
+            $parameters['sort'] = $sort;
+        }
+
+        if ($direction !== null) {
+            $parameters['direction'] = $direction;
+        }
+
+        return $this->get('/orgs/'.rawurlencode($organization).'/repos', $parameters);
     }
 
     /**
@@ -69,7 +84,7 @@ class Organization extends AbstractApi
      */
     public function members()
     {
-        return new Members($this->client);
+        return new Members($this->getClient());
     }
 
     /**
@@ -77,7 +92,7 @@ class Organization extends AbstractApi
      */
     public function hooks()
     {
-        return new Hooks($this->client);
+        return new Hooks($this->getClient());
     }
 
     /**
@@ -85,7 +100,31 @@ class Organization extends AbstractApi
      */
     public function teams()
     {
-        return new Teams($this->client);
+        return new Teams($this->getClient());
+    }
+
+    /**
+     * @return Secrets
+     */
+    public function secrets(): Secrets
+    {
+        return new Secrets($this->getClient());
+    }
+
+    /**
+     * @return Variables
+     */
+    public function variables(): Variables
+    {
+        return new Variables($this->getClient());
+    }
+
+    /**
+     * @return OutsideCollaborators
+     */
+    public function outsideCollaborators()
+    {
+        return new OutsideCollaborators($this->getClient());
     }
 
     /**

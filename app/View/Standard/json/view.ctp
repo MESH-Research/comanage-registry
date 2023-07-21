@@ -37,7 +37,7 @@
     
     foreach($$modelpl as $m)
     {
-      $a = array("Version" => "1.0",    // XXX this needs to be set by the controller
+      $a = array("Version" => $vv_model_version,
                  "Id" => $m[$req]['Id']);
       
       foreach(array_keys($m[$req]) as $k)
@@ -56,16 +56,16 @@
               $a['Person'] = array('Type' => 'Dept',
                                    'Id' => $m[$req][$k]);
               break;
-            case 'CoGroupId':
-              $a['Person'] = array('Type' => 'Group',
-                                   'Id' => $m[$req][$k]);
-              break;
             case 'CoPersonId':
               $a['Person'] = array('Type' => 'CO',
                                    'Id' => $m[$req][$k]);
               break;
             case 'CoPersonRoleId':
               $a['Person'] = array('Type' => 'CoRole',
+                                   'Id' => $m[$req][$k]);
+              break;
+            case 'OrganizationId':
+              $a['Person'] = array('Type' => 'Organization',
                                    'Id' => $m[$req][$k]);
               break;
             case 'OrgIdentityId':

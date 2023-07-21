@@ -1,11 +1,14 @@
 {
   "config": {
-    "vendor-dir": "Vendor"
+    "vendor-dir": "Vendor",
+    "allow-plugins": {
+      "php-http/discovery": true
+    }
   },
   "require": {
-    "guzzlehttp/guzzle": "~6.0",
-    "knplabs/github-api": "^2.12",
-    "php-http/guzzle6-adapter": "^1.1",
-    "cache/filesystem-adapter": "^1.0"
+    "guzzlehttp/guzzle": "~7.5",
+    "knplabs/github-api": "^3.9",
+    "php-http/guzzle7-adapter": "^1.0.0",
+    "cache/filesystem-adapter": "^1.2"
   }
 }

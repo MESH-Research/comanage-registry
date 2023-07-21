@@ -42,6 +42,7 @@ class ProvisionerBehavior extends ModelBehavior {
     StatusEnum::Active,
     StatusEnum::Expired,
     StatusEnum::GracePeriod,
+    StatusEnum::Locked,
     StatusEnum::Suspended
   );
   
@@ -594,10 +595,23 @@ class ProvisionerBehavior extends ModelBehavior {
       $pAction = ProvisioningActionEnum::CoGroupDeleted;
     }
     
+    // Ideally, we'd have used containable to pull CoProvisioningTargetFilter
+    // with $coProvisionerTarget, but the latter is ChangelogBehavior-enabled
+    // while the former isn't, which results in issues pulling archived records
+    // that shouldn't be pulled. So we check for filters here.
+    
+    $args = array();
+    $args['conditions']['CoProvisioningTargetFilter.co_provisioning_target_id'] = $coProvisioningTarget['CoProvisioningTarget']['id'];
+    $args['order'] = 'CoProvisioningTargetFilter.ordr ASC';
+    $args['contain'] = array('DataFilter');
+    
+    $CPTFilter = ClassRegistry::init('CoProvisioningTargetFilter');
+    $filters = $CPTFilter->find('all', $args);
+    
     // Pass the provisioning data through any configured data filters.
     // The parent call should have ordered the filters already (via containable).
-    if(!empty($coProvisioningTarget['CoProvisioningTargetFilter'])) {
-      foreach($coProvisioningTarget['CoProvisioningTargetFilter'] as $filter) {
+    if(!empty($filters)) {
+      foreach($filters as $filter) {
         if(!empty($filter['DataFilter']) 
            && $filter['DataFilter']['status'] == SuspendableStatusEnum::Active) {
           $pluginModelName = $filter['DataFilter']['plugin'] . "." . $filter['DataFilter']['plugin'];
@@ -765,10 +779,14 @@ class ProvisionerBehavior extends ModelBehavior {
     // Pull the Provisioning Targets for this CO. We use the CO ID from $provisioningData.
     
     $args = array();
-    $args['conditions']['CoProvisioningTarget.status'] = array(ProvisionerStatusEnum::AutomaticMode);
+    $args['conditions']['CoProvisioningTarget.status'] = array(
+      ProvisionerModeEnum::AutomaticMode,
+      ProvisionerModeEnum::QueueMode,
+      ProvisionerModeEnum::QueueOnErrorMode
+    );
     if($action == ProvisioningActionEnum::CoPersonPetitionProvisioned) {
       // Also run provisioners in Enrollment Mode
-      $args['conditions']['CoProvisioningTarget.status'][] = ProvisionerStatusEnum::EnrollmentMode;
+      $args['conditions']['CoProvisioningTarget.status'][] = ProvisionerModeEnum::EnrollmentMode;
     }
     if(isset($provisioningData[ $model->name ]['co_id'])) {
       $args['conditions']['CoProvisioningTarget.co_id'] = $provisioningData[ $model->name ]['co_id'];
@@ -790,28 +808,81 @@ class ProvisionerBehavior extends ModelBehavior {
     } else {
       $args['order'] = array('CoProvisioningTarget.ordr ASC');
     }
-    $args['contain'] = array('CoProvisioningTargetFilter' => array(
-      'DataFilter',
-      'order' => 'CoProvisioningTargetFilter.ordr ASC'
-    ));
+    $args['contain'] = false;
     
     $targets = $model->Co->CoProvisioningTarget->find('all', $args);
     
     if(!empty($targets)) {
       foreach($targets as $target) {
-        // Fire off each provisioning target
+        // Look at each plugin's mode (confusingly called status). If it is
+        // Automatic or QueueOnError, invoke it now. If it is Queue, register
+        // a job.
         
-        try {
-          $this->invokePlugin($target,
-                              $provisioningData,
-                              $action,
-                              $actorCoPersonId);
+        // Note that queued jobs will trigger manualProvision, which calls
+        // invokePlugin() directly (bypassing invokePlugins).
+        
+        $error = false;
+        
+        if($target['CoProvisioningTarget']['status'] != ProvisionerModeEnum::QueueMode) {
+          // Fire off each provisioning target
+          
+          try {
+            $this->invokePlugin($target,
+                                $provisioningData,
+                                $action,
+                                $actorCoPersonId);
+          }
+          catch(InvalidArgumentException $e) {
+            $err .= _txt('er.prov.plugin', array($target['CoProvisioningTarget']['description'], $e->getMessage())) . ";";
+          }
+          catch(RuntimeException $e) {
+            // XXX should we maybe suppress or modify this when mode = QueueOnErrorMode?
+            $err .= _txt('er.prov.plugin', array($target['CoProvisioningTarget']['description'], $e->getMessage())) . ";";
+            
+            // We only requeue on RuntimeException, not InvalidArgumentException
+            // (which presumably won't be fixed by rerunning it).
+            $error = true;
+          }
         }
-        catch(InvalidArgumentException $e) {
-          $err .= _txt('er.prov.plugin', array($target['CoProvisioningTarget']['description'], $e->getMessage())) . ";";
-        }
-        catch(RuntimeException $e) {
-          $err .= _txt('er.prov.plugin', array($target['CoProvisioningTarget']['description'], $e->getMessage())) . ";";
+        
+        if($target['CoProvisioningTarget']['status'] == ProvisionerModeEnum::QueueMode
+           || ($target['CoProvisioningTarget']['status'] == ProvisionerModeEnum::QueueOnErrorMode
+               && $error)) {
+          // Queue the job. The job will be processed by ProvisionJob, and the
+          // job infrastructure will handle retrying if it fails (again).
+          
+          $retry = (!empty($target['CoProvisioningTarget']['retry_interval'])
+                    ? $target['CoProvisioningTarget']['retry_interval']
+                    : 900);
+          
+          // It's possible we'll try to register a job for a target when there is
+          // already one in the queue, eg if two changes are made in quick succession.
+          // To keep the noise down, we'll ignore these errors.
+          $model->Co->CoJob->register($target['CoProvisioningTarget']['co_id'], 
+                                      'CoreJob.Provision',
+                                      $provisioningData[ $model->name ]['id'],
+                                      $model->name,
+                                      _txt(($target['CoProvisioningTarget']['status'] == ProvisionerModeEnum::QueueMode
+                                            ? 'rs.prov.queue'
+                                            : 'rs.prov.queue.err'), 
+                                           array($model->name,
+                                                 $provisioningData[ $model->name ]['id'],
+                                                 $target['CoProvisioningTarget']['description'],
+                                                 $target['CoProvisioningTarget']['id'])),
+                                      true,
+                                      false,
+                                      array(
+                                        'co_provisioning_target_id' => $target['CoProvisioningTarget']['id'],
+                                        'record_type' => $model->name,
+                                        'record_id' => $provisioningData[ $model->name ]['id'],
+                                        'provisioning_action' => $action
+                                      ),
+                                      // Start as soon as possible, unless on error, in which case we
+                                      // retry in 15 minutes XXX document, make con
+                                      ($target['CoProvisioningTarget']['status'] == ProvisionerModeEnum::QueueMode
+                                       ? 0 : $retry),
+                                      0,
+                                      $retry);
         }
       }
     }
@@ -877,14 +948,7 @@ class ProvisionerBehavior extends ModelBehavior {
       
       $args = array();
       $args['conditions']['CoProvisioningTarget.id'] = $coProvisioningTargetId;
-      // beforeFilter may have bound all the plugins (depending on how we were called),
-      // so this find will pull the related models as well. However, to reduce the number
-      // of database queries should a large number of plugins be installed, we'll use
-      // containable behavior and make a second call for the plugin we want.
-      $args['contain'] = array('CoProvisioningTargetFilter' => array(
-        'DataFilter',
-        'order' => 'CoProvisioningTargetFilter.ordr ASC'
-      ));
+      $args['contain'] = false;
       
       // Currently, CoPerson and CoGroup are the only models that calls manualProvision, so we know
       // how to find CoProvisioningTarget
@@ -1104,103 +1168,29 @@ class ProvisionerBehavior extends ModelBehavior {
       return array();
     }
     
-    // Because Authenticators are handled via plugins (which might not be configured)
-    // we need to handle them specially. Pull the set of authenticators and then
-    // pull their model data. Note we assume FooAuthenticator, where Foo is the
-    // corresponding model.
-    
-    $authplugins = preg_grep('/.*Authenticator$/', CakePlugin::loaded());
-    
-    foreach($authplugins as $authplugin) {
-      // $authplugin = (eg) PasswordAuthenticator
-      // $authmodel = (eg) Password
-      $authmodel = substr($authplugin, 0, -13);
+    if(!in_array($coPersonData['CoPerson']['status'], $this->personStatuses)) {
+      // As per https://spaces.at.internet2.edu/display/COmanage/CO+Person+and+Person+Role+Status
+      // we don't provision data for many statuses. We return a skeletal record
+      // to facilitate deprovisioning.
       
-      // We should be able to just modify the 'contain' above, but for some reason
-      // this isn't working (possibly cake resetting associations somewhere or maybe
-      // due to Passward not being changelog enabled).
-      $coPersonModel->bindModel(array('hasMany' => array($authplugin.'.'.$authmodel => array('dependent' => true))));
-      
-      $args = array();
-      $args['conditions'][$authmodel.'.co_person_id'] = $coPersonId;
-      // We also need the configuration ("Authenticator") status as well as
-      // the status of this specific authenticator ("AuthenticatorStatus").
-      // For some reason when called from SAMController::manage() (but not from other functions)
-      // this contain picks up (eg) PasswordAuthenticator, but not Authenticator or AuthenticatorStatus.
-      // So we have to make multiple calls.
-//      $args['contain']['PasswordAuthenticator']['Authenticator'] = 'AuthenticatorStatus';
-      $args['contain'][] = $authplugin;
-      
-      $authenticators = $coPersonModel->$authmodel->find('all', $args);
-      
-      // We only want Authenticators that are Active. (The Plugins decide what to do
-      // with AuthenticatorStatus.)
-      
-      $coPersonData[$authmodel] = array();
-      
-      foreach($authenticators as $p) {
-        // Now we need to pull the Authenticator and Status
-        if(!empty($p[$authplugin]['authenticator_id'])) {
-          $args = array();
-          $args['conditions']['Authenticator.id'] = $p[$authplugin]['authenticator_id'];
-          $args['contain'] = array(
-            'AuthenticatorStatus' => array(
-              'conditions' => array('AuthenticatorStatus.co_person_id' => $coPersonId)
-            )
-          );
-          
-          $aStatus = $coPersonModel->$authmodel->$authplugin->Authenticator->find('first', $args);
-          
-          if(isset($aStatus['Authenticator']['status'])
-             && $aStatus['Authenticator']['status'] == SuspendableStatusEnum::Active) {
-            // Reformat the data to match the main find
-            $pd = $p[$authmodel];
-            
-            if(!empty($aStatus['AuthenticatorStatus'][0])) {
-              $pd['AuthenticatorStatus'] = $aStatus['AuthenticatorStatus'][0];
-            }
-            
-            $coPersonData[$authmodel][] = $pd;
-          }
-        }
-      }
+      return array(
+        'CoPerson' => array(
+          'co_id' => $coPersonData['CoPerson']['co_id'],
+          'id' => $coPersonId,
+          'status' => $coPersonData['CoPerson']['status']
+        )
+      );
     }
     
-    // Pulling Cluster information works similarly, but not identically, to Authenticators
+    // Merge in Authenticator data, obtained via plugins
+    $coPersonData = array_merge($coPersonData, 
+                                $coPersonModel->Co->Authenticator->marshallProvisioningData($coPersonData['CoPerson']['co_id'],
+                                                                                            $coPersonData['CoPerson']['id']));
     
-    $clusterplugins = preg_grep('/.*Cluster$/', CakePlugin::loaded());
-    
-    foreach($clusterplugins as $clusterplugin) {
-      // We use $cmPluginHasMany to determine which models to provision.
-      $clustermodel = $clusterplugin;
-      
-      $Cluster = ClassRegistry::init($clusterplugin.'.'.$clustermodel);
-      
-      if(!empty($Cluster->cmPluginHasMany['CoPerson'])) {
-        foreach($Cluster->cmPluginHasMany['CoPerson'] as $clustersubmodel) {
-          $coPersonModel->bindModel(array('hasMany' => array($clusterplugin.'.'.$clustersubmodel => array('dependent' => true))));
-          
-          $args = array();
-          $args['conditions'][$clustersubmodel.'.co_person_id'] = $coPersonId;
-          $args['conditions'][$clustersubmodel.'.status'] = array(StatusEnum::Active, StatusEnum::GracePeriod);
-          $args['conditions']['AND'][] = array(
-            'OR' => array(
-              $clustersubmodel.'.valid_from IS NULL',
-              $clustersubmodel.'.valid_from < ' => date('Y-m-d H:i:s', time())
-            )
-          );
-          $args['conditions']['AND'][] = array(
-            'OR' => array(
-              $clustersubmodel.'.valid_through IS NULL',
-              $clustersubmodel.'.valid_through > ' => date('Y-m-d H:i:s', time())
-            )
-          );
-          $args['contain'] = array($clustermodel => array('Cluster'));
-          
-          $coPersonData[$clustersubmodel] = $coPersonModel->$clustersubmodel->find('all', $args);
-        }
-      }
-    }
+    // Merge in Cluster data, obtained via plugins
+    $coPersonData = array_merge($coPersonData, 
+                                $coPersonModel->Co->Cluster->marshallProvisioningData($coPersonData['CoPerson']['co_id'],
+                                                                                      $coPersonData['CoPerson']['id']));
     
     // At the moment, if a CO Person is not active we remove their Role Records
     // (even if those are active) and group memberships, but leave the rest of the
@@ -1296,11 +1286,13 @@ class ProvisionerBehavior extends ModelBehavior {
     // coPersonModel above does not filter out email list memberships where
     // the associated group membership is empty.
 
-    foreach($coPersonData['CoGroupMember'] as &$membership) {
-      if(empty($membership['member'])) {
-        $membership['CoGroup']['EmailListAdmin'] = array();
-        $membership['CoGroup']['EmailListMember'] = array();
-        $membership['CoGroup']['EmailListModerator'] = array();
+    if(!empty($coPersonData['CoGroupMember'])) {
+      foreach($coPersonData['CoGroupMember'] as &$membership) {
+        if(empty($membership['member'])) {
+          $membership['CoGroup']['EmailListAdmin'] = array();
+          $membership['CoGroup']['EmailListMember'] = array();
+          $membership['CoGroup']['EmailListModerator'] = array();
+        }
       }
     }
 
@@ -1528,6 +1520,12 @@ class ProvisionerBehavior extends ModelBehavior {
             $paction = ProvisioningActionEnum::CoPersonUnexpired;
           }
         }
+      }
+      
+      if(!in_array($pdata['CoPerson']['status'], $this->personStatuses)) {
+        // Convert to a delete operation in case we're downgrading a record
+        // from a provisioned status to a non-provisioned status
+        $paction = ProvisioningActionEnum::CoPersonDeleted;
       }
       
       // Invoke all provisioning plugins

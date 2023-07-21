@@ -41,6 +41,8 @@ class Identifier extends AppModel {
     "CoPerson",
     // An identifier may be created from a Provisioner
     "CoProvisioningTarget",
+    // An Ad Hoc Attribute may be attached to an Organization
+    "Organization",
     // An identifier may be attached to an Org Identity
     "OrgIdentity",
     // An identifier created from a Pipeline has a Source Identifier
@@ -57,6 +59,7 @@ class Identifier extends AppModel {
 //  public $order = array("Identifier.identifier");
   
   public $actsAs = array('Containable',
+                         'Normalization' => array('priority' => 4),
                          'Provisioner',
                          'Changelog' => array('priority' => 5));
   
@@ -77,17 +80,39 @@ class Identifier extends AppModel {
       // See also Identifier Self Service (CO-1255).
       'filter' => array(
         'rule' => array('validateInput')
-      )
+      ),
+//    XXX We (currently) don't enforce duplicate checking for CoDepartment
+//        or OrgIdentity. Uncomment the rule below in order to change this.
+//      'unique' => array(
+//        'rule' => array(
+//          'isUniqueChangelog',
+//          array(
+//            'identifier',
+//            'type',
+//            'co_person_id',
+//            'co_group_id',
+//            'org_identity_id',
+//            'organization_id',
+//            'co_department_id',
+//            'source_identifier_id'
+//            ),
+//          false),
+//        'message' => array('The Identifier is already in use.'),
+//        'last' => 'true'
+//      ),
     ),
     'type' => array(
       'content' => array(
         'rule' => array('validateExtendedType',
                         array('attribute' => 'Identifier.type',
-                              'default' => array(IdentifierEnum::Badge,
+                              'default' => array(IdentifierEnum::AffiliateSOR,
+                                                 IdentifierEnum::Badge,
                                                  IdentifierEnum::Enterprise,
                                                  IdentifierEnum::ePPN,
                                                  IdentifierEnum::ePTID,
                                                  IdentifierEnum::ePUID,
+                                                 IdentifierEnum::GuestSOR,
+                                                 IdentifierEnum::HRSOR,
                                                  IdentifierEnum::Mail,
                                                  IdentifierEnum::National,
                                                  IdentifierEnum::Network,
@@ -99,6 +124,7 @@ class Identifier extends AppModel {
                                                  IdentifierEnum::SamlPairwise,
                                                  IdentifierEnum::SamlSubject,
                                                  IdentifierEnum::SORID,
+                                                 IdentifierEnum::StudentSOR,
                                                  IdentifierEnum::UID))),
         'required' => true,
         'allowEmpty' => false
@@ -210,13 +236,14 @@ class Identifier extends AppModel {
    * @param  Integer Object ID
    * @param  Integer Actor CO Person ID
    * @param  Boolean Whether or not to run provisioners on save
+   * @param  Integer Actor API User ID
    * @return Array Success for each attribute, where the key is the attribute assigned and the value is 1 for success, 2 for already assigned, or an error string
    * @throws Exception
    * @throws InvalidArgumentException
    * @throws OverflowException
    */  
   
-  function assign($objType, $objId, $actorCoPersonId, $provision=true) {
+  function assign($objType, $objId, $actorCoPersonId, $provision=true, $actorApiUserId=null) {
     $ret = array();
     
     // First, pull the CO ID from the object record
@@ -252,13 +279,17 @@ class Identifier extends AppModel {
         
         try {
           // We don't provision here, but instead once below after all identifiers are assigned
-          $this->CoPerson->Co->CoIdentifierAssignment->assign($ia, $objType, $objId, $actorCoPersonId, false);
+          $this->CoPerson->Co->CoIdentifierAssignment->assign($ia, $objType, $objId, $actorCoPersonId, false, $actorApiUserId);
           $ret[ $ia['CoIdentifierAssignment']['identifier_type'] ] = 1;
           $cnt++;
         }
         catch(OverflowException $e) {
           // An identifier already exists of this type for this CO Person/CO Group
           $ret[ $ia['CoIdentifierAssignment']['identifier_type'] ] = 2;
+        }
+        catch(UnderflowException $e) {
+          // The CO Person is not a member of the configured CO Group
+          $ret[ $ia['CoIdentifierAssignment']['identifier_type'] ] = 3;
         }
         catch(Exception $e) {
           $ret[ $ia['CoIdentifierAssignment']['identifier_type'] ] = $e->getMessage();
@@ -378,7 +409,7 @@ class Identifier extends AppModel {
           $this->_rollback();
           
           $eclass = get_class($e);
-          throw new $eclass($e->getMessage());
+          throw new $eclass($e->getMessage(), $e->getCode());
         }
       }
     }
@@ -406,6 +437,7 @@ class Identifier extends AppModel {
       'CoDepartment',
       'CoGroup',
       'CoPerson',
+      'Organization',
       'OrgIdentity'
     );
 
@@ -426,12 +458,13 @@ class Identifier extends AppModel {
    * Perform a keyword search.
    *
    * @since  COmanage Registry v3.1.0
-   * @param  Integer $coId CO ID to constrain search to
-   * @param  String  $q    String to search for
+   * @param  integer $coId  CO ID to constrain search to
+   * @param  string  $q     String to search for
+   * @param  integer $limit Search limit
    * @return Array Array of search results, as from find('all)
    */
   
-  public function search($coId, $q) {
+  public function search($coId, $q, $limit) {
     $args = array();
     $args['conditions']['Identifier.identifier'] = $q;
     $args['conditions']['OR'] = array(
@@ -439,6 +472,7 @@ class Identifier extends AppModel {
       'CoGroup.co_id' => $coId
     );
     $args['order'] = array('Identifier.identifier');
+    $args['limit'] = $limit;
     $args['contain'] = array(
       'CoGroup',
       'CoPerson' => 'PrimaryName'

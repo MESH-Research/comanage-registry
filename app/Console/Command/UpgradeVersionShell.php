@@ -29,6 +29,7 @@ class UpgradeVersionShell extends AppShell {
   var $uses = array('Meta',
                     'Address',
                     'ApiUser',
+                    'AttributeEnumeration',
                     'CmpEnrollmentConfiguration',
                     'Co',
                     'CoEnrollmentAttributeDefault',
@@ -37,9 +38,12 @@ class UpgradeVersionShell extends AppShell {
                     'CoGroup',
                     'CoIdentifierAssignment',
                     'CoJob',
+                    'CoSetting',
+                    'DataFilter',
                     'GrouperProvisioner.CoGrouperProvisionerTarget',
                     'HttpServer',
                     'Identifier',
+                    'CoMessageTemplate',
                     'SshKeyAuthenticator.SshKey',
                     'SshKeyAuthenticator.SshKeyAuthenticator');
   
@@ -89,7 +93,16 @@ class UpgradeVersionShell extends AppShell {
     "3.2.5" => array('block' => false),
     "3.3.0" => array('block' => false, 'pre' => 'pre330', 'post' => 'post330'),
     "3.3.1" => array('block' => false),
-    "3.3.2" => array('block' => false)
+    "3.3.2" => array('block' => false),
+    "3.3.3" => array('block' => false),
+    "3.3.4" => array('block' => false),
+    "4.0.0" => array('block' => false, 'post' => 'post400'),
+    "4.0.1" => array('block' => false),
+    "4.0.2" => array('block' => false),
+    "4.1.0" => array('block' => false, 'post' => 'post410'),
+    "4.1.1" => array('block' => false),
+    "4.1.2" => array('block' => false),
+    "4.2.0" => array('block' => false)
   );
   
   public function getOptionParser() {
@@ -502,4 +515,140 @@ class UpgradeVersionShell extends AppShell {
     // SQL: Alter table foo rename column bar to baz (should be cross plaform)
     $this->CoEnrollmentFlow->query("ALTER TABLE " . $prefix . "co_enrollment_flows RENAME COLUMN return_url_whitelist TO return_url_allowlist");
   }
+  
+  public function post400() {
+    // 4.0.0 converts Attribute Enumerations to use Dictionaries.
+    $this->out(_txt('sh.ug.400.attrenums'));
+    $this->AttributeEnumeration->_ug400();
+    
+    // 4.0.0 adds Organization Extended Type
+    $this->out(_txt('sh.ug.400.org'));
+    
+    $args = array();
+    $args['contain'] = false;
+    
+    $cos = $this->Co->find('all', $args);
+    
+    // We update inactive COs as well, in case they become active again
+    foreach($cos as $co) {
+      $this->out('- ' . $co['Co']['name']);
+      
+      $this->CoExtendedType->addDefault($co['Co']['id'], 'Organization.type');
+    }
+    
+    // Resize HttpServer password column
+    $this->out(_txt('sh.ug.400.http_server.password'));
+    $this->HttpServer->_ug400();
+
+    // Update CoMessageTemplate format column
+    $this->out(_txt('sh.ug.400.messagetemplate.format'));
+    $this->CoMessageTemplate->_ug400();
+
+    // Register Garbage Collector Job
+    $this->out(_txt('sh.ug.400.garbage.collector.register'));
+    
+    // Register the GarbageCollector
+    $Co = ClassRegistry::init('Co');
+    $args = array();
+    $args['conditions']['Co.name'] = DEF_COMANAGE_CO_NAME;
+    $args['conditions']['Co.status'] = TemplateableStatusEnum::Active;
+    $args['fields'] = array('Co.id');
+    $args['contain'] = false;
+
+    $cmp = $Co->find('first', $args);
+    $cmp_id = $cmp['Co']['id'];
+
+    // We will need a requeue Interval, this will be the same as the queue one.
+    $jobid = $Co->CoJob->register(
+      $cmp_id,                                                // $coId
+      'CoreJob.GarbageCollector',                             // $jobType
+      null,                                                   // $jobTypeFk
+      "",                                                     // $jobMode
+      _txt('rs.jb.started.web', array(__FUNCTION__ , -1)),    // $summary
+      true,                                                   // $queued
+      false,                                                  // $concurrent
+      array(                                                  // $params
+        'object_type' => 'Co',
+      ),
+      0,                                                      // $delay (in seconds)
+      DEF_GARBAGE_COLLECT_INTERVAL                            // $requeueInterval (in seconds)
+    );
+    
+    // Set various new defaults
+    $this->out(_txt('sh.ug.400.co_settings'));
+    $this->CoSetting->_ug400();
+
+    // 4.0.0 adds multiple types of File Sources, however the FileSource
+    // plugin might not be enabled.
+    
+    if(CakePlugin::loaded('FileSource')) {
+      // We can't add models to $uses since they may not exist
+      $this->loadModel('FileSource.FileSource');
+      
+      // All existing Password Authenticators have a password_source of Self Select
+      $this->out(_txt('sh.ug.400.filesource'));
+      
+      $this->FileSource->updateAll(
+        array(
+          'FileSource.format' => "'C1'"  // Wacky updateAll syntax
+        ),
+        array(
+          'FileSource.format' => null
+        )
+      );
+    }
+  }
+  
+  public function post410() {
+    // 4.1.0 adds duplicate_mode to EnvSource, however the EnvSource plugin
+    // might not be enabled.
+    
+    if(CakePlugin::loaded('EnvSource')) {
+      // We can't add models to $uses since they may not exist
+      $this->loadModel('EnvSource.EnvSource');
+      
+      // All existing Password Authenticators have a password_source of Self Select
+      $this->out(_txt('sh.ug.410.envsource'));
+      
+      $this->EnvSource->updateAll(
+        array(
+          'EnvSource.duplicate_mode' => "'SI'"  // Wacky updateAll syntax
+        ),
+        array(
+          'EnvSource.duplicate_mode' => null
+        )
+      );
+    }
+    
+    // 4.1.0 adds a new context for DataFilters. All existing DataFilters are
+    // ProvisioningTarget context.
+    
+    $this->out(_txt('sh.ug.410.datafilter'));
+    
+    $this->DataFilter->updateAll(
+      array(
+        'DataFilter.context' => "'PT'"  // Wacky updateAll syntax
+      ),
+      array(
+        'DataFilter.context' => null
+      )
+    );
+    
+    // 4.1.0 adds at auth type for HttpServers
+    
+    $this->out(_txt('sh.ug.410.httpserver'));
+    
+    $this->HttpServer->updateAll(
+      array(
+        'HttpServer.auth_type' => "'BA'"  // Wacky updateAll syntax
+      ),
+      array(
+        'HttpServer.auth_type' => null
+      )
+    );
+  }
+  
+  // We should eventually do something like
+  //  upgradeShell::populate_default_values("FileSource", "file_sources", "format", "C1")
+  // rather than copying/pasting updateAll syntax
 }

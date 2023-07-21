@@ -62,10 +62,12 @@
     if(approval) {
       document.getElementById('approvergroupdiv').style.display = "block";
       document.getElementById('approvalnotifydiv').style.display = "block";
+      $("#CoEnrollmentFlowRequestVetting").closest("li").show('fade');
     } else {
       document.getElementById('approvergroupdiv').style.display = "none";
       document.getElementById('approvalnotifydiv').style.display = "none";
       document.getElementById('CoEnrollmentFlowApproverCoGroupId').value = "";
+      $("#CoEnrollmentFlowRequestVetting").closest("li").hide('fade');
     }
   }
   
@@ -85,11 +87,11 @@
       } else {
         $("#CoEnrollmentFlowDuplicateMode").closest("li").hide('fade');
       }
+      
+      dupe_update_gadgets();
     } else {
       $("#CoEnrollmentFlowInvitationValidity").closest("ul.field-children").hide('fade');
     }
-    
-    tandc_update_gadgets();
   }
   
   function authz_update_gadgets() {
@@ -124,7 +126,43 @@
       }
     }
     
-    tandc_update_gadgets();
+    // Update the People Picker tickbox, which only needs to be made available
+    // for unregistered petitioners
+    if(authz == '<?php print EnrollmentAuthzEnum::None; ?>' || authz == '<?php print EnrollmentAuthzEnum::AuthUser; ?>') {
+      $("#CoEnrollmentFlowEnablePersonFind").closest("li").show('fade');
+    } else {
+      $("#CoEnrollmentFlowEnablePersonFind").closest("li").hide('fade');
+    }
+  }
+  
+  function dupe_update_gadgets() {
+    // We use the same configuration for old style duplicate on $REMOTE_USER
+    // and new style Identity Matching = External.
+    
+    // Because of how this code is currently structured, we have to reimplement
+    // the same lofic in authn_update_gadgets and fields_update_gadgets.
+    
+    var externalMatch = false;
+    var confirmation = false;  // This will go away in Registry v5
+    
+    var matchpolicy = document.getElementById('CoEnrollmentFlowMatchPolicy').value;
+    
+    if(matchpolicy == "<?php print EnrollmentMatchPolicyEnum::External; ?>") {
+      externalMatch = true;
+    }
+    
+    var confirm = document.getElementById('CoEnrollmentFlowEmailVerificationMode').value;
+    var authn = document.getElementById('CoEnrollmentFlowRequireAuthn').checked;
+    
+    if(confirm != '<?php print VerificationModeEnum::None; ?>' && authn) {
+      confirmation = true;
+    }
+    
+    if(externalMatch || confirmation) {
+      $("#CoEnrollmentFlowDuplicateMode").closest("li").show('fade');
+    } else {
+      $("#CoEnrollmentFlowDuplicateMode").closest("li").hide('fade');
+    }
   }
   
   function fields_update_gadgets() {
@@ -192,20 +230,18 @@
       $("#clusters").hide('fade');
     }
     <?php endif; // $vv_clusters ?>
-  }
-  
-  function tandc_update_gadgets() {
-    // T&C require some form of authentication
-    var confirm = document.getElementById('CoEnrollmentFlowEmailVerificationMode').value;
-    var authn = document.getElementById('CoEnrollmentFlowRequireAuthn').checked;
-    var authz = document.getElementById('CoEnrollmentFlowAuthzLevel').value;
+
+    // If Identity Matching is External, show the available servers
     
-    if((confirm != '<?php print VerificationModeEnum::None; ?>' && authn)
-       || authz != '<?php print EnrollmentAuthzEnum::None ?>') {
-      $("#CoEnrollmentFlowTAndCMode").closest("li").show('fade');
+    var matchpolicy = document.getElementById('CoEnrollmentFlowMatchPolicy').value;
+    
+    if(matchpolicy == "<?php print EnrollmentMatchPolicyEnum::External; ?>") {
+      $("#CoEnrollmentFlowMatchServerId").closest("li").show('fade');
     } else {
-      $("#CoEnrollmentFlowTAndCMode").closest("li").hide('fade');
+      $("#CoEnrollmentFlowMatchServerId").closest("li").hide('fade');
     }
+    
+    dupe_update_gadgets();
   }
   
   function js_local_onload() {
@@ -213,6 +249,17 @@
     fields_update_gadgets();
     authn_update_gadgets();
     authz_update_gadgets();
+    theme_config_fields();
+  }
+
+  function theme_config_fields() {
+      const $eofCustomTheme = $('#CoEnrollmentFlowCoThemeId > option:selected').val();
+      if($eofCustomTheme != undefined
+          && $eofCustomTheme !== '') {
+          $('.eof-theme-stacking').show().fadeIn('slow','swing');
+      } else {
+          $('.eof-theme-stacking').hide().fadeOut('slow','swing');
+      }
   }
 </script>
 <ul id="<?php print $this->action; ?>_co_enrollment_configuration" class="fields form-list form-list-admin">
@@ -220,6 +267,7 @@
     <div class="field-name">
       <div class="field-title">
         <?php print ($e ? $this->Form->label('name',_txt('fd.name')) : _txt('fd.name')); ?>
+        <span class="required">*</span>
       </div>
     </div>
     <div class="field-info">
@@ -361,6 +409,7 @@
         global $cm_lang, $cm_texts;
         $attrs = array();
         $attrs['value'] = (isset($co_enrollment_flows) ? $co_enrollment_flows[0]['CoEnrollmentFlow']['match_policy'] : EnrollmentMatchPolicyEnum::Advisory);
+        $attrs['onChange'] = 'fields_update_gadgets()';
         $attrs['empty'] = false;
 
         if($e) {
@@ -375,6 +424,61 @@
           print _txt('en.enrollment.match', null, $co_enrollment_flows[0]['CoEnrollmentFlow']['match_policy']);
         }
       ?>
+    </div>
+    <ul class="field-children">
+      <li style="display:none">
+        <div class="field-name">
+          <div class="field-title"><?php print _txt('ct.match_servers.1'); ?></div>
+        </div>
+        <div class="field-info">
+          <?php
+            $attrs = array();
+            $attrs['value'] = (isset($co_enrollment_flows[0]['CoEnrollmentFlow']['match_server_id'])
+                               ? $co_enrollment_flows[0]['CoEnrollmentFlow']['match_server_id']
+                               : null);
+            $attrs['empty'] = false;
+
+            if($e) {
+              print $this->Form->select('match_server_id',
+                                        $vv_servers,
+                                        $attrs);
+
+              if($this->Form->isFieldError('match_server_id')) {
+                print $this->Form->error('match_server_id');
+              }
+            } else {
+              if(!empty($co_enrollment_flows[0]['CoEnrollmentFlow']['match_server_id'])) {
+                print filter_var($vv_servers[ $co_enrollment_flows[0]['CoEnrollmentFlow']['match_server_id'] ], FILTER_SANITIZE_SPECIAL_CHARS);
+              }
+            }
+          ?>
+        </div>
+      </li>
+    </ul>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title">
+        <?php print $this->Form->label('sor_label',_txt('fd.sor_label')); ?>
+      </div>
+      <div class="field-desc"><?php print _txt('fd.sor_label.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e ? $this->Form->input('sor_label') : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['sor_label'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title">
+        <?php print ($e ? $this->Form->label('enable_person_find', _txt('fd.ef.enable_person_find')) : _txt('fd.ef.enable_person_find')); ?>
+      </div>
+      <div class="field-desc"><?php print _txt('fd.ef.enable_person_find.desc'); ?></div>
+    </div>
+    <div class="field-info checkbox">
+      <?php print ($e
+                   ? $this->Form->input('enable_person_find') . 
+                     $this->Form->label('enable_person_find', _txt('fd.ef.enable_person_find'))
+                   : ($co_enrollment_flows[0]['CoEnrollmentFlow']['enable_person_find'] ? _txt('fd.yes') : _txt('fd.no'))); ?>
     </div>
   </li>
   <li>
@@ -464,6 +568,20 @@
       </li>
       <li>
         <div class="field-name">
+          <div class="field-title">
+            <?php print ($e ? $this->Form->label('regenerate_expired_verification', _txt('fd.ef.inv.regen')) :_txt('fd.ef.inv.regen')); ?>
+          </div>
+          <div class="field-desc"><?php print _txt('fd.ef.inv.regen.desc'); ?></div>
+        </div>
+        <div class="field-info">
+          <?php print ($e
+            ? $this->Form->input('regenerate_expired_verification') . ' ' .
+            $this->Form->label('regenerate_expired_verification', _txt('fd.ef.inv.regen'))
+            : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['regenerate_expired_verification'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+        </div>
+      </li>
+      <li>
+        <div class="field-name">
           <div class="field-title"><?php print _txt('fd.ef.vmt'); ?></div>
           <div class="field-desc"><?php print _txt('fd.ef.vmt.desc'); ?></div>
         </div>
@@ -535,37 +653,51 @@
             : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['require_authn'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
         </div>
       </li>
-      <li style="display:none">
-        <div class="field-name">
-          <div class="field-title">
-            <?php print ($e ? $this->Form->label('duplicate_mode', _txt('fd.ef.dupe')) : _txt('fd.ef.dupe')); ?>
-          </div>
-          <div class="field-desc"><?php print _txt('fd.ef.dupe.desc'); ?></div>
-        </div>
-        <div class="field-info">
-          <?php
-            global $cm_lang, $cm_texts;
-            $attrs = array();
-            $attrs['value'] = (!empty($co_enrollment_flows[0]['CoEnrollmentFlow']['duplicate_mode'])
-              ? $co_enrollment_flows[0]['CoEnrollmentFlow']['duplicate_mode']
-              : EnrollmentDupeModeEnum::Duplicate);
-            $attrs['empty'] = false;
-
-            if($e) {
-              print $this->Form->select('duplicate_mode',
-                $cm_texts[ $cm_lang ]['en.enrollment.dupe'],
-                $attrs);
-
-              if($this->Form->isFieldError('duplicate_mode')) {
-                print $this->Form->error('duplicate_mode');
-              }
-            } else {
-              print _txt('en.enrollment.dupe', null, $co_enrollment_flows[0]['CoEnrollmentFlow']['duplicate_mode']);
-            }
-          ?>
-        </div>
-      </li>
     </ul>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title">
+        <?php print ($e ? $this->Form->label('request_vetting', _txt('fd.ef.vet')) : _txt('fd.ef.vet')); ?>
+      </div>
+      <div class="field-desc"><?php print _txt('fd.ef.vet.desc'); ?></div>
+    </div>
+    <div class="field-info checkbox">
+      <?php print ($e
+                   ? $this->Form->input('request_vetting') . 
+                     $this->Form->label('request_vetting', _txt('fd.ef.vet'))
+                   : ($co_enrollment_flows[0]['CoEnrollmentFlow']['request_vetting'] ? _txt('fd.yes') : _txt('fd.no'))); ?>
+    </div>
+  </li>
+  <li style="display:none">
+    <div class="field-name">
+      <div class="field-title">
+        <?php print ($e ? $this->Form->label('duplicate_mode', _txt('fd.ef.dupe')) : _txt('fd.ef.dupe')); ?>
+      </div>
+      <div class="field-desc"><?php print _txt('fd.ef.dupe.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php
+        global $cm_lang, $cm_texts;
+        $attrs = array();
+        $attrs['value'] = (!empty($co_enrollment_flows[0]['CoEnrollmentFlow']['duplicate_mode'])
+          ? $co_enrollment_flows[0]['CoEnrollmentFlow']['duplicate_mode']
+          : EnrollmentDupeModeEnum::Duplicate);
+        $attrs['empty'] = false;
+
+        if($e) {
+          print $this->Form->select('duplicate_mode',
+            $cm_texts[ $cm_lang ]['en.enrollment.dupe'],
+            $attrs);
+
+          if($this->Form->isFieldError('duplicate_mode')) {
+            print $this->Form->error('duplicate_mode');
+          }
+        } else {
+          print _txt('en.enrollment.dupe', null, $co_enrollment_flows[0]['CoEnrollmentFlow']['duplicate_mode']);
+        }
+      ?>
+    </div>
   </li>
   <li>
     <div class="field-name">
@@ -769,12 +901,25 @@
       <div class="field-title">
         <?php print ($e ? $this->Form->label('introduction_text', _txt('fd.ef.intro')) : _txt('fd.ef.intro')); ?>
       </div>
-      <div class="field-desc"><?php print _txt('fd.ef.intro.desc'); ?></div>
+      <div class="field-desc"><?php print _txt('fd.ef.intro.start.desc'); ?></div>
     </div>
     <div class="field-info">
       <?php print ($e
                    ? $this->Form->input('introduction_text')
                    : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['introduction_text'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+    </div>
+  </li>
+  <li class="field-stack">
+    <div class="field-name">
+      <div class="field-title">
+        <?php print ($e ? $this->Form->label('introduction_text_pa', _txt('fd.ef.intro')) : _txt('fd.ef.intro')); ?>
+      </div>
+      <div class="field-desc"><?php print _txt('fd.ef.intro.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php print ($e
+        ? $this->Form->input('introduction_text_pa')
+        : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['introduction_text_pa'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
     </div>
   </li>
   <li class="field-stack">
@@ -790,6 +935,7 @@
                    : filter_var($co_enrollment_flows[0]['CoEnrollmentFlow']['conclusion_text'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
     </div>
   </li>
+  <?php if($vv_tandc_count > 0): ?>
   <li>
     <div class="field-name">
       <div class="field-title">
@@ -821,6 +967,7 @@
       ?>
     </div>
   </li>
+  <?php endif; // vv_tandc_count ?>
   <li>
     <div class="field-name">
       <div class="field-title">
@@ -1060,6 +1207,7 @@
         $attrs['value'] = (isset($co_enrollment_flows[0]['CoEnrollmentFlow']['co_theme_id'])
                            ? $co_enrollment_flows[0]['CoEnrollmentFlow']['co_theme_id']
                            : null);
+        $attrs['onchange'] = 'theme_config_fields()';
         $attrs['empty'] = true;
 
         if($e) {
@@ -1075,11 +1223,39 @@
         }
       ?>
     </div>
+    <ul class="field-children">
+      <li class="eof-theme-stacking">
+          <div class="field-name">
+              <div class="field-title">
+                <?php print ($e ? $this->Form->label('theme_stacking',_txt('fd.theme.stacking_status')) : _txt('fd.theme.stacking_status')); ?>
+              </div>
+          </div>
+          <div class="field-info">
+            <?php
+            $attrs = array();
+            $attrs['value'] = (isset($co_enrollment_flows) ? $co_enrollment_flows[0]['CoEnrollmentFlow']['theme_stacking'] : SuspendableStatusEnum::Active);
+            $attrs['empty'] = false;
+            if($e) {
+              print $this->Form->select('theme_stacking',
+                                        SuspendableStatusEnum::$to_api,
+                                        $attrs);
+              if($this->Form->isFieldError('theme_stacking')) {
+                print $this->Form->error('theme_stacking');
+              }
+            } else {
+              print _txt('en.status.susp', null, $co_enrollment_flows[0]['CoEnrollmentFlow']['theme_stacking']);
+            }
+            ?>
+          </div>
+      </li>
+    </ul>
   </li>
-    
+
   <?php if($e): ?>
     <li class="fields-submit">
-      <div class="field-name"></div>
+      <div class="field-name">
+        <span class="required"><?php print _txt('fd.req'); ?></span>
+      </div>
       <div class="field-info">
         <?php print $this->Form->submit($submit_label); ?>
       </div>

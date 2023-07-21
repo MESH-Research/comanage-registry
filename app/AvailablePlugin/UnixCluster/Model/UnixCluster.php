@@ -31,6 +31,9 @@ class UnixCluster extends ClusterInterface {
   // Define class name for cake
   public $name = "UnixCluster";
 
+  // Current schema version for API
+  public $version = "1.0";
+
   // Required by COmanage Plugins
   public $cmPluginType = "cluster";
 	
@@ -46,7 +49,11 @@ class UnixCluster extends ClusterInterface {
 	
 	// Association rules from this model to other models
 	public $belongsTo = array(
-		"Cluster"
+		"Cluster",
+    "DefaultCoGroup" => array(
+      'className' => 'CoGroup',
+      'foreignKey' => 'default_co_group_id'
+    )
 	);
 	
 	public $hasMany = array(
@@ -168,9 +175,12 @@ class UnixCluster extends ClusterInterface {
       )
     ),
     'default_co_group_id' => array(
-      'rule' => 'numeric',
-      'required' => false,
-      'allowEmpty' => true
+      'content' => array(
+        'rule' => 'numeric',
+        'required' => false,
+        'allowEmpty' => true,
+        'unfreeze' => 'CO'
+      )
     )
 	);
 	

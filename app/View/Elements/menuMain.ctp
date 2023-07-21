@@ -39,6 +39,18 @@ if(!empty($vv_enrollment_flow_cos)) {
   // Convert the list of COs with enrollment flows defined into a more useful format
   $efcos = Hash::extract($vv_enrollment_flow_cos, '{n}.CoEnrollmentFlow.co_id');
 }
+
+// Determine if we have an expanded menu selected but do not expand a menu if the menu drawer is half-closed.
+// Currently this is used only for the two expandable menus in the Main Menu (People and Platform).
+$selectedMenu = "";
+$currentMenu = "";
+$drawerState = "open";
+if(!empty($vv_app_prefs['uiDrawerState'])) {
+  $drawerState = filter_var($vv_app_prefs['uiDrawerState'],FILTER_SANITIZE_STRING);
+}
+if(!empty($vv_app_prefs['uiMainMenuSelectedParentId']) && $drawerState != 'half-closed') {
+  $selectedMenu = filter_var($vv_app_prefs['uiMainMenuSelectedParentId'],FILTER_SANITIZE_STRING);
+}
 ?>
 
 <ul id="main-menu" class="metismenu">
@@ -49,39 +61,39 @@ if(!empty($vv_enrollment_flow_cos)) {
       $menuCoId = $cur_co['Co']['id'];
 
       // People Menu
+      $currentMenu = 'peopleMenu';
       if(isset($permissions['menu']['cos']) && $permissions['menu']['cos']) {
-        print '<li id="peopleMenu" class="co-expandable-menu-item">';
-        print '<a class="menuTop mdl-js-ripple-effect" aria-expanded="false" href="#">';
+        print '<li id="peopleMenu" class="co-expandable-menu-item' . ($selectedMenu == $currentMenu ? " active" : "") . '">';
+        print '<a class="menuTop" title="' . _txt('me.people') . '" aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '" href="#">';
         print '<em class="material-icons" aria-hidden="true">person</em>';
         print '<span class="menuTitle">' . _txt('me.people') . '</span>';
-        print '<span class="fa arrow fa-fw"></span>';
-        print '<span class="mdl-ripple"></span>';
+        print '<em class="material-icons arrow" aria-hidden="true">chevron_left</em>';
         print '</a>';
-        print '<ul aria-expanded="false" class="collapse">';
-
-        print '<li class="mdl-js-ripple-effect">';
+        print '<ul aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '" class="collapse' . ($selectedMenu == $currentMenu ? " in" : "") . '">';
+        print '<li>';
         $args = array();
         $args['plugin'] = null;
         $args['controller'] = 'co_people';
         $args['action'] = 'index';
         $args['co'] = $menuCoId;
 
-        print $this->Html->link(_txt('me.population'), $args);
-        print '<span class="mdl-ripple"></span>';
+        print $this->Html->link(_txt('me.population'), $args, array('class' => 'spin'));
+
         print "</li>";
 
         if(!empty($permissions['menu']['admincous'])) {
           foreach($permissions['menu']['admincous'] as $couid => $couname) {
-            print '<li class="mdl-js-ripple-effect">';
+            print '<li>';
             $args = array();
             $args['plugin'] = null;
             $args['controller'] = 'co_people';
             $args['action'] = 'index';
             $args['co'] = $menuCoId;
-            $args['Search.couid'] = $couid;
+            $args['search.cou'] = $couid;
+            $args['op'] = 'search';
 
-            print $this->Html->link(_txt('me.population.cou', array($couname)), $args);
-            print '<span class="mdl-ripple"></span>';
+            print $this->Html->link(_txt('me.population.cou', array($couname)), $args, array('class' => 'spin'));
+    
             print "</li>";
 
           }
@@ -99,29 +111,29 @@ if(!empty($vv_enrollment_flow_cos)) {
             $args['co'] = $menuCoId;
           }
 
-          print '<li class="mdl-js-ripple-effect">';
-          print $this->Html->link(_txt('ct.org_identities.pl'), $args);
-          print '<span class="mdl-ripple"></span>';
+          print '<li>';
+          print $this->Html->link(_txt('ct.org_identities.pl'), $args, array('class' => 'spin'));
+  
           print "</li>";
         }
 
         if(in_array($menuCoId, $efcos)) {
           // Enrollment Flows enabled
           if(isset($permissions['menu']['createpetition']) && $permissions['menu']['createpetition']) {
-            print '<li class="mdl-js-ripple-effect">';
+            print '<li>';
             $args = array();
             $args['plugin'] = null;
             $args['controller'] = 'co_enrollment_flows';
             $args['action'] = 'select';
             $args['co'] = $menuCoId;
 
-            print $this->Html->link(_txt('op.enroll'), $args);
-            print '<span class="mdl-ripple"></span>';
+            print $this->Html->link(_txt('op.enroll'), $args, array('class' => 'spin'));
+    
             print "</li>";
           }
 
           if(isset($permissions['menu']['petitions']) && $permissions['menu']['petitions']) {
-            print '<li class="mdl-js-ripple-effect">';
+            print '<li>';
             $args = array();
             $args['plugin'] = null;
             $args['controller'] = 'co_petitions';
@@ -129,25 +141,40 @@ if(!empty($vv_enrollment_flow_cos)) {
             $args['co'] = $menuCoId;
             $args['sort'] = 'CoPetition.created';
             $args['direction'] = 'desc';
-            $args['search.status'][] = StatusEnum::PendingApproval;
-            $args['search.status'][] = StatusEnum::PendingConfirmation;
+            $args['search.status'] = StatusEnum::PendingApproval;
 
-            print $this->Html->link(_txt('ct.co_petitions.pl'), $args);
-            print '<span class="mdl-ripple"></span>';
+            print $this->Html->link(_txt('ct.co_petitions.pl'), $args, array('class' => 'spin'));
+    
+            print "</li>";
+          }
+          
+          if(isset($permissions['menu']['vettingrequests']) && $permissions['menu']['vettingrequests']) {
+            print '<li>';
+            $args = array();
+            $args['plugin'] = null;
+            $args['controller'] = 'vetting_requests';
+            $args['action'] = 'index';
+            $args['co'] = $menuCoId;
+            $args['sort'] = 'VettingRequest.created';
+            $args['direction'] = 'desc';
+            $args['search.status'] = VettingStatusEnum::PendingManual;
+
+            print $this->Html->link(_txt('ct.vetting_requests.pl'), $args, array('class' => 'spin'));
+    
             print "</li>";
           }
         } else {
           // Default enrollment
           if(isset($permissions['menu']['invite']) && $permissions['menu']['invite']) {
-            print '<li class="mdl-js-ripple-effect">';
+            print '<li>';
             $args = array();
             $args['plugin'] = null;
             $args['controller'] = 'org_identities';
             $args['action'] = 'find';
             $args['co'] = $menuCoId;
 
-            print $this->Html->link(_txt('op.inv'), $args);
-            print '<span class="mdl-ripple"></span>';
+            print $this->Html->link(_txt('op.inv'), $args, array('class' => 'spin'));
+    
             print "</li>";
           }
         }
@@ -156,9 +183,9 @@ if(!empty($vv_enrollment_flow_cos)) {
           $pluginLinks = retrieve_plugin_menus($menuContent['plugins'], 'copeople', $menuCoId);
 
           foreach($pluginLinks as $plabel => $pcfg) {
-            print '<li class="mdl-js-ripple-effect">';
-            print $this->Html->link($plabel, $pcfg['url']);
-            print '<span class="mdl-ripple"></span>';
+            print '<li>';
+            print $this->Html->link($plabel, $pcfg['url'], array('class' => 'spin'));
+    
             print '</li>';
           }
         }
@@ -169,60 +196,119 @@ if(!empty($vv_enrollment_flow_cos)) {
       // END People Menu
 
       // Groups Menu
+      $currentMenu = 'groupMenu';
       if(isset($permissions['menu']['cogroups']) && $permissions['menu']['cogroups']) {
-        if(empty(retrieve_plugin_menus($menuContent['plugins'], 'cogroups', $menuCoId))) {
-          // we have no groups plugins: make this a top-level menu item
-          print '<li id="groupMenu">';
 
-          $linkContent = '<em class="material-icons" aria-hidden="true">group</em><span class="menuTitle">' . _txt('ct.co_groups.pl') .
-            '</span><span class="mdl-ripple"></span>';
+        print '<li id="groupMenu" class="co-expandable-menu-item' . ($selectedMenu == $currentMenu ? " active" : "") . '">';
 
-          $args = array();
-          $args['plugin'] = null;
-          $args['controller'] = 'co_groups';
-          $args['action'] = 'index';
-          $args['co'] = $menuCoId;
+        print '<a class="menuTop" title="' . _txt('ct.co_groups.pl') . '" aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '" href="#">';
+        print '<em class="material-icons" aria-hidden="true">group</em>';
+        print '<span class="menuTitle">' . _txt('ct.co_groups.pl') . '</span>';
+        print '<em class="material-icons arrow" aria-hidden="true">chevron_left</em>';
+        print '</a>';
 
-          print $this->Html->link($linkContent, $args, array('class' => 'mdl-js-ripple-effect', 'escape' => false,));
+        print '<ul aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '" class="collapse' . ($selectedMenu == $currentMenu ? " in" : "") . '">';
 
-          print "</li>";
+        // Regular Groups (with default filtering)
+        print '<li>';
+        $args = array();
+        $args['plugin'] = null;
+        $args['controller'] = 'co_groups';
+        $args['action'] = 'index';
+        $args['co'] = $menuCoId;
+        $args['search.auto'] = 'f'; // filter out automatic groups by default
+        $args['search.noadmin'] = '1'; // exclude administration groups by default
+        print $this->Html->link(_txt('op.grm.regular'), $args, array('class' => 'spin'));
+        print "</li>";
 
-        } else {
-          // we have groups plugins: make this an expandable menu item
-          print '<li id="groupMenu" class="co-expandable-menu-item">';
+        // System Groups (automatic groups)
+        print '<li>';
+        $args = array();
+        $args['plugin'] = null;
+        $args['controller'] = 'co_groups';
+        $args['action'] = 'index';
+        $args['co'] = $menuCoId;
+        $args['search.auto'] = 't'; // show only automatic groups
+        print $this->Html->link(_txt('op.grm.system'), $args, array('class' => 'spin'));
+        print "</li>";
 
-          print '<a class="menuTop mdl-js-ripple-effect" aria-expanded="false" href="#">';
-          //print '<span class="fa fa-users fa-fw"></span>';
-          print '<em class="material-icons" aria-hidden="true">group</em>';
-          print '<span class="menuTitle">' . _txt('ct.co_groups.pl') . '</span>';
-          print '<span class="fa arrow fa-fw"></span>';
-          print '<span class="mdl-ripple"></span>';
-          print '</a>';
-          print '<ul aria-expanded="false" class="collapse">';
+        // All Groups
+        print '<li>';
+        $args = array();
+        $args['plugin'] = null;
+        $args['controller'] = 'co_groups';
+        $args['action'] = 'index';
+        $args['co'] = $menuCoId;
+        print $this->Html->link(_txt('ct.co_all_groups'), $args, array('class' => 'spin'));
+        print "</li>";
 
-          print '<li class="mdl-js-ripple-effect">';
-          $args = array();
-          $args['plugin'] = null;
-          $args['controller'] = 'co_groups';
-          $args['action'] = 'index';
-          $args['co'] = $menuCoId;
-          print $this->Html->link(_txt('ct.co_all_groups'), $args);
-          print '<span class="mdl-ripple"></span>';
-          print "</li>";
+        // Display My Groups, My Memberships, and Open Groups only to members with an active status in the CO and at
+        // least one CoPersonRole. Determine this by investigating the $menuContent. This is identical 
+        // to the constraints placed on menuUser for "My Profile" and "My Group Memberships" links.
+        if(isset($cur_co)) {
+          foreach ($menuContent['cos'] as $co) {
+            if ($co['co_id'] == $cur_co['Co']['id']) {
+              if(isset($co['co_person']['status'])
+                 && ($co['co_person']['status'] == StatusEnum::Active 
+                     || $co['co_person']['status'] == StatusEnum::GracePeriod)
+                 && !empty($co['co_person']['CoPersonRole'])) {
 
-          // Plugins
+                // My Groups
+                print '<li>';
+                $args = array();
+                $args['plugin'] = null;
+                $args['controller'] = 'co_groups';
+                $args['action'] = 'index';
+                $args['co'] = $menuCoId;
+                $args['search.member'] = '1'; // include groups in which current user is a member
+                $args['search.owner'] = '1'; // include groups in which current user is an owner
+                print $this->Html->link(_txt('op.grm.my.groups'), $args, array('class' => 'spin'));
+                print "</li>";
+
+                // My Memberships
+                print '<li>';
+                $args = array();
+                $args['plugin'] = null;
+                $args['controller'] = 'co_groups';
+                $args['action'] = 'select';
+                $args['copersonid'] = $this->Session->read('Auth.User.co_person_id');
+                $args['co'] = $menuCoId;
+                $args['search.member'] = '1';
+                $args['search.owner'] = '1';
+                print $this->Html->link(_txt('op.grm.my.memberships'), $args, array('class' => 'spin'));
+                print "</li>";
+  
+                // Groups I Can Join (Open Groups)
+                print '<li>';
+                $args = array();
+                $args['plugin'] = null;
+                $args['controller'] = 'co_groups';
+                $args['action'] = 'select';
+                $args['copersonid'] = $this->Session->read('Auth.User.co_person_id');
+                $args['co'] = $menuCoId;
+                $args['search.open'] = 't'; // show only open groups
+                print $this->Html->link(_txt('op.grm.join'), $args, array('class' => 'spin'));
+                print "</li>";
+                
+              }
+            }
+          }
+        }
+
+        // Plugins
+        if(!empty(retrieve_plugin_menus($menuContent['plugins'], 'cogroups', $menuCoId))) {
           $pluginLinks = retrieve_plugin_menus($menuContent['plugins'], 'cogroups', $menuCoId);
 
-          foreach($pluginLinks as $plabel => $pcfg) {
-            print '<li class="mdl-js-ripple-effect">';
+          foreach ($pluginLinks as $plabel => $pcfg) {
+            print '<li>';
             print $this->Html->link($plabel, $pcfg['url']);
-            print '<span class="mdl-ripple"></span>';
             print '</li>';
           }
 
-          print "</ul>";
-          print "</li>";
         }
+
+        print "</ul>";
+        print "</li>";
       }
       // END Groups Menu
       
@@ -231,7 +317,7 @@ if(!empty($vv_enrollment_flow_cos)) {
         print '<li id="deptMenu">';
 
         $linkContent = '<em class="material-icons" aria-hidden="true">business</em><span class="menuTitle">' . _txt('ct.co_departments.pl') .
-          '</span><span class="mdl-ripple"></span>';
+          '</span>';
 
         $args = array();
         $args['plugin'] = null;
@@ -239,18 +325,37 @@ if(!empty($vv_enrollment_flow_cos)) {
         $args['action'] = 'index';
         $args['co'] = $menuCoId;
 
-        print $this->Html->link($linkContent, $args, array('class' => 'mdl-js-ripple-effect', 'escape' => false,));
+        print $this->Html->link($linkContent, $args, array('escape' => false, 'class' => 'spin', 'title' => _txt('ct.co_departments.pl')));
 
         print "</li>";
       }
       // END Departments Menu
+      
+      // Organizations Menu
+      if($permissions['menu']['organizations']) {
+        print '<li id="orgMenu">';
+
+        $linkContent = '<em class="material-icons" aria-hidden="true">account_balance</em><span class="menuTitle">' . _txt('ct.organizations.pl') .
+          '</span>';
+
+        $args = array();
+        $args['plugin'] = null;
+        $args['controller'] = 'organizations';
+        $args['action'] = 'index';
+        $args['co'] = $menuCoId;
+
+        print $this->Html->link($linkContent, $args, array('escape' => false, 'class' => 'spin', 'title' => _txt('ct.organizations.pl')));
+
+        print "</li>";
+      }
+      // END Organizations Menu
       
       // Email Lists Menu
       if($permissions['menu']['colists']) {
         print '<li id="emailMenu">';
 
         $linkContent = '<em class="material-icons" aria-hidden="true">email</em><span class="menuTitle">' . _txt('ct.co_email_lists.pl') .
-          '</span><span class="mdl-ripple"></span>';
+          '</span>';
 
         $args = array();
         $args['plugin'] = null;
@@ -258,7 +363,7 @@ if(!empty($vv_enrollment_flow_cos)) {
         $args['action'] = 'index';
         $args['co'] = $menuCoId;
 
-        print $this->Html->link($linkContent, $args, array('class' => 'mdl-js-ripple-effect', 'escape' => false,));
+        print $this->Html->link($linkContent, $args, array('escape' => false, 'class' => 'spin', 'title' => _txt('ct.co_email_lists.pl')));
 
         print "</li>";
       }
@@ -281,11 +386,10 @@ if(!empty($vv_enrollment_flow_cos)) {
           // Multiple entries, so render a link to each COU.
           
           print '<li id="serviceMenu">';
-          print '<a class="menuTop mdl-js-ripple-effect" aria-expanded="false" href="#">';
+          print '<a class="menuTop" title="' . _txt('ct.co_services.pl') . '" aria-expanded="false" href="#">';
           print '<em class="material-icons" aria-hidden="true">apps</em>';
           print '<span class="menuTitle">' . _txt('ct.co_services.pl') . '</span>';
-          print '<span class="fa arrow fa-fw"></span>';
-          print '<span class="mdl-ripple"></span>';
+          print '<em class="material-icons arrow" aria-hidden="true">chevron_left</em>';
           print '</a>';
           print '<ul aria-expanded="false" class="collapse">';
           
@@ -294,7 +398,7 @@ if(!empty($vv_enrollment_flow_cos)) {
           sort($couIds);
           
           foreach($couIds as $sCouId) {
-            print '<li class="mdl-js-ripple-effect">';
+            print '<li>';
             $args = array();
             $args['plugin'] = null;
             $args['controller'] = 'co_services';
@@ -302,13 +406,13 @@ if(!empty($vv_enrollment_flow_cos)) {
             if($sCouId == -1) {
               // CO Portal
               $args['co'] = $menuCoId;
-              print $this->Html->link($cur_co['Co']['name'], $args);
+              print $this->Html->link($cur_co['Co']['name'], $args, array('class' => 'spin'));
             } else {
               $args['cou'] = $sCouId;
-              print $this->Html->link($menuContent['cous'][$sCouId], $args);
+              print $this->Html->link($menuContent['cous'][$sCouId], $args, array('class' => 'spin'));
             }
     
-            print '<span class="mdl-ripple"></span>';
+    
             print "</li>";
           }
           
@@ -322,7 +426,7 @@ if(!empty($vv_enrollment_flow_cos)) {
           print '<li id="serviceMenu">';
   
           $linkContent = '<em class="material-icons" aria-hidden="true">apps</em><span class="menuTitle">' . _txt('ct.co_services.pl') .
-            '</span><span class="mdl-ripple"></span>';
+            '</span>';
   
           $args = array();
           $args['plugin'] = null;
@@ -333,7 +437,7 @@ if(!empty($vv_enrollment_flow_cos)) {
           } else {
             $args['co'] = $menuCoId;
           }
-          print $this->Html->link($linkContent, $args, array('class' => 'mdl-js-ripple-effect', 'escape' => false));
+          print $this->Html->link($linkContent, $args, array('escape' => false, 'class' => 'spin', 'title' => _txt('ct.co_services.pl')));
   
           print "</li>";
         }
@@ -345,7 +449,7 @@ if(!empty($vv_enrollment_flow_cos)) {
         print '<li id="jobsMenu">';
 
         $linkContent = '<em class="material-icons" aria-hidden="true">assignment</em><span class="menuTitle">' . _txt('ct.co_jobs.pl') .
-          '</span><span class="mdl-ripple"></span>';
+          '</span>';
 
         $args = array();
         $args['plugin'] = null;
@@ -353,7 +457,7 @@ if(!empty($vv_enrollment_flow_cos)) {
         $args['action'] = 'index';
         $args['co'] = $menuCoId;
 
-        print $this->Html->link($linkContent, $args, array('class' => 'mdl-js-ripple-effect', 'escape' => false,));
+        print $this->Html->link($linkContent, $args, array('escape' => false, 'class' => 'spin', 'title' => _txt('ct.co_jobs.pl')));
 
         print "</li>";
       }
@@ -364,7 +468,7 @@ if(!empty($vv_enrollment_flow_cos)) {
         print '<li id="serversMenu">';
 
         $linkContent = '<em class="material-icons" aria-hidden="true">storage</em><span class="menuTitle">' . _txt('ct.servers.pl') .
-          '</span><span class="mdl-ripple"></span>';
+          '</span>';
 
         $args = array();
         $args['plugin'] = null;
@@ -372,7 +476,7 @@ if(!empty($vv_enrollment_flow_cos)) {
         $args['action'] = 'index';
         $args['co'] = $menuCoId;
 
-        print $this->Html->link($linkContent, $args, array('class' => 'mdl-js-ripple-effect', 'escape' => false,));
+        print $this->Html->link($linkContent, $args, array('escape' => false, 'class' => 'spin', 'title' => _txt('ct.servers.pl')));
 
         print "</li>";
       }
@@ -390,9 +494,9 @@ if(!empty($vv_enrollment_flow_cos)) {
 
             $linkContent = '<em class="material-icons" aria-hidden="true">' . $pcfg['icon'] .
               '</em><span class="menuTitle">' . $plabel .
-              '</span><span class="mdl-ripple"></span>';
+              '</span>';
 
-            print $this->Html->link($linkContent, $pcfg['url'], array('class' => 'mdl-js-ripple-effect', 'escape' => false,));
+            print $this->Html->link($linkContent, $pcfg['url'], array('escape' => false, 'class' => 'spin', 'title' => $plabel));
 
             print "</li>";
             $itemIndex++;
@@ -406,7 +510,7 @@ if(!empty($vv_enrollment_flow_cos)) {
         print '<li id="configMenu">';
 
         $linkContent = '<em class="material-icons" aria-hidden="true">settings</em><span class="menuTitle">' . _txt('me.configuration') .
-          '</span><span class="mdl-ripple"></span>';
+          '</span>';
 
         $args = array();
         $args['plugin'] = null;
@@ -414,7 +518,7 @@ if(!empty($vv_enrollment_flow_cos)) {
         $args['action'] = 'configuration';
         $args['co'] = $menuCoId;
 
-        print $this->Html->link($linkContent, $args, array('class' => 'mdl-js-ripple-effect', 'escape' => false,));
+        print $this->Html->link($linkContent, $args, array('escape' => false, 'class' => 'spin', 'title' => _txt('me.configuration')));
 
         print "</li>";
       }
@@ -422,68 +526,65 @@ if(!empty($vv_enrollment_flow_cos)) {
     // END Configuration Menu
 
     // Platform Menu
+    $currentMenu = "platformMenu";
     if(!empty($permissions['menu']['admin']) && $permissions['menu']['admin']) {
-      print '<li id="platformMenu" class="co-expandable-menu-item">';
-      print '<a href="#" class="menuTop mdl-js-ripple-effect" aria-expanded="false">';
+      print '<li id="platformMenu" class="co-expandable-menu-item' . ($selectedMenu == $currentMenu ? " active" : "") . '">';
+      print '<a href="#" class="menuTop" title="' . _txt('me.platform') . '" aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '">';
       print '<em class="material-icons" aria-hidden="true">build</em>';
       print '<span class="menuTitle">' . _txt('me.platform') . '</span>';
-      print '<span class="fa arrow fa-fw"></span>';
-      print '<span class="mdl-ripple"></span>';
+      print '<em class="material-icons arrow" aria-hidden="true">chevron_left</em>';
       print '</a>';
-      print '<ul aria-expanded="false" class="collapse">';
+      print '<ul aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '" class="collapse' . ($selectedMenu == $currentMenu ? " in" : "") . '">';
       
       if($pool_org_identities) {
-        print '<li class="mdl-js-ripple-effect">';
+        print '<li>';
         $args = array();
         $args['plugin'] = null;
         $args['controller'] = 'attribute_enumerations';
         $args['action'] = 'index';
 
-        print $this->Html->link(_txt('ct.attribute_enumerations.pl'), $args);
-        print '<span class="mdl-ripple"></span>';
+        print $this->Html->link(_txt('ct.attribute_enumerations.pl'), $args, array('class' => 'spin'));
+
         print '</li>';
       } // pool_org_identities
 
-      print '<li class="mdl-js-ripple-effect">';
+      print '<li>';
       $args = array();
       $args['plugin'] = null;
       $args['controller'] = 'cmp_enrollment_configurations';
       $args['action'] = 'select';
 
-      print $this->Html->link(_txt('ct.cmp_enrollment_configurations.pl'), $args);
-      print '<span class="mdl-ripple"></span>';
+      print $this->Html->link(_txt('ct.cmp_enrollment_configurations.pl'), $args, array('class' => 'spin'));
       print '</li>';
 
-      print '<li class="mdl-js-ripple-effect">';
+      print '<li>';
       $args = array();
       $args['plugin'] = null;
       $args['controller'] = 'cos';
       $args['action'] = 'index';
 
-      print $this->Html->link(_txt('ct.cos.pl'), $args);
-      print '<span class="mdl-ripple"></span>';
+      print $this->Html->link(_txt('ct.cos.pl'), $args, array('class' => 'spin'));
       print '</li>';
 
-      print '<li class="mdl-js-ripple-effect">';
+      print '<li>';
       $args = array();
       $args['plugin'] = null;
       $args['controller'] = 'navigation_links';
       $args['action'] = 'index';
 
-      print $this->Html->link(_txt('ct.navigation_links.pl'), $args);
-      print '<span class="mdl-ripple"></span>';
+      print $this->Html->link(_txt('ct.navigation_links.pl'), $args, array('class' => 'spin'));
       print '</li>';
 
       if($pool_org_identities) {
-        print '<li class="mdl-js-ripple-effect">';
+        print '<li>';
         // If org identities are pooled, only CMP admins can define sources
         $args = array();
         $args['plugin'] = null;
         $args['controller'] = 'org_identity_sources';
         $args['action'] = 'index';
 
-        print $this->Html->link(_txt('ct.org_identity_sources.pl'), $args);
-        print '<span class="mdl-ripple"></span>';
+        print $this->Html->link(_txt('ct.org_identity_sources.pl'), $args, array('class' => 'spin'));
+
         print '</li>';
       } // pool_org_identities
 
@@ -492,9 +593,9 @@ if(!empty($vv_enrollment_flow_cos)) {
         $pluginLinks = retrieve_plugin_menus($menuContent['plugins'], 'cmp');
         
         foreach($pluginLinks as $plabel => $pcfg) {
-          print '<li class="mdl-js-ripple-effect">';
-          print $this->Html->link($plabel, $pcfg['url']);
-          print '<span class="mdl-ripple"></span>';
+          print '<li>';
+          print $this->Html->link($plabel, $pcfg['url'], array('class' => 'spin'));
+  
           print '</li>';
         }
       }
@@ -518,9 +619,9 @@ if(!empty($vv_enrollment_flow_cos)) {
       print '<li id="collabMenu">';
 
       $linkContent = '<em class="material-icons" aria-hidden="true">transfer_within_a_station</em><span class="menuTitle">' . _txt('me.collaborations') .
-        '</span><span class="mdl-ripple"></span>';
+        '</span>';
 
-      print $this->Html->link($linkContent, '/', array('class' => 'mdl-js-ripple-effect', 'escape' => false,));
+      print $this->Html->link($linkContent, '/', array('escape' => false, 'class' => 'spin', 'title' => _txt('me.collaborations')));
 
       print "</li>";
     }

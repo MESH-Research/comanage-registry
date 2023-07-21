@@ -90,14 +90,20 @@ class ApiUser extends AppModel {
         'rule' => array('validateTimestamp'),
         'required' => false,
         'allowEmpty' => true
-      )
+      ),
+      'precedes' => array(
+        'rule' => array('validateTimestampRange', "valid_through", "<"),
+      ),
     ),
     'valid_through' => array(
       'content' => array(
         'rule' => array('validateTimestamp'),
         'required' => false,
         'allowEmpty' => true
-      )
+      ),
+      'follows' => array(
+        'rule' => array("validateTimestampRange", "valid_from", ">"),
+      ),
     ),
     'remote_ip' => array(
       'rule' => 'notBlank',
@@ -155,7 +161,7 @@ class ApiUser extends AppModel {
       $this->data['ApiUser']['username'] = $prefix . $this->data['ApiUser']['username'];
     }
 
-    return true;
+    return parent::beforeValidate($options);
   }
 
   /**

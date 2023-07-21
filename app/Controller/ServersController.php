@@ -44,7 +44,9 @@ class ServersController extends StandardController {
   
   public $view_contains = array(
     'HttpServer',
-    'LdapServer',
+    'KafkaServer',
+// CO-1320
+//    'LdapServer',
     'MatchServer',
     'Oauth2Server',
     'SqlServer'

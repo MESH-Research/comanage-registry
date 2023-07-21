@@ -226,6 +226,17 @@
     <li>
       <div class="field-name">
         <div class="field-title">
+          <?php print $this->Form->label('sor_label',_txt('fd.sor_label')); ?>
+        </div>
+        <div class="field-desc"><?php print _txt('fd.sor_label.desc'); ?></div>
+      </div>
+      <div class="field-info">
+        <?php print ($e ? $this->Form->input('sor_label') : filter_var($match_servers[0]['MatchServer']['sor_label'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
+      </div>
+    </li>
+    <li>
+      <div class="field-name">
+        <div class="field-title">
           <?php print _txt('fd.ois.sync.skipknown'); ?>
         </div>
         <div class="field-desc"><?php print _txt('fd.ois.sync.skipknown.desc'); ?></div>

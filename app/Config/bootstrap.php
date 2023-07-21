@@ -48,6 +48,16 @@ define('LOCAL', ROOT . DS . 'local' . DS);
  *
  */
 
+/**
+ * Full URL prefix
+ * Get and set the fullBaseUrl using an environmental variable
+ * e.g. Apache server configuration
+ * SetEnv COMANAGE_REGISTRY_FULL_BASE_URL https://example.com
+ */
+if (!is_null(env('COMANAGE_REGISTRY_FULL_BASE_URL'))) {
+  Configure::write('App.fullBaseUrl', env('COMANAGE_REGISTRY_FULL_BASE_URL'));
+}
+
 // Local overlay directory for Plugins
 App::build(array('Plugin' => array(LOCAL . 'Plugin' . DS)));
 
@@ -127,3 +137,10 @@ CakeLog::config('error', array(
 	'types' => array('warning', 'error', 'critical', 'alert', 'emergency'),
 	'file' => 'error',
 ));
+
+// PHP 8 removes FILTER_SANITIZE_MAGIC_QUOTES, which was replaced with FILTER_SANITIZE_ADD_SLASHES
+// starting in 7.3.0. Since we need to support both version concurrently, we'll
+// just backwards define the old label.
+if(!defined('FILTER_SANITIZE_MAGIC_QUOTES')) {
+	define('FILTER_SANITIZE_MAGIC_QUOTES', FILTER_SANITIZE_ADD_SLASHES);
+}

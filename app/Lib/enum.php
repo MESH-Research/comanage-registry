@@ -43,6 +43,7 @@ class ActionEnum
   const CoEmailListManuallyProvisioned  = 'PCEM';
   const CoEmailListProvisioned          = 'PCEA';
   const CoGroupAdded                    = 'ACGR';
+  const CoGroupAddedBulk                = 'ACGB';
   const CoGroupDeleted                  = 'DCGR';
   const CoGroupEdited                   = 'ECGR';
   const CoGroupManuallyProvisioned      = 'PCGM';
@@ -60,12 +61,13 @@ class ActionEnum
   const CoPersonAddedPipeline           = 'ACPL';
   const CoPersonDeletedManual           = 'DCPM';
   const CoPersonDeletedPetition         = 'DCPP';
+  const CoPersonEditedApi               = 'ECPA';
   const CoPersonEditedManual            = 'ECPM';
   const CoPersonEditedPetition          = 'ECPP';
   const CoPersonEditedPipeline          = 'ECPL';
   const CoPersonManuallyProvisioned     = 'PCPM';
   const CoPersonMatchedPetition         = 'MCPP';
-  const CoPersonMatchedPipelne          = 'MCPL';
+  const CoPersonMatchedPipeline         = 'MCPL';
   const CoPersonProvisioned             = 'PCPA';
   const CoPersonStatusRecalculated      = 'RCPS';
   const CoPersonRoleAddedManual         = 'ACRM';
@@ -90,6 +92,9 @@ class ActionEnum
   const ExpirationPolicyMatched         = 'EXPM';
   const HistoryRecordActorExpunged      = 'HRAE';
   const IdentifierAutoAssigned          = 'AIDA';
+  const IdentityDocumentAdded           = 'AIDD';
+  const IdentityDocumentEdited          = 'EIDD';
+  const IdentityDocumentDeleted         = 'DIDD';
   const InvitationConfirmed             = 'INVC';
   const InvitationDeclined              = 'INVD';
   const InvitationExpired               = 'INVE';
@@ -119,6 +124,10 @@ class ActionEnum
   const ProvisionerAction               = 'PRVA';
   const ProvisionerFailed               = 'PRVX';
   const ReferenceIdentifierObtained     = 'OIDR';
+  const VettingRequestCanceled          = 'VETX';
+  const VettingRequestCompleted         = 'VETD';
+  const VettingRequestRegistered        = 'VETC';
+  const VettingRequestRequeued          = 'VETQ';
 }
 
 class AdministratorEnum
@@ -203,9 +212,20 @@ class ContactEnum
 
 class DataFilterContextEnum
 {
-// Not yet implemented
-//  const OrgIdentitySource  = 'OIS';
+  const OrgIdentitySource  = 'OS';
   const ProvisioningTarget = 'PT';
+}
+
+class DepartmentEnum {
+  const Department          = 'department';
+  const ResearchInstitute   = 'researchinstitute';
+  const VO                  = 'vo';
+}
+
+class DictionaryModeEnum {
+  const Department    = "OU";
+  const Organization  = "O";
+  const Standard      = "S";
 }
 
 class ElectStrategyEnum {
@@ -244,7 +264,7 @@ class EnrollmentDupeModeEnum
 
 class EnrollmentMatchPolicyEnum {
   const Advisory  = "A";
-  const Automatic = "M";
+  const External  = "E";
   const None      = "N";
   const Select    = "P";
   const Self      = "S";
@@ -291,8 +311,72 @@ class GroupEnum
   const NestedMembers = "MN";
 }
 
+class HttpServerAuthType
+{
+  const Basic         = "BA";
+  const Bearer        = "BE";
+  const None          = "X";
+}
+
+// XXX [REF]https://httpstatuses.com
+class HttpStatusCodesEnum
+{
+  // [Informational 1xx]
+  const HTTP_CONTINUE                        = 100;
+  const HTTP_SWITCHING_PROTOCOLS             = 101;
+
+  // [Successful 2xx]
+  const HTTP_OK                              = 200;
+  const HTTP_CREATED                         = 201;
+  const HTTP_ACCEPTED                        = 202;
+  const HTTP_NONAUTHORITATIVE_INFORMATION    = 203;
+  const HTTP_NO_CONTENT                      = 204;
+  const HTTP_RESET_CONTENT                   = 205;
+  const HTTP_PARTIAL_CONTENT                 = 206;
+
+  // [Redirection 3xx]
+  const HTTP_MULTIPLE_CHOICES                = 300;
+  const HTTP_MOVED_PERMANENTLY               = 301;
+  const HTTP_FOUND                           = 302;
+  const HTTP_SEE_OTHER                       = 303;
+  const HTTP_NOT_MODIFIED                    = 304;
+  const HTTP_USE_PROXY                       = 305;
+  const HTTP_UNUSED                          = 306;
+  const HTTP_TEMPORARY_REDIRECT              = 307;
+
+  // [Client Error 4xx]
+  const errorCodesBeginAt                    = 400;
+  const HTTP_BAD_REQUEST                     = 400;
+  const HTTP_UNAUTHORIZED                    = 401;
+  const HTTP_PAYMENT_REQUIRED                = 402;
+  const HTTP_FORBIDDEN                       = 403;
+  const HTTP_NOT_FOUND                       = 404;
+  const HTTP_METHOD_NOT_ALLOWED              = 405;
+  const HTTP_NOT_ACCEPTABLE                  = 406;
+  const HTTP_PROXY_AUTHENTICATION_REQUIRED   = 407;
+  const HTTP_REQUEST_TIMEOUT                 = 408;
+  const HTTP_CONFLICT                        = 409;
+  const HTTP_GONE                            = 410;
+  const HTTP_LENGTH_REQUIRED                 = 411;
+  const HTTP_PRECONDITION_FAILED             = 412;
+  const HTTP_REQUEST_ENTITY_TOO_LARGE        = 413;
+  const HTTP_REQUEST_URI_TOO_LONG            = 414;
+  const HTTP_UNSUPPORTED_MEDIA_TYPE          = 415;
+  const HTTP_REQUESTED_RANGE_NOT_SATISFIABLE = 416;
+  const HTTP_EXPECTATION_FAILED              = 417;
+
+  // [Server Error 5xx]
+  const HTTP_INTERNAL_SERVER_ERROR           = 500;
+  const HTTP_NOT_IMPLEMENTED                 = 501;
+  const HTTP_BAD_GATEWAY                     = 502;
+  const HTTP_SERVICE_UNAVAILABLE             = 503;
+  const HTTP_GATEWAY_TIMEOUT                 = 504;
+  const HTTP_VERSION_NOT_SUPPORTED           = 505;
+}
+
 class IdentifierAssignmentEnum
 {
+  const Plugin     = 'P';
   const Random     = 'R';
   const Sequential = 'S';
 }
@@ -313,12 +397,15 @@ class IdentifierAssignmentExclusionEnum
 
 class IdentifierEnum
 {
+  const AffiliateSOR       = 'sor-affiliate';
   const Badge              = 'badge';
   const Enterprise         = 'enterprise';
   const ePPN               = 'eppn';
   const ePTID              = 'eptid';
   const ePUID              = 'epuid';
   const GID                = 'gid';
+  const GuestSOR           = 'sor-guest';
+  const HRSOR              = 'sor-hr';
   const Mail               = 'mail';
   const National           = 'national';
   const Network            = 'network';
@@ -327,10 +414,32 @@ class IdentifierEnum
   const ORCID              = 'orcid';
   const ProvisioningTarget = 'provisioningtarget';
   const Reference          = 'reference';
-  const SORID              = 'sorid';
   const SamlPairwise       = 'pairwiseid';
   const SamlSubject        = 'subjectid';
+  const StudentSOR         = 'sor-student';
+  const SORID              = 'sorid';
   const UID                = 'uid';
+}
+// These generally align with the TAP Core Schema
+class IdentityDocumentEnum {
+  const BirthCertificate  = 'BC';
+  const DriversLicense    = 'DL';
+  const Local             = 'L';
+  const National          = 'N';
+  const NonDriver         = 'ND';
+  const Passport          = 'P';
+  const Regional          = 'R';
+  const Residency         = 'RC';
+  const SelfAssertion     = 'SA';
+  const Tribal            = 'T';
+  const Visa              = 'V';
+}
+
+class IdentityVerificationMethodEnum {
+  const None      = 'X';
+  const Online    = 'O';
+  const Physical  = 'P';
+  const Remote    = 'R';
 }
 
 class JobStatusEnum
@@ -341,14 +450,6 @@ class JobStatusEnum
   const InProgress = 'GO';
   const Notice     = 'NT';
   const Queued     = 'Q';
-}
-
-class JobTypeEnum
-{
-  // Reserve X* for local plugins/jobs
-  const Expiration      = 'EX';
-  const GroupValidity   = 'GV';
-  const OrgIdentitySync = 'OS';
 }
 
 class LinkLocationEnum
@@ -366,10 +467,19 @@ class MatchStrategyEnum
 
 class MessageTemplateEnum
 {
+  const Authenticator          = 'AU';
   const EnrollmentApproval     = 'EA';
   const EnrollmentFinalization = 'EF';
   const EnrollmentVerification = 'EV';
   const ExpirationNotification = 'XN';
+  const Plugin                 = 'PL';
+}
+
+class MessageFormatEnum
+{
+    const Plaintext        = 'text';
+    const HTML             = 'html';
+    const PlaintextAndHTML = 'both';
 }
 
 class NameEnum
@@ -381,6 +491,12 @@ class NameEnum
   const Preferred = 'preferred';
 }
 
+class NestedEnum
+{
+  const Direct   = 'D';
+  const Indirect = 'I';
+}
+  
 class NotificationStatusEnum
 {
   const Acknowledged          = 'A';
@@ -435,6 +551,12 @@ class Oauth2GrantEnum
   // We don't currently support Implicit or Password Credentials
 }
 
+class OrganizationEnum {
+  const Academic            = 'edu';
+  const Commercial          = 'com';
+  const Government          = 'gov';
+}
+
 class OrgIdentityMismatchEnum
 {
   const CreateNew        = 'N';
@@ -449,7 +571,9 @@ class OrgIdentityStatusEnum
 
 class PeoplePickerModeEnum
 {
+  const Manager   = 'M';
   const Sponsor   = 'S';
+  const All       = 'AL';
 }
 
 class PermissionEnum
@@ -495,18 +619,22 @@ class PetitionActionEnum
   const FlaggedDuplicate        = 'FD';
   const IdentifierAuthenticated = 'ID';
   const IdentifiersAssigned     = 'IA';
+  const IdentityDocumentAdded   = 'DA';
   const IdentityLinked          = 'IL';
   const IdentityNotLinked       = 'IX';
   const IdentityRelinked        = 'IR';
   const InviteConfirmed         = 'IC';
   const InviteSent              = 'IS';
   const InviteViewed            = 'IV';
+  const MatchResult             = 'MR';
   const NotificationSent        = 'NS';
   const OrgIdentitySourced      = 'OC';
   const StatusUpdated           = 'SU';
   const StepFailed              = 'SX';
   const TCExplicitAgreement     = 'TE';
   const TCImpliedAgreement      = 'TI';
+  const VettingCompleted        = 'VC';
+  const VettingRequested        = 'VR';
 }
 
 class PetitionStatusEnum
@@ -521,14 +649,16 @@ class PetitionStatusEnum
   const Finalized           = 'F';
   const PendingApproval     = 'PA';
   const PendingConfirmation = 'PC';
+  const PendingVetting      = 'PV';
 }
 
-// The status of a provisioning plugin
-class ProvisionerStatusEnum
+class ProvisionerModeEnum
 {
   const AutomaticMode       = 'A';
   const Disabled            = 'X';
   const EnrollmentMode      = 'E';
+  const QueueMode           = 'Q';
+  const QueueOnErrorMode    = 'QE';
   const ManualMode          = 'M';
 }
 
@@ -578,6 +708,9 @@ class RequiredEnum
 // We use the actual field names here to simplify form rendering
 class RequiredAddressFieldsEnum
 {
+  const CityState                    = "locality,state";
+  const Country                      = "country";
+  const Postal                       = "postal_code";
   const Street                       = "street";
   const StreetCityStatePostal        = "street,locality,state,postal_code";
   const StreetCityStatePostalCountry = "street,locality,state,postal_code,country";
@@ -593,7 +726,9 @@ class ServerEnum
 {
   // When adding a new server type, be sure to add it to ServersController::view_contains
   const HttpServer    = 'HT';
-  const LdapServer    = 'LD';
+  const KafkaServer   = 'KA';
+// CO-1320
+//  const LdapServer    = 'LD';
   const MatchServer   = 'MT';
   const Oauth2Server  = 'O2';
   // Generic SQL Server, not "MS SQL Server"
@@ -628,9 +763,11 @@ class StatusEnum
   const Expired             = 'XP';
   const GracePeriod         = 'GP';
   const Invited             = 'I';
+  const Locked              = 'LK';
   const Pending             = 'P';
   const PendingApproval     = 'PA';
   const PendingConfirmation = 'PC';
+  const PendingVetting      = 'PV';
   const Suspended           = 'S';
   const Declined            = 'X';
 
@@ -644,9 +781,11 @@ class StatusEnum
     'Expired'             => StatusEnum::Expired,
     'GracePeriod'         => StatusEnum::GracePeriod,
     'Invited'             => StatusEnum::Invited,
+    'Locked'              => StatusEnum::Locked,
     'Pending'             => StatusEnum::Pending,
     'PendingApproval'     => StatusEnum::PendingApproval,
     'PendingConfirmation' => StatusEnum::PendingConfirmation,
+    'PendingVetting'      => StatusEnum::PendingVetting,
     'Suspended'           => StatusEnum::Suspended,
     'Declined'            => StatusEnum::Declined
   );
@@ -661,9 +800,11 @@ class StatusEnum
     StatusEnum::Expired             => 'Expired',
     StatusEnum::GracePeriod         => 'GracePeriod',
     StatusEnum::Invited             => 'Invited',
+    StatusEnum::Locked              => 'Locked',
     StatusEnum::Pending             => 'Pending',
     StatusEnum::PendingApproval     => 'PendingApproval',
     StatusEnum::PendingConfirmation => 'PendingConfirmation',
+    StatusEnum::PendingVetting      => 'PendingVetting',
     StatusEnum::Suspended           => 'Suspended',
     StatusEnum::Declined            => 'Declined'
   );
@@ -724,17 +865,20 @@ class TemplateableStatusEnum
   const Active              = 'A';
   const Suspended           = 'S';
   const Template            = 'T';
-  
+  const InTrash             = 'TR';
+
   public static $from_api = array(
     'Active'    => TemplateableStatusEnum::Active,
     'Suspended' => TemplateableStatusEnum::Suspended,
-    'Template'  => TemplateableStatusEnum::Template
+    'Template'  => TemplateableStatusEnum::Template,
+    'InTrash'   => TemplateableStatusEnum::InTrash
   );
 
   public static $to_api = array(
     TemplateableStatusEnum::Active    => 'Active',
     TemplateableStatusEnum::Suspended => 'Suspended',
-    TemplateableStatusEnum::Template  => 'Template'
+    TemplateableStatusEnum::Template  => 'Template',
+    TemplateableStatusEnum::InTrash   => 'InTrash'
   );
 }
 
@@ -748,17 +892,23 @@ class UrlEnum {
   const Personal      = 'personal';
 }
 
-class DepartmentEnum {
-  const VO                  = 'vo';
-  const ResearchInstitute   = 'researchinstitute';
-  const Department          = 'department';
-}
-
 class VerificationModeEnum
 {
-  const Automatic = 'A';
-  const Review    = 'R';
-  const None      = 'X';
+  const Automatic       = 'A';
+  const Review          = 'R';
+  const SkipIfVerified  = 'V';
+  const None            = 'X';
+}
+
+class VettingStatusEnum
+{
+  const Canceled      = 'X';    // Admin canceled vetting request
+  const Error         = 'ER';   // Plugin returned error
+  const Failed        = 'N';    // Plugin returned failure
+  const Passed        = 'Y';    // Plugin returned success
+  const PendingManual = 'PM';   // Plugin determined manual review is required
+  const PendingResult = 'PR';   // Plugin submitted request to API/etc and is awaiting reply
+  const Requested     = 'R';    // Vetting requested, but not complete
 }
 
 class VisibilityEnum

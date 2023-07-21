@@ -31,6 +31,10 @@ class PasswordAuthenticatorsController extends SAuthController {
   // Class name, used by Cake
   public $name = "PasswordAuthenticators";
   
+  public $edit_contains = array();
+  
+  public $view_contains = array();
+  
   /**
    * Authorization for this Controller, called by Auth component
    * - precondition: Session.Auth holds data used for authz decisions

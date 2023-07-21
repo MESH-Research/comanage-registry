@@ -46,7 +46,12 @@
     switch(attrname) {
     <?php foreach(array_keys($vv_enums) as $k): ?>
       case "<?php print $k; ?>":
-        ret = new Array(<?php print '"' . join('","', array_map(function($v) { return filter_var($v, FILTER_SANITIZE_SPECIAL_CHARS); }, array_values($vv_enums[$k]))) . '"'; ?>);
+        ret = <?php
+          foreach($vv_enums[$k] as $key => $v) {
+            $vv_enums[$k][$key] = filter_var($v, FILTER_SANITIZE_SPECIAL_CHARS);
+          }
+          print json_encode($vv_enums[$k]);
+          ?>;
         break;
     <?php endforeach; ?>
     }
@@ -110,7 +115,7 @@
     var attrtype = curattr[0];
     
     if(attrtype == "r" || attrtype == "o" || attrtype == "x" || attrtype == "g") {
-      $("#attr_def_div").show("fade", { "direction" : "up" });
+      $("#attr_def_div").show("fade");
       
       // Adjust the gadgets shown
       
@@ -120,6 +125,7 @@
       $("#attr_def_val_date_div").hide();
       $("#attr_def_val_enum_div").hide();
       $("#attr_def_val_group_div").hide();
+      $("#attr_def_val_manager_div").hide();
       $("#attr_def_val_sponsor_div").hide();
 
       // Update the Form input value
@@ -137,8 +143,8 @@
       if(enums != undefined) {
         // Enumerations are defined for the attribute, so generate an appropriate select
         var options = "<option value=''></option>";
-        for(var i=0;i < enums.length;i++) {
-          options += "<option value='" + enums[i] + "'>" + enums[i] + "</option>";
+        for(let id of Object.keys(enums)) {
+          options += "<option value='" + id + "'>" + enums[id] + "</option>";
         }
         $("#def_enum_val").find('option').remove().end().append($(options));
         
@@ -153,6 +159,10 @@
         // Set current value before showing
         document.getElementById('def_cou_val').value = curval;
         $("#attr_def_val_cou_div").show("fade");
+      } else if(curattrcode == "r" && curattrname == "manager_co_person_id") {
+        // Set current value before showing
+        document.getElementById('def_manager_val').value = curval;
+        $("#attr_def_val_manager_div").show("fade");
       } else if(curattrcode == "r" && curattrname == "sponsor_co_person_id") {
         // Set current value before showing
         document.getElementById('def_sponsor_val').value = curval;
@@ -190,7 +200,7 @@
         $("#attr_def_val_div").show("fade");
       }
     } else {
-      $("#attr_def_div").hide("fade", { "direction" : "up" });
+      $("#attr_def_div").hide("fade");
     }
   }
   
@@ -352,11 +362,22 @@
       source: "<?php print $this->Html->url(array('controller' => 'co_people', 'action' => 'find', 'co' => $cur_co['Co']['id'], 'mode' => PeoplePickerModeEnum::Sponsor)); ?>",
       minLength: 3,
       select: function(event, ui) {
-        $("#sponsors").val(ui.item.label);
+        $("#sponsors").val(ui.item.label + " (" + ui.item.value + ")");
         document.getElementById('CoEnrollmentAttributeDefault0Value').value = ui.item.value;
         return false;
+      },
+      search: function (event, ui) {
+        $("#attr_def_val_sponsor_div .co-loading-mini").show();
+      },
+      focus: function (event, ui) {
+        event.preventDefault();
+        $("#attr_def_val_sponsor_div .co-loading-mini").hide();
+        $("#sponsors").val(ui.item.label + " (" + ui.item.value + ")");
+      },
+      close: function (event, ui) {
+        $("#attr_def_val_sponsor_div .co-loading-mini").hide();
       }
-    });
+    }).autocomplete("instance")._renderItem = formatCoPersonAutoselectItem;
 
     // Used in inline-edit mode for Sponsor (i.e. when sponsor list > 50)
     $("#cm-ief-button-remove-sponsor_co_person_id").click(function() {
@@ -366,6 +387,25 @@
       $("#sponsors").focus();
     });
     <?php endif; //vv_sponsor_mode ?>
+    
+    // Manager Auto-complete
+    $("#managers").autocomplete({
+      source: "<?php print $this->Html->url(array('controller' => 'co_people', 'action' => 'find', 'co' => $cur_co['Co']['id'], 'mode' => PeoplePickerModeEnum::Manager)); ?>",
+      minLength: 3,
+      select: function(event, ui) {
+        $("#managers").val(ui.item.label);
+        document.getElementById('CoEnrollmentAttributeDefault0Value').value = ui.item.value;
+        return false;
+      }
+    });
+
+    // Used in inline-edit mode for Manager
+    $("#cm-ief-button-remove-manager_co_person_id").click(function() {
+      reset_manager();
+      $(this).closest(".cm-ief-val").hide();
+      $(this).closest(".cm-inline-editable-field").find(".cm-ief-widget").removeClass('hidden');
+      $("#managers").focus();
+    });
   });
 
   <?php if($vv_sponsor_mode !== SponsorEligibilityEnum::None && !isset($vv_sponsors)): ?>
@@ -374,6 +414,11 @@
     document.getElementById('CoEnrollmentAttributeDefault0Value').value = null;
   }
   <?php endif; //vv_sponsor_mode ?>
+  
+  function reset_manager() {
+    $("#managers").val("");
+    document.getElementById('CoEnrollmentAttributeDefault0Value').value = null;
+  }
 </script>
 <?php
   // Determine if fields are editable
@@ -434,11 +479,12 @@
   $co_enrollment_attribute_attribute = !empty($co_enrollment_attributes[0]['CoEnrollmentAttribute']['attribute'])
                                        ? filter_var($co_enrollment_attributes[0]['CoEnrollmentAttribute']['attribute'],FILTER_SANITIZE_SPECIAL_CHARS)
                                        : '';
-  $co_enrollment_attribute_value = !empty($co_enrollment_attributes[0]['CoEnrollmentAttribute']['value'])
-                                       ? filter_var($co_enrollment_attributes[0]['CoEnrollmentAttribute']['value'],FILTER_SANITIZE_SPECIAL_CHARS)
-                                       : '';
   print $this->Form->hidden('attribute', array('value' => $co_enrollment_attribute_attribute)) . "\n";
-  print $this->Form->hidden('CoEnrollmentAttributeDefault.0.value', array('value' => filter_var($co_enrollment_attribute_value,FILTER_SANITIZE_SPECIAL_CHARS))) . "\n";
+
+  $co_enrollment_attribute_value_def = !empty($co_enrollment_attributes[0]['CoEnrollmentAttributeDefault'][0]['value'])
+                                       ? filter_var($co_enrollment_attributes[0]['CoEnrollmentAttributeDefault'][0]['value'],FILTER_SANITIZE_SPECIAL_CHARS)
+                                       : '';
+  print $this->Form->hidden('CoEnrollmentAttributeDefault.0.value', array('value' => filter_var($co_enrollment_attribute_value_def,FILTER_SANITIZE_SPECIAL_CHARS))) . "\n";
 
   $l = 1;
 ?>
@@ -767,6 +813,49 @@
               </select>
             <?php endif; ?>
           </div>
+          <div id="attr_def_val_manager_div">
+            <!-- Always use a people picker (unlike Sponsor) -->
+            <div class="cm-inline-editable-field">
+              <?php
+                $inlineEditableFields['manager-val']['set'] = false;
+
+                if(!empty($vv_manager)) {
+                  $inlineEditableFields['manager-val']['set'] = true;
+                  print '<div class="cm-ief-val">';
+
+                  print $this->Html->link(
+                    generateCn($vv_manager['PrimaryName']),
+                    array(
+                      'controller' => 'co_people',
+                      'action' => 'canvas',
+                      $vv_manager['CoPerson']['id']
+                    )
+                  );
+
+                  print $this->element('inlineEditControls', array(
+                    'fieldName' => 'manager_co_person_id',
+                    'actions' => array('remove')
+                  ));
+                  print '</div>';
+                }
+
+                $iefClasses = "cm-ief-widget";
+                if ($inlineEditableFields['manager-val']['set']) {
+                  $iefClasses .= " hidden";
+                }
+              ?>
+              <div class="<?php print $iefClasses; ?>">
+                <div class="ui-widget">
+                  <input id="managers" type="text" />
+                  <input type="hidden" name="def_manager_val" id="def_manager_val" />
+                </div>
+                <div class="field-desc">
+                  <span class="ui-icon ui-icon-info co-info"></span>
+                  <em><?php print _txt('fd.manager.desc'); ?></em>
+                </div>
+              </div>
+            </div>
+          </div>
           <div id="attr_def_val_sponsor_div">
             <?php if($e && $vv_sponsor_mode != SponsorEligibilityEnum::None): ?>
               <?php if(isset($vv_sponsors)): ?>
@@ -814,7 +903,10 @@
                   ?>
                   <div class="<?php print $iefClasses; ?>">
                       <div class="ui-widget">
-                        <input id="sponsors" type="text" />
+                        <span class="co-loading-mini-input-container">
+                          <input id="sponsors" type="text" />
+                          <span class="co-loading-mini"><span></span><span></span><span></span></span>
+                        </span>  
                         <input type="hidden" name="def_sponsor_val" id="def_sponsor_val" />
                       </div>
                       <div class="field-desc">

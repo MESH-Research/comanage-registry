@@ -35,22 +35,24 @@
 
   // Add dashboard navigation if we have more than one dashboard
   if(!empty($vv_available_dashboards) && count($vv_available_dashboards) > 1) {
-    print '<div id="dashboard-tabs" class="mdl-tabs">';
-    print '<nav class="mdl-tabs__tab-bar">';
+    print '<nav id="dashboard-tabs" class="cm-subnav-tabs">';
+    print '<ul class="nav nav-tabs">';
     foreach($vv_available_dashboards as $dashboardId => $dashboardName) {
+      print '<li class="nav-item">';
       if ($vv_dashboard['CoDashboard']['id'] == $dashboardId) {
-        print '<span class="mdl-tabs__tab selected">' . $dashboardName . '</span>';
+        print '<span class="nav-link active">' . $dashboardName . '</span>';
       } else {
         print $this->Html->link(filter_var($dashboardName, FILTER_SANITIZE_SPECIAL_CHARS), array(
           'controller' => 'co_dashboards',
           'action' => 'dashboard',
           $dashboardId
         ),
-          array('class' => 'mdl-tabs__tab'));
+          array('class' => 'nav-link spin'));
       }
+      print '</li>';
     }
+    print '</ul>';
     print '</nav>';
-    print '</div>';
   }
 ?>
 
@@ -70,9 +72,7 @@
           $w[$pmodel]['id']
         );
 
-        print "var coSpinnerTarget" . $w['id'] . " = document.getElementById('widgetSpinner" . $w['id'] . "');\n";
-        print "var coSpinner" . $w['id'] . " = new Spinner(coMiniSpinnerOpts).spin(coSpinnerTarget" . $w['id'] . ");\n";
-        print "$('#widget" . $w['id'] . "').load('" . addslashes($this->Html->url($args)) . "', function() { coSpinner" . $w['id'] . ".stop(); });\n";
+        print "$('#widget" . $w['id'] . "').load('" . addslashes($this->Html->url($args)) . "', function() { $('#widgetSpinner" . $w['id'] . "').hide(); });\n";
       }
     }
   }
@@ -93,7 +93,7 @@
           <div class="dashboard-widget-container">
             <h2 class="widget-title">
               <?php print filter_var($w['description'], FILTER_SANITIZE_SPECIAL_CHARS); ?>
-              <span id="widgetSpinner<?php print $w['id']; ?>" class="mini-spinner"></span>
+              <span id="widgetSpinner<?php print $w['id']; ?>" class="co-loading-mini"><span></span><span></span><span></span></span>
             </h2>
             <div id="widget<?php print $w['id']; ?>"></div>
           </div>

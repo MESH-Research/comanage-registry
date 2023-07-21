@@ -351,6 +351,50 @@
         : filter_var($cmp_enrollment_configurations[0]['CmpEnrollmentConfiguration']['eds_hidden_idps'],FILTER_SANITIZE_SPECIAL_CHARS)); ?>
     </div>
   </li>
+  <li>
+      <div class="field-name">
+          <div class="field-title">
+            <?php
+            print ($e ? $this->Form->label('redirect_on_logout', _txt('fd.ef.rd.logout'))
+              : _txt('fd.ef.rd.logout'));
+            ?>
+          </div>
+          <div class="field-desc"><?php
+            print _txt('fd.ef.rd.logout.desc'); ?></div>
+      </div>
+      <div class="field-info">
+        <?php
+        print ($e
+          ? $this->Form->input(
+            'redirect_on_logout',
+            array(
+              'size' => 60,
+              'maxlength' => 1024,
+            )
+          )
+          : filter_var($cmp_enrollment_configurations[0]['CmpEnrollmentConfiguration']['redirect_on_logout'], FILTER_SANITIZE_SPECIAL_CHARS));
+        ?>
+      </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title">
+        <?php
+        print ($e ? $this->Form->label('app_base', _txt('fd.ef.app.base')) : _txt('fd.ef.app.base'));
+        ?>
+      </div>
+      <div class="field-desc"><?php
+        print _txt('fd.ef.app.base.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php
+      if ($e) {
+        print $this->Form->hidden('app_base', array('value' => $this->webroot));
+      }
+      print filter_var($cmp_enrollment_configurations[0]['CmpEnrollmentConfiguration']['app_base'], FILTER_SANITIZE_SPECIAL_CHARS);
+      ?>
+    </div>
+  </li>
 
   <?php if($e): ?>
     <li class="fields-submit">

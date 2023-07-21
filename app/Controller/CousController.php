@@ -86,9 +86,51 @@ class CousController extends StandardController {
       $this->set('parent_options', $options);
       }
     }
+
+    // XXX This block should execute before its parent. The parent needs the $vv_cou_list
+    if(!$this->request->is('restful')
+       && $this->action == 'index') {
+      // Get the full list of COUs
+      $cous_all = $this->Cou->allCous($this->cur_co["Co"]["id"]);
+      asort($cous_all, SORT_STRING);
+      // `Any` option will return all COUs with a parent
+      // `None` option will return all COUs with parent equal to null
+      $vv_cou_list[_txt('op.select.opt.any')] = _txt('op.select.opt.any');
+      $vv_cou_list[_txt('op.select.opt.none')] = _txt('op.select.opt.none');
+      $vv_cou_list[_txt('fd.cou.list')] = $cous_all;
+      $this->set('vv_cou_list', $vv_cou_list);
+    }
     
     parent::beforeRender();
   }
+
+  /**
+   * Search Block fields configuration
+   *
+   * @since  COmanage Registry v4.0.0
+   */
+
+  public function searchConfig($action) {
+    if($action == 'index') {                   // Index
+      return array(
+        'search.couName' => array(
+          'label' => _txt('fd.name'),
+          'type'  => 'text',
+        ),
+        'search.couDesc' => array(
+          'type'    => 'text',
+          'label'   => _txt('fd.description'),
+        ),
+        'search.parentCou' => array(
+          'type'    => 'select',
+          'label'   => _txt('fd.parent'),
+          'empty'   => _txt('op.select.all'),
+          'options' => !empty($this->viewVars['vv_cou_list']) ? $this->viewVars['vv_cou_list'] : array(),
+        ),
+      );
+    }
+  }
+
 
   /**
    * Perform any dependency checks required prior to a delete operation.
@@ -215,7 +257,7 @@ class CousController extends StandardController {
    */
   
   function checkWriteFollowups($reqdata, $curdata = null, $origdata = null) {
-    if(!$this->request->is('restful') && $this->action == 'edit') {
+    if($this->action == 'edit') {
       if(!empty($reqdata['Cou']['name'])
          && !empty($curdata['Cou']['name'])
          && $reqdata['Cou']['name'] != $curdata['Cou']['name']) {
@@ -226,6 +268,48 @@ class CousController extends StandardController {
     }
     
     return true;
+  }
+
+  /**
+   * Determine the conditions for pagination of the index view, when rendered via the UI.
+   *
+   * @since  COmanage Registry v4.0.0
+   * @return Array An array suitable for use in $this->paginate
+   */
+
+  public function paginationConditions() {
+    $ret = array();
+
+    // COU Name
+    $cou_name = isset($this->request->params['named']['search.couName']) ? $this->request->params['named']['search.couName'] : "";
+    // COU Description
+    $cou_description = isset($this->request->params['named']['search.couDesc']) ? strtolower($this->request->params['named']['search.couDesc']) : "";
+    // Parent COU
+    $parent_couid = isset($this->request->params['named']['search.parentCou']) ? $this->request->params['named']['search.parentCou'] : "";
+
+    $ret['conditions']['Cou.co_id'] = $this->cur_co['Co']['id'];
+    if(!empty($cou_name)) {
+      $cou_name = strtolower(str_replace(urlencode("/"), "/", $cou_name));
+      $ret['conditions']['LOWER(Cou.name) LIKE'] = "%$cou_name%";
+    }
+    if(!empty($cou_description)) {
+      $cou_description = strtolower(str_replace(urlencode("/"), "/", $cou_description));
+      $ret['conditions']['LOWER(Cou.description) LIKE'] = "%{$cou_description}%";
+    }
+    if(!empty($parent_couid)) {
+      if($parent_couid == _txt('op.select.opt.any')) {
+        $ret['conditions'][] = 'Cou.parent_id IS NOT NULL';
+      } elseif($parent_couid == _txt('op.select.opt.none')) {
+        $ret['conditions'][] = 'Cou.parent_id IS NULL';
+      } else {
+        $ret['conditions']['Cou.parent_id'] = $parent_couid;
+      }
+    }
+    if(isset($this->view_contains)) {
+      $ret['contain'] = $this->view_contains;
+    }
+
+    return $ret;
   }
 
   /**
@@ -256,7 +340,8 @@ class CousController extends StandardController {
     
     // View all existing COUs?
     $p['index'] = ($roles['cmadmin'] || $roles['coadmin']);
-    
+    $p['search'] = $p['index'];
+
     // View an existing COU?
     $p['view'] = ($roles['cmadmin'] || $roles['coadmin']);
 

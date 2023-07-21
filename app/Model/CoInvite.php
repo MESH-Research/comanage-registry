@@ -74,6 +74,11 @@ class CoInvite extends AppModel {
       'rule' => '/.*/',  // The 'date' rule is too constraining
       'required' => false,
       'allowEmpty' => true
+    ),
+    'skip_invite' => array(
+      'rule' => array('boolean'),
+      'required' => false,
+      'allowEmpty' => true
     )
   );
   
@@ -267,12 +272,13 @@ class CoInvite extends AppModel {
    * @param  String Email Address to send the invite from
    * @param  String CO Name (to pass into invite)
    * @param  String Subject text (for configured templates stored in the database)
-   * @param  String Template text (for configured templates stored in the database)
+   * @param  String/Array Template text (for configured templates stored in the database)
    * @param  Integer Email Address ID to verify
    * @param  Integer Time, in minutes, the invitation is valid for (default = 1440 = 1 day)
    * @param  String Comma separated list of addresses to cc
    * @param  String Comma separated list of addresses to bcc
    * @param  Array Substitutions for message template (to supplement those handled natively)
+   * @param  String Message Body format type it can be txt, html or both
    * @return Integer CO Invitation ID
    * @throws RuntimeException
    * @todo The function signature has evolved organically and is a bit of a mess, clean up as part of CO-753
@@ -290,7 +296,9 @@ class CoInvite extends AppModel {
                        $expiry=null,
                        $cc=null,
                        $bcc=null,
-                       $subs=array()) {
+                       $subs=array(),
+                       $format=MessageFormatEnum::Plaintext,
+                       $skip_invite=false) {
     // Toss any prior invitations for $coPersonId to $toEmail
     
     try {
@@ -308,6 +316,7 @@ class CoInvite extends AppModel {
     $invite['CoInvite']['co_person_id'] = $coPersonId;
     $invite['CoInvite']['invitation'] = Security::generateAuthKey();
     $invite['CoInvite']['mail'] = $toEmail;
+    $invite['CoInvite']['skip_invite'] = $skip_invite;
     // XXX date format may not be portable
     $invite['CoInvite']['expires'] = date('Y-m-d H:i:s', strtotime('+' . ($expiry ? $expiry : DEF_INV_VALIDITY) . ' minutes'));
     if($emailAddressID) {
@@ -317,6 +326,9 @@ class CoInvite extends AppModel {
     $this->create($invite);
     
     if($this->save()) {
+      if($skip_invite) {
+        return $this->id;
+      }
       // Try to send the invite
       
       // Set up and send the invitation via email
@@ -340,7 +352,7 @@ class CoInvite extends AppModel {
           } else {
             $msgSubject = _txt('em.invite.subject', array($coName));
           }
-          
+
           $msgBody = processTemplate($template, $substitutions);
           
           // If this enrollment has a default email address set, use it, otherwise leave in the default for the site.
@@ -350,17 +362,41 @@ class CoInvite extends AppModel {
           
           // If cc's or bcc's were set, convert to an array
           if($cc) {
-            $email->cc(explode(',', $cc));
+            $email->cc(array_map('trim', explode(',', $cc)));
           }
           
           if($bcc) {
-            $email->bcc(explode(',', $bcc));
+            $email->bcc(array_map('trim', explode(',', $bcc)));
           }
-          
-          $email->emailFormat('text')
-                ->to($toEmail)
-                ->subject($msgSubject)
-                ->send($msgBody);
+
+          if($format === MessageFormatEnum::PlaintextAndHTML
+             && is_array($msgBody)) {
+             $viewVariables = array(
+                MessageFormatEnum::Plaintext  => $msgBody[MessageFormatEnum::Plaintext],
+                MessageFormatEnum::HTML => $msgBody[MessageFormatEnum::HTML],
+              );
+          } elseif($format === MessageFormatEnum::HTML
+                   && is_array($msgBody)) {
+            $viewVariables = array(
+                MessageFormatEnum::HTML => $msgBody[MessageFormatEnum::HTML],
+              );
+          } else {
+              if(is_array($msgBody)) {
+                  $viewVariables = array(
+                    MessageFormatEnum::Plaintext => $msgBody[MessageFormatEnum::Plaintext],
+                  );
+              } else {
+                  $viewVariables = array(
+                    MessageFormatEnum::Plaintext => $msgBody,
+                  );
+              }
+          }
+          $email->template('custom', 'basic')
+            ->emailFormat($format)
+            ->to($toEmail)
+            ->viewVars($viewVariables)
+            ->subject($msgSubject);
+          $email->send();
         } else {
           $viewVariables = array(
             'co_name'   => $coName,
@@ -381,7 +417,7 @@ class CoInvite extends AppModel {
          $email->send();
         }
       } catch(Exception $e) {
-        throw new RuntimeException($e->getMessage());
+        throw new RuntimeException($e->getMessage() . PHP_EOL . _txt('er.ev.sent.failed', array($toEmail)));
       }
       
       // Create a history record

@@ -159,6 +159,15 @@
 </div>
 <br />
 <?php else: // vv_not_found ?>
+<script>
+  $(function() {
+    // Toggle source record formatting
+    $("#source-record-format-toggle").click(function (e) {
+      e.preventDefault();
+      $("code.source-record").toggleClass("source-record-formatted");
+    });
+  });
+</script>
 <div class="innerContent">
   <div class="table-container">
     <table id="view_org_identity_source_record">
@@ -309,7 +318,11 @@
         <?php if(!empty($vv_org_source_record['Identifier'])) foreach($vv_org_source_record['Identifier'] as $id): ?>
         <tr class="line<?php print $l++ % 2; ?>">
           <td>
-            <?php print _txt('fd.identifier.identifier') . " (" . $id['type'] . ")"; ?>
+            <?php 
+              print _txt('fd.identifier.identifier') . " (" 
+                    . $id['type'] 
+                    . ((isset($id['login']) && $id['login']) ? ", " . _txt('fd.identifier.login') : "")
+                    . ")"; ?>
           </td>
           <td>
           <?php print filter_var($id['identifier'],FILTER_SANITIZE_SPECIAL_CHARS); ?>
@@ -374,19 +387,42 @@
           </td>
         </tr>
         <?php endif; // AdHocAttribute ?>
+        <?php if(!empty($vv_org_source_record['OrgIdentity']['manager_identifier'])): ?>
+        <tr class="line<?php print $l++ % 2; ?>">
+          <td>
+            <?php print _txt('fd.manager'); ?>
+          </td>
+          <td>
+            <?php print $vv_org_source_record['OrgIdentity']['manager_identifier']; ?>
+          </td>
+        </tr>
+        <?php endif; // manager_identifier ?>
+        <?php if(!empty($vv_org_source_record['OrgIdentity']['sponsor_identifier'])): ?>
+        <tr class="line<?php print $l++ % 2; ?>">
+          <td>
+            <?php print _txt('fd.sponsor'); ?>
+          </td>
+          <td>
+            <?php print $vv_org_source_record['OrgIdentity']['sponsor_identifier']; ?>
+          </td>
+        </tr>
+        <?php endif; // sponsor_identifier ?>
         <tr class="line<?php print $l++ % 2; ?>">
           <td>
             <?php print _txt('fd.ois.record'); ?><br />
             <span class="descr"><?php print _txt('fd.ois.record.desc'); ?></span>
           </td>
           <td>
-            <pre>
+            <button id="source-record-format-toggle" class="btn btn-link">
+              <?php print _txt('op.ois.toggle.format') ?>
+            </button>
+            <code class="source-record">
               <?php
                 if(!empty($vv_raw_source_record)) {
                 print filter_var($vv_raw_source_record,FILTER_SANITIZE_SPECIAL_CHARS);
                 }
               ?>
-            </pre>
+            </code>
           </td>
         </tr>
         <?php if($vv_org_identity_source['hash_source_record']): ?>

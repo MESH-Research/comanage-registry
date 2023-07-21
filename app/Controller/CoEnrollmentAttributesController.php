@@ -166,19 +166,28 @@ class CoEnrollmentAttributesController extends StandardController {
           $this->set('vv_ef_id', $this->CoEnrollmentAttribute->CoEnrollmentFlow->id);
           
           // Determine attribute enumerations
-          $enums = $this->AttributeEnumeration->active($this->viewVars['vv_coid'],
-                                                       null,
-                                                       'list',
-                                                       $this->CmpEnrollmentConfiguration->orgIdentitiesPooled());
           
-          // We need to rekey $enums from general format (eg) "OrgIdentity.o" to
-          // Enrollment Attribute format (eg) "o:o"
+          $supportedAttrEnums = array(
+            'CoPersonRole.o',
+            'CoPersonRole.ou',
+            'CoPersonRole.title',
+            'OrgIdentity.o',
+            'OrgIdentity.ou',
+            'OrgIdentity.title'
+          );
           
-          if(!empty($enums)) {
-            foreach($enums as $attr => $enum) {
+          $enums = array();
+          
+          foreach($supportedAttrEnums as $attr) {
+            $cfg = $this->AttributeEnumeration->enumerations($this->viewVars['vv_coid'], $attr);
+            
+            // XXX CO-2012 for now we don't support "allow_other"
+            if($cfg) {
+              // We need to rekey from general format (eg) "OrgIdentity.o" to
+              // Enrollment Attribute format (eg) "o:o"
               $a = explode('.', $attr, 2);
               $code = "";
-              
+
               switch($a[0]) {
                 case 'CoPersonRole':
                   $code = 'r';
@@ -190,9 +199,8 @@ class CoEnrollmentAttributesController extends StandardController {
                   throw new LogicException(_txt('er.notimpl'));
                   break;
               }
-              
-              $enums[ $code.":".$a[1] ] = $enum;
-              unset($enums[$attr]);
+
+              $enums[ $code.":".$a[1] ] = $cfg['dictionary'];
             }
           }
           
@@ -201,6 +209,16 @@ class CoEnrollmentAttributesController extends StandardController {
           // Assemble the set of available attributes for the view to render
           
           $availableAttributes = $this->CoEnrollmentAttribute->availableAttributes($coid);
+          
+          // Simple key value, primarily for "order"
+          $availableAttributesFlat = array();
+          
+          foreach(array_keys($availableAttributes) as $m) {
+            $availableAttributesFlat += $availableAttributes[$m];
+          }
+          $this->set('vv_available_attributes', $availableAttributesFlat);
+          
+          // Nested
           $availableAttributesNested = array();
           foreach($availableAttributes as $mdl_name => &$attr_mdl) {
             foreach($attr_mdl as $attribute_map => $attribute_fn) {
@@ -285,6 +303,18 @@ class CoEnrollmentAttributesController extends StandardController {
                 
                 $this->set('vv_sponsor', $this->CoEnrollmentAttribute->CoEnrollmentFlow->Co->CoPerson->find('first', $args));
               }
+            }
+            
+            // Also populate the current manager, if set
+            if(!empty($this->viewVars['co_enrollment_attributes'][0]['CoEnrollmentAttribute']['attribute'])
+               && $this->viewVars['co_enrollment_attributes'][0]['CoEnrollmentAttribute']['attribute'] == 'r:manager_co_person_id'
+               && !empty($this->viewVars['co_enrollment_attributes'][0]['CoEnrollmentAttributeDefault'][0]['value'])) {
+              // The default value is a CO Person ID
+              $args = array();
+              $args['conditions']['CoPerson.id'] = $this->viewVars['co_enrollment_attributes'][0]['CoEnrollmentAttributeDefault'][0]['value'];
+              $args['contain'] = array('PrimaryName');
+              
+              $this->set('vv_manager', $this->CoEnrollmentAttribute->CoEnrollmentFlow->Co->CoPerson->find('first', $args));
             }
 
             // Assemble the list of available groups. Note we currently allow any group to be
@@ -483,7 +513,9 @@ class CoEnrollmentAttributesController extends StandardController {
     $p['index'] = ($roles['cmadmin'] || $roles['coadmin']);
     
     // Modify ordering for display via AJAX 
-    $p['reorder'] = ($roles['cmadmin'] || $roles['coadmin']);
+    $p['reorder'] = $roles['cmadmin']
+                    || $roles['coadmin']
+                    || ($roles['apiuser'] && ($roles['cmadmin'] || $roles['coadmin']));
 
     // View an existing CO Enrollment Attributes?
     $p['view'] = ($roles['cmadmin'] || $roles['coadmin']);
