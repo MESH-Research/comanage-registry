@@ -111,33 +111,48 @@ class EnvSourceBackend extends OrgIdentitySourceBackend {
     $orgdata['Name'] = array();
     
     $orgdata['Name'][0]['honorific'] = $result['env_name_honorific'];
-    $orgdata['Name'][0]['given'] = $result['env_name_given'];
+    // We need a Name in order to save an OrgIdentity, but we may not get one since
+    // some IdPs don't release meaningful attributes. So we create default values.
+    $orgdata['Name'][0]['given'] = !empty($result['env_name_given']) ?
+                                    $result['env_name_given'] : $result['env_identifier_sorid'];
     $orgdata['Name'][0]['middle'] = $result['env_name_middle'];
-    $orgdata['Name'][0]['family'] = $result['env_name_family'];
+    // Populate a default last name in case it's required.
+    $orgdata['Name'][0]['family'] = !empty($result['env_name_family']) ?
+                                     $result['env_name_family'] : _txt('pl.envsource.name.unknown');
     $orgdata['Name'][0]['suffix'] = $result['env_name_suffix'];
     $orgdata['Name'][0]['primary_name'] = true;
     $orgdata['Name'][0]['type'] = NameEnum::Official;
-    
-    // We need a Name in order to save an OrgIdentity, but we may not get one since
-    // some IdPs don't release meaningful attributes. So we create default values.
-    
-    if(empty($orgdata['Name'][0]['given'])) {
-      // For now we only check given, though it's possible we only received a
-      // given name but the current configuration requires both given and family.
-    
-      // The only thing we can guarantee is SORID
-      $orgdata['Name'][0]['given'] = $result['env_identifier_sorid'];
-    
-      // Populate a default last name in case it's required.
-      $orgdata['Name'][0]['family'] = _txt('pl.envsource.name.unknown');
-    }
-    
+
     $orgdata['EmailAddress'] = array();
     
     if($result['env_mail']) {
-      $orgdata['EmailAddress'][0]['mail'] = $result['env_mail'];
-      $orgdata['EmailAddress'][0]['type'] = EmailAddressEnum::Official;
-      $orgdata['EmailAddress'][0]['verified'] = true;
+      if(!empty($this->pluginCfg['sp_type'])
+         && $this->pluginCfg['sp_type'] != AuthProviderEnum::Other) {
+        $delimiter = "";
+        if($this->pluginCfg['sp_type'] == AuthProviderEnum::Shibboleth) {
+          $delimiter = ";";
+        } elseif($this->pluginCfg['sp_type'] == AuthProviderEnum::Simplesamlphp) {
+          $delimiter =",";
+        }
+
+        $env_email_list = explode($delimiter, $result['env_email']);
+        if(count($env_email_list) > 1) {
+          foreach($env_email_list as $idx => $mail) {
+            $orgdata['EmailAddress'][$idx] = array();
+            $orgdata['EmailAddress'][$idx]['mail'] = $mail;
+            $orgdata['EmailAddress'][$idx]['type'] = EmailAddressEnum::Official;
+            $orgdata['EmailAddress'][$idx]['verified'] = true;
+          }
+        } else {
+          $orgdata['EmailAddress'][0]['mail'] = $result['env_mail'];
+          $orgdata['EmailAddress'][0]['type'] = EmailAddressEnum::Official;
+          $orgdata['EmailAddress'][0]['verified'] = true;
+        }
+      } else {
+        $orgdata['EmailAddress'][0]['mail'] = $result['env_mail'];
+        $orgdata['EmailAddress'][0]['type'] = EmailAddressEnum::Official;
+        $orgdata['EmailAddress'][0]['verified'] = true;
+      }
     }
     
     $orgdata['Address'] = array();
