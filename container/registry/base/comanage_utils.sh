@@ -274,7 +274,7 @@ function comanage_utils::enable_virtual_host() {
 function comanage_utils::enable_plugins() {
 
     # Enable any supported non-core plugins if requested.
-    if [[ -n "$COMANAGE_REGISTRY_ENABLE_PLUGIN" ]]; then
+    if [[ -n "${COMANAGE_REGISTRY_ENABLE_PLUGIN}" ]]; then
         # Clear the caches.
         comanage_utils::registry_clear_cache
 
@@ -290,7 +290,7 @@ function comanage_utils::enable_plugins() {
 
         popd > "$OUTPUT" 2>&1
 
-        if [[ -z "COMANAGE_REGISTRY_SKIP_SETUP" ]]; then
+        if [[ -z "${COMANAGE_REGISTRY_SKIP_SETUP}" ]]; then
             pushd "$COMANAGE_REGISTRY_DIR/app" > "$OUTPUT" 2>&1
             ./Console/cake database > "$OUTPUT" 2>&1
             popd > "$OUTPUT" 2>&1
@@ -1348,6 +1348,8 @@ ServerName ${COMANAGE_REGISTRY_VIRTUAL_HOST_SCHEME:-http}://${COMANAGE_REGISTRY_
 UseCanonicalName On
 UseCanonicalPhysicalPort On
 
+Header set Content-Security-Policy "frame-ancestors 'self';"
+
 EOF
 }
 
@@ -1375,6 +1377,7 @@ UseCanonicalName On
 UseCanonicalPhysicalPort On
 
 Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains"
+Header always set Content-Security-Policy "frame-ancestors 'self';"
 
 SSLEngine on
 SSLProtocol all -SSLv2 -SSLv3

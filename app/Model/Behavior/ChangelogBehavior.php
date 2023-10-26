@@ -119,6 +119,7 @@ class ChangelogBehavior extends ModelBehavior {
     if($this->isDeleted($model, $model->id, true)) {
       // We can't really pass back an error to be nicely rendered, but we can
       // at least force a stack trace.
+      $dataSource->rollback();
       throw new RuntimeException(_txt('er.delete.already'));
     }
     
@@ -228,7 +229,11 @@ class ChangelogBehavior extends ModelBehavior {
       $ret['conditions'][] = $malias . '.deleted IS NOT true';
       
       if(!empty($query['contain'])
-         && (!isset($query['contain'][0]) || $query['contain'][0] != false)) {
+         && (!isset($query['contain'][0])
+             || $query['contain'][0] != false
+             || (is_bool($query['contain']) && $query['contain'])
+            )
+      ) {
         $ret['contain'] = $this->modifyContain($model, $query['contain']);
       }
       
@@ -534,6 +539,13 @@ class ChangelogBehavior extends ModelBehavior {
     // If we get a simple string, convert it to a simple array
     if(is_string($contain)) {
       $contain = array(0 => $contain);
+    }
+
+    if(is_bool($contain) && $contain) {
+      // We will create the contain array here by using the associations of the model
+      $has = array_merge($model->hasOne, $model->hasMany);
+      $belongs = $model->belongsTo;
+      $contain = array_merge(array_keys($has), array_keys($belongs));
     }
     
     $ret = $contain;
