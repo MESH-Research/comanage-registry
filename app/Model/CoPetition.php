@@ -2040,8 +2040,7 @@ class CoPetition extends AppModel {
     $createLink = false;
     
     // Track validation
-    
-    $fail = false;
+
     $orgData = array();
     $coData = array();
     $coRoleData = array();
@@ -2058,30 +2057,24 @@ class CoPetition extends AppModel {
       
       try {
         $orgData = $this->validateModel('EnrolleeOrgIdentity', $requestData, $efAttrs);
-      }
-      catch(Exception $e) {
+      } catch(Exception $e) {
         // Validation failed
-        $fail = true;
+        $dbc->rollback();
+        throw new InvalidArgumentException(_txt('er.fields'));
       }
     }
     
     try {
       $coData = $this->validateModel('EnrolleeCoPerson', $requestData, $efAttrs);
-    }
-    catch(Exception $e) {
+    } catch(Exception $e) {
       // Validation failed
-      $fail = true;
+      $dbc->rollback();
+      throw new InvalidArgumentException(_txt('er.fields'));
     }
     
     try {
       $coRoleData = $this->validateModel('EnrolleeCoPersonRole', $requestData, $efAttrs);
-    }
-    catch(Exception $e) {
-      // Validation failed
-      $fail = true;
-    }
-    
-    if($fail) {
+    } catch(Exception $e) {
       // Validation failed
       $dbc->rollback();
       throw new InvalidArgumentException(_txt('er.fields'));
@@ -2698,6 +2691,24 @@ class CoPetition extends AppModel {
       $enrolleeName = generateCn($pt['EnrolleeCoPerson']['PrimaryName']);
     } elseif(!empty($pt['EnrolleeOrgIdentity']['PrimaryName'])) {
       $enrolleeName = generateCn($pt['EnrolleeOrgIdentity']['PrimaryName']);
+    }
+
+    // Select from the petition the CoPersonRole associated with the
+    // enrollee and the enrollment flow.
+    $enrolleeCoPersonRole = null;
+    if(!empty($pt['EnrolleeCoPerson']['CoPersonRole']) && !empty($pt['CoPetition']['enrollee_co_person_role_id'])) {
+      if(is_array($pt['EnrolleeCoPerson']['CoPersonRole'])) {
+        $roles = $pt['EnrolleeCoPerson']['CoPersonRole'];
+      } else {
+        $roles = array();
+        $roles[] = $pt['EnrolleeCoPerson']['CoPersonRole'];
+      }
+      foreach($roles as $r) {
+        if($r['id'] == $pt['CoPetition']['enrollee_co_person_role_id']) {
+          $enrolleeCoPersonRole = $r;
+          break;
+        }
+      }
     }
 
     $subject = null;
@@ -3555,7 +3566,8 @@ class CoPetition extends AppModel {
   
   protected function validateModel($pmodel, $requestData, $efAttrs) {
     $ret = array();
-    
+    $fail = false;
+
     if(!empty($requestData[$pmodel])) {
       // Adjust validation rules for top level attributes only (OrgIdentity, CO Person, CO Person Role)
       // and validate those models without validating the associated models.
@@ -3584,6 +3596,14 @@ class CoPetition extends AppModel {
           if(in_array($field . '-required', $requestDataFields)) {
             throw new RuntimeException(_txt('er.validation'));
           }
+        }
+
+        // CoPerson Role needs the co_person_id as well as the status
+        // The first one we do not know yet and the latter will be calculated
+        // in the afterSave event. As a result we do not take into account the
+        // failure here and we continue
+        if($fail && $pmodel != "EnrolleeCoPersonRole") {
+          throw new RuntimeException(_txt('er.validation'));
         }
       }
       
