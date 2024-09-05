@@ -26,6 +26,8 @@
  */
 -->
 <?php
+  global $cm_lang, $cm_texts;
+  
   // Determine if fields are editable
   $e = false;
   
@@ -94,14 +96,12 @@
 </script>
 
 <ul id="<?php print $this->action; ?>_password_authenticator" class="fields form-list form-list-admin">
-  <li>
+    <li>
     <div class="field-name">
       <div class="field-title"><?php print $this->Form->label('password_source',_txt('pl.passwordauthenticator.password_source'),array('class' => 'fieldTitle'));?></div>
     </div>
     <div class="field-info">
       <?php
-        global $cm_lang, $cm_texts;
-
         $attrs = array();
         $attrs['value'] = (isset($password_authenticators[0]['PasswordAuthenticator']['password_source'])
                            ? $password_authenticators[0]['PasswordAuthenticator']['password_source']
@@ -174,6 +174,80 @@
     </div>
     <div class="field-info">
       <?php if($e) print $this->Form->input('format_plaintext'); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print _txt('pl.passwordauthenticator.show_username'); ?></div>
+      <div class="field-desc"><?php print _txt('pl.passwordauthenticator.show_username.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php if($e) print $this->Form->input('show_username'); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print $this->Form->label('username_identifier_type',_txt('pl.passwordauthenticator.username_identifier_type'),array('class' => 'fieldTitle'));?></div>
+      <div class="field-desc"><?php print _txt('pl.passwordauthenticator.username_identifier_type.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php
+        
+        $attrs = array();
+        $attrs['value'] = (isset($password_authenticators[0]['PasswordAuthenticator']['username_identifier_type'])
+                           ? $password_authenticators[0]['PasswordAuthenticator']['username_identifier_type']
+                           : IdentifierEnum::ePPN);
+        $attrs['empty'] = false;
+        $attrs['onChange'] = 'fields_update_gadgets()';
+        
+        if($e) {
+          print $this->Form->select('username_identifier_type',
+                                    $cm_texts[ $cm_lang ]['en.identifier.type'],
+                                    $attrs);
+
+          if($this->Form->isFieldError('username_identifier_type')) {
+            print $this->Form->error('username_identifier_type');
+          }
+        } else {
+          print _txt('en.identifier.type', null, $password_authenticators[0]['PasswordAuthenticator']['username_identifier_type']);
+        }
+      ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print _txt('pl.passwordauthenticator.username_from_org_identity'); ?></div>
+      <div class="field-desc"><?php print _txt('pl.passwordauthenticator.username_from_org_identity.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php if($e) print $this->Form->input('username_from_org_identity'); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print _txt('pl.passwordauthenticator.username_help_text'); ?></div>
+      <div class="field-desc"><?php print _txt('pl.passwordauthenticator.username_help_text.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php if($e) print $this->Form->input('username_help_text'); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print _txt('pl.passwordauthenticator.authenticator_help_text'); ?></div>
+      <div class="field-desc"><?php print _txt('pl.passwordauthenticator.authenticator_help_text.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php if($e) print $this->Form->input('authenticator_help_text'); ?>
+    </div>
+  </li>
+  <li>
+    <div class="field-name">
+      <div class="field-title"><?php print _txt('pl.passwordauthenticator.remove_domain_from_username'); ?></div>
+      <div class="field-desc"><?php print _txt('pl.passwordauthenticator.remove_domain_from_username.desc'); ?></div>
+    </div>
+    <div class="field-info">
+      <?php if($e) print $this->Form->input('remove_domain_from_username'); ?>
     </div>
   </li>
   <?php if($e): ?>

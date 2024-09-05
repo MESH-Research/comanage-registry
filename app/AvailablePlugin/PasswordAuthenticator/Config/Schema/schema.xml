@@ -38,6 +38,12 @@
     <field name="format_crypt_php" type="L" />
     <field name="format_plaintext" type="L" />
     <field name="format_sha1_ldap" type="L" />
+    <field name="show_username" type="L" />
+    <field name="username_identifier_type" type="C" size="20" />
+    <field name="username_from_org_identity" type="L" />
+    <field name="username_help_text" type="C" size="255" />
+    <field name="authenticator_help_text" type="C" size="255" />
+    <field name="remove_domain_from_username" type="L" />
     <field name="created" type="T" />
     <field name="modified" type="T" />
     

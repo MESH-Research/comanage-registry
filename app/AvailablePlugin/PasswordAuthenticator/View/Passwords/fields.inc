@@ -45,7 +45,11 @@
   // Add breadcrumbs
   print $this->element("coCrumb", array('authenticator' => 'Password'));
 ?>
-
+<?php if( $vv_authenticator['PasswordAuthenticator']['authenticator_help_text'] ): ?>
+  <div class="password-authenticator-help-text">
+    <?php print $vv_authenticator['PasswordAuthenticator']['authenticator_help_text']; ?>
+  </div>
+<?php endif; ?>
 <div class="co-info-topbox">
   <em class="material-icons">info</em>
   <div class="co-info-topbox-text">
@@ -105,10 +109,21 @@
 </ul>
 <?php elseif($vv_authenticator['PasswordAuthenticator']['password_source'] == PasswordAuthPasswordSourceEnum::SelfSelect): ?>
 <ul id="<?php print $this->action; ?>_password" class="fields form-list form-list-admin">
+  <?php if($vv_identifier): ?>
+    <li>
+      <div class="field-name">
+        <div class="field-title"><?php print _txt('pl.passwordauthenticator.username'); ?></div>
+        <div class="field-desc"><?php print $vv_authenticator['PasswordAuthenticator']['username_help_text']; ?></div>
+      </div>
+      <div class="field-info">
+        <?php print $this->Form->input('username', [ 'default' => $vv_identifier, 'label' => false, 'div' => false, 'readonly' => true ] );?>
+      </div>  
+    </li>
+  <?php endif; ?>
   <!-- If we are editing our own password and one already exists, we must provide it
        (otherwise we're probably an admin -->
   <?php if(!empty($vv_current)
-           && ($vv_co_person['CoPerson']['id'] == $this->Session->read('Auth.User.co_person_id'))): ?>
+           && ($vv_co_person['CoPerson']['id'] == $this->Session->read('Auth.User.co_person_id'))): ?>  
   <li>
     <div class="field-name">
       <div class="field-title">

@@ -33,6 +33,8 @@ class PasswordsController extends SAMController {
   
   // Password Authenticator ID, used by ssr()
   protected $passwordAuthenticatorId = null;
+
+  //public $uses = [ 'OrgIdentity' ];
   
   /**
    * Callback before other controller methods are invoked or views are rendered.
@@ -71,6 +73,55 @@ class PasswordsController extends SAMController {
           $this->redirect('/');
         }
       }
+    }
+  }
+
+  public function beforeRender() {
+    parent::beforeRender();
+
+    $config = $this->viewVars['vv_authenticator']['PasswordAuthenticator'];
+
+    if ( ! $config['show_username'] ) {
+      return;
+    }
+
+    try {
+      if ( $config['username_from_org_identity'] ) {
+        $args = [
+          'joins' => [
+            [
+              'table' => 'co_org_identity_links',
+              'alias' => 'CoOrgIdentityLink',
+              'type' => 'INNER',
+              'conditions' => [
+                'CoOrgIdentityLink.org_identity_id=OrgIdentity.id'
+              ]
+            ]
+          ],
+          'conditions' => [
+            'CoOrgIdentityLink.co_person_id' => $this->viewVars['vv_co_person_id'],
+            'Identifier.type' => $config['username_identifier_type']
+          ],
+        ];
+
+        $identifier = $this->CoPerson->Identifier->find('first', $args);
+      } else {
+        $args = [
+          'conditions' => [
+            'Identifier.co_person_id' => $this->viewVars['vv_co_person_id'],
+            'Identifier.type' => $config['username_identifier_type']
+          ],
+        ];
+
+        $identifier = $this->CoPerson->Identifier->find('first', $args);
+      }
+      $identifier_string = $identifier['Identifier']['identifier'];
+      if ( $config['remove_domain_from_username'] ) {
+        $identifier_string = preg_replace('/@.*/', '', $identifier_string);
+      }
+      $this->viewVars['vv_identifier'] = $identifier_string;
+    } catch (Exception $e) {
+      $this->Flash->set($e->getMessage(), array('key' => 'error'));
     }
   }
   
