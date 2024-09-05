@@ -173,6 +173,18 @@ class AppController extends Controller {
         exit;
       }
 
+      // We do not allow REST calls for Auth users, only for REST API authenticated users
+      if((!$this->Session->check('Auth.User.api')
+          || ($this->Session->check('Auth.User.api') && !$this->Session->read('Auth.User.api')))
+         && $this->Session->check('Auth.User.username')
+         && !$this->request->is('ajax')) {
+        $this->Api->restResultHeader(HttpStatusCodesEnum::HTTP_UNAUTHORIZED, _txt('er.http.401'));
+        // We force an exit here to prevent any views from rendering, but also
+        // to prevent Cake from dumping the default layout
+        $this->response->send();
+        exit;
+      }
+
       // Set up basic auth and attempt to login the API user, unless we're already
       // logged in (ie: via a cookie provided via an AJAX initiated REST call)
       
@@ -254,7 +266,7 @@ class AppController extends Controller {
         $coid = $this->parseCOID($this->Api->getData());
         $roles = $this->Role->calculateCMRoles();
         if($this->requires_co
-           && $coid === -1
+           && (int)$coid === -1
            && !$roles['cmadmin']) {
           throw new InvalidArgumentException(_txt('er.co.specify'), HttpStatusCodesEnum::HTTP_UNAUTHORIZED);
         }
@@ -265,12 +277,27 @@ class AppController extends Controller {
         $args['contain'] = false;
 
         $this->cur_co = $this->Co->find('first', $args);
-      } catch(RuntimeException $e) {
+
+        // In the case a CMP admin performs an API request with an invalid CO Id, we will get
+        // here but the $this->cur_co object will be null
+        if(empty($this->cur_co)
+           || !is_array($this->cur_co)
+           || !isset($this->cur_co['Co'])) {
+          throw new NotFoundException(_txt('er.notfound-b', array(_txt('ct.cos.1'))));
+        }
+      } catch(HttpException $e) {
         // This is probably $id not found... strictly speaking we should somehow
         // check authorization before returning id not found, but we can't really
         // authorize a request for an invalid id.
-        
-        $this->Api->restResultHeader(404, "Not Found");
+        $message = $e->getMessage() ?? 'Not Found';
+
+        $this->Api->restResultHeader($e->getCode(), $message);
+        $this->response->send();
+        exit;
+      } catch(Exception $e) {
+        $message = $e->getMessage() ?? 'Other error';
+
+        $this->Api->restResultHeader($e->getCode(), $message);
         $this->response->send();
         exit;
       }
@@ -297,6 +324,13 @@ class AppController extends Controller {
         // We have an auto-detected timezone from a previous page render from the browser.
         // Adjust the default timezone. Actually, don't we want to always record times in UTC.
         //        date_default_timezone_set($_COOKIE['cm_registry_tz_auto']);
+        $timezone_identifiers = DateTimeZone::listIdentifiers(DateTimeZone::ALL_WITH_BC);
+        if(!in_array($_COOKIE['cm_registry_tz_auto'], $timezone_identifiers)) {
+          $this->log(__METHOD__ . '::cookie value => ' . var_export($_COOKIE['cm_registry_tz_auto'], true), LOG_ERROR);
+          // This is not an acceptable value
+          throw new RuntimeException(_txt('er.invalid.cookie'), HttpStatusCodesEnum::HTTP_NOT_ACCEPTABLE);
+        }
+
         $this->set('vv_tz', $_COOKIE['cm_registry_tz_auto']);
       } else {
         $this->set('vv_tz', date_default_timezone_get());
@@ -1142,7 +1176,22 @@ class AppController extends Controller {
     // XXX A side effect of this current logic is that the link only appears when the person is viewing
     // another link with the CO specified in it (otherwise copersonid isn't set)
                               || ($roles['copersonid'] && $this->Role->isApprover($roles['copersonid']));
-    
+
+    // Since we do not have access to every Petition we will search each Enrollment Flow for special permissions
+    if(!$p['menu']['petitions'] && isset($this->cur_co['Co']['id'])) {
+      // Calculate the petition permissions for each enrollment flow
+      $CoEnrollmentFlow = ClassRegistry::init('CoEnrollmentFlow');
+      $enrollmentFlowList = $CoEnrollmentFlow->enrollmentFlowList($this->cur_co['Co']['id']);
+      $this->set('vv_enrollment_flow_list', $enrollmentFlowList);
+      foreach($enrollmentFlowList as $eof_id => $eof_name) {
+        $roleStatus = $this->Role->isApproverForFlow($roles['copersonid'], $eof_id);
+        $p['menu']['petitions'][$eof_name] = $roleStatus;
+        if($roleStatus) {
+          $p['menu']['cos'] = true;
+        }
+      }
+    }
+
     // Manage CO extended attributes?
     $p['menu']['extattrs'] = $roles['cmadmin'] || $roles['coadmin'];
     

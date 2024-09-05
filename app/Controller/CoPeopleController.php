@@ -136,6 +136,12 @@ class CoPeopleController extends StandardController {
           'empty'   => _txt('op.select.all'),
           'options' => $this->viewVars['vv_cous'],
         ),
+        'search.unattached' => array(         // 4th row, left column
+          'label' => _txt('fd.people.no.org'),
+          'type' => 'checkbox',
+          'group' => _txt('fd.people'),
+          'column' => 0
+        ),
       );
     }
   }
@@ -156,6 +162,35 @@ class CoPeopleController extends StandardController {
     // not need the co id carried).
     
     $this->set('pool_org_identities', $this->CmpEnrollmentConfiguration->orgIdentitiesPooled());
+
+    if($this->action == "find"
+       && !empty($this->request->params['named']['mode'])
+       && $this->request->params['named']['mode'] == PeoplePickerModeEnum::Sponsor
+       && !empty($this->request->params['named']['petitionid'])) {
+      $args = array();
+      $args['conditions']['CoPetition.id'] = $this->request->params['named']['petitionid'];
+      $args['conditions']['CoPetition.status'] = PetitionStatusEnum::Created;
+      $args['contain'] = false;
+      $pt = $this->CoPerson->Co->CoPetition->find('first', $args);
+
+      if (!empty($pt)) {
+        // Get the enrollment flow Configuration
+        $args = array();
+        $args['conditions']['CoEnrollmentFlow.id'] = $pt['CoPetition']['co_enrollment_flow_id'];
+        $args['contain'] = false;
+
+        $ef = $this->CoPerson->Co->CoPetition->CoEnrollmentFlow->find('first', $args);
+
+        // Get Sponsor Eligibility details
+        $sponsorEligibilityMode = $this->CoPerson->Co->CoSetting->getSponsorEligibility($ef["CoEnrollmentFlow"]["co_id"]);
+
+        if($ef["CoEnrollmentFlow"]["authz_level"] == EnrollmentAuthzEnum::None
+           && $ef["CoEnrollmentFlow"]["enable_person_find"]
+           && !empty($sponsorEligibilityMode)) {
+          $this->Auth->allow($this->action);
+        }
+      }
+    }
     
     parent::beforeFilter();
   }
@@ -168,7 +203,8 @@ class CoPeopleController extends StandardController {
    */
 
   public function beforeRender() {
-    if(!$this->request->is('restful')){
+    if(!$this->request->is('restful')
+        && !$this->request->is('ajax')){
       // Determine if there are any Enrollment Flows for this CO and if so pass
       // them to the view. Currently, we don't check for COU-specific flows. 
       
@@ -563,109 +599,21 @@ class CoPeopleController extends StandardController {
    */
 
   public function find() {
-    $coPersonIds = array();
-    
     // What search mode should we use?
     if(empty($this->request->params['named']['mode'])) {
-      $this->Api->restResultHeader(400, "Mode Not Specified");
+      $this->Api->restResultHeader(HttpStatusCodesEnum::HTTP_BAD_REQUEST, _txt('er.notprov-b', array('mode')));
       return;
     }
-    
-    $mode = $this->request->params['named']['mode'];
-    
-    // jquery Autocomplete sends the search as url?term=foo
-    if(!empty($this->request->query['term'])) {
-      // Leverage model specific keyword search
-      
-      // Note EmailAddress and Identifier don't support substring search
-      foreach(array('Name', 'EmailAddress', 'Identifier') as $m) {
-        $hits = $this->CoPerson->$m->search($this->cur_co['Co']['id'], $this->request->query['term'], 25);
-        
-        $coPersonIds = array_merge($coPersonIds, Hash::extract($hits, '{n}.CoPerson.id'));
-      }
-    }
-    
-    $coPersonIds = array_unique($coPersonIds);
-    
-    // Look up additional information to provide hints as to which person is which.
-    // We only do this when there are relatively small numbers of results to
-    // avoid making a bunch of database queries early in the search.
-  
-    $matches = array();
-    
-    if(count($coPersonIds) > 100) {
-      // We don't return large sets to avoid slow performance
-      
-      $matches[] = array(
-        'value' => -1,
-        'label' => _txt('er.picker.toomany')
-      );
-    } else {
-      $people = $this->CoPerson->filterPicker($this->cur_co['Co']['id'], $coPersonIds, $mode);
-      $pickerEmailType = $this->Co->CoSetting->getPersonPickerEmailType($this->cur_co['Co']['id']);
-      $pickerIdentifierType = $this->Co->CoSetting->getPersonPickerIdentifierType($this->cur_co['Co']['id']);
-      $pickerDisplayTypes = $this->Co->CoSetting->getPersonPickerDisplayTypes($this->cur_co['Co']['id']);
-      
-      foreach($people as $p) {
-        $label = generateCn($p['Name'][0]);
-        $idArr = $p['Identifier'];
-        $emailArr = $p['EmailAddress'];
-        $email = '';
-        $emailLabel = '';
-        $id = '';
-        $idLabel = '';
-          
-        // Iterate over the email array
-        if(!empty($emailArr) && !empty($pickerEmailType)) {
-          if(!empty($pickerDisplayTypes)) {
-            $emailLabel = _txt('fd.extended_type.generic.label', array(_txt('fd.email_address.mail'), $pickerEmailType));
-          }
-          else {
-            $emailLabel = _txt('fd.email_address.mail') . ': ';
-          }
-          foreach($emailArr as $e) {
-            if($e['type'] == $pickerEmailType) {
-              $email = $e['mail'] . ' ' . $pickerDisplayTypes;
-              break;
-            }
-          }
-        }
-        
-        // Set the identifier for display (and limit it to 30 characters max)
-        if(!empty($idArr[0]['identifier']) && !empty($pickerIdentifierType)) {
-          if(!empty($pickerDisplayTypes)) {
-            $idLabel = _txt('fd.extended_type.generic.label', array(_txt('fd.identifier.identifier'), $pickerIdentifierType));
-          }
-          else {
-            $idLabel = _txt('fd.identifier.identifier') . ': ';
-          }
-          foreach($idArr as $i) {
-            if($i['type'] == $pickerIdentifierType) {
-              $id = mb_strimwidth($i['identifier'], 0, 30, '...');
-              break;
-            }
-          }
-        }
-         
-        // Make sure we don't already have an entry for this CO Person ID
-        if(!Hash::check($matches, '{n}[value='.$p['CoPerson']['id'].']')) {
-          $matches[] = array(
-            'value' => $p['CoPerson']['id'],
-            'label' => $label,
-            'email' => $email,
-            'emailLabel' => $emailLabel,
-            'identifier' => $id,
-            'identifierLabel' => $idLabel
-          );
-        }
-      }
-    }
-    
+
+    $matches = $this->CoPerson->findForPicker($this->cur_co['Co']['id'],
+                                              $this->request->params['named']['mode'],
+                                              $this->request->query['term'] ?? null);
+
     // We're really semi-RESTful here from the framework perspective, since
     // the query URL does not end in .json. We manually adjust some settings
     // to generate a JSON result, but some other results (errors, specifically)
-    // will generate redirects rathen than proper HTTP result codes.
-    
+    // will generate redirects rather than proper HTTP result codes.
+
     $this->set('vv_co_people', $matches);
     $this->layout = 'ajax';
     $this->response->type('json');
@@ -1167,7 +1115,7 @@ class CoPeopleController extends StandardController {
       return;
     }
     // Validate the request data
-     list($criteria, $invalidFields, $unProcessedFields) = $this->CoPerson->validateRequestData($reqData);
+    list($criteria, $invalidFields, $unProcessedFields) = $this->CoPerson->validateRequestData($reqData);
     if ($invalidFields > 0 && $this->request->is('restful')) {
       $this->Api->restResultHeader(400, 'Invalid fields');
       return;
@@ -1185,6 +1133,9 @@ class CoPeopleController extends StandardController {
     } else {
       $this->set('matches', $matches);
     }
+    
+    // Set the affiliation types lookup
+    $this->set('vv_copr_affiliation_types', $this->CoPerson->CoPersonRole->types($this->cur_co['Co']['id'], 'affiliation'));
   }
 
   /**
@@ -1298,6 +1249,17 @@ class CoPeopleController extends StandardController {
       $pagcond['joins'][$jcnt]['type'] = 'INNER';
       $pagcond['joins'][$jcnt]['conditions'][0] = 'CoPerson.id=CoPersonRole.co_person_id';
       $pagcond['conditions']['CoPersonRole.cou_id'] = $this->request->params['named']['search.cou'];
+      $jcnt++;
+    }
+
+    // Filter by Unattached
+    if(!empty($this->params['named']['search.unattached'])) {
+      $pagcond['joins'][$jcnt]['table'] = 'co_org_identity_links';
+      $pagcond['joins'][$jcnt]['alias'] = 'CoOrgIdentityLink';
+      $pagcond['joins'][$jcnt]['type'] = 'LEFT';
+      $pagcond['joins'][$jcnt]['conditions'][0] = 'CoOrgIdentityLink.co_person_id=CoPerson.id';
+      $pagcond['conditions'][] = 'CoOrgIdentityLink.id IS NULL';
+      $jcnt++;
     }
 
     // If a CO Person has more than one roles or more than one partial matches that are identical,

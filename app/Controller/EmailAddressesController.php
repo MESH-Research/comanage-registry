@@ -164,7 +164,8 @@ class EmailAddressesController extends MVPAController {
         }
         break;
       case 'index':
-         if(!$this->request->is('restful')) {
+        // XXX Currently we only support REST API calls
+        if(!$this->request->is('restful')) {
           break;
         }
 

@@ -96,10 +96,14 @@
         event.preventDefault();
         $(this).next(".fields").slideToggle("fast");
         // toggle the +/- icon:
-        if ($(this).find(".material-icons").text() == "indeterminate_check_box") {
-          $(this).find(".material-icons").text("add_box");
+        if ($(this).find(".material-icons").text() == "expand_less") {
+          $(this).find(".material-icons").text("expand_more");
+          $(this).attr('title','<?php print _txt('op.expand'); ?>');
+          $(this).attr('aria-expanded','false');
         } else {
-          $(this).find(".material-icons").text("indeterminate_check_box");
+          $(this).find(".material-icons").text("expand_less");
+          $(this).attr('title','<?php print _txt('op.collapse'); ?>');
+          $(this).attr('aria-expanded','true');
         }
       });
 
@@ -116,8 +120,20 @@
       $("#sponsors").autocomplete({
         source: "<?php print $this->Html->url(array('controller' => 'co_people', 'action' => 'find', 'co' => $cur_co['Co']['id'], 'mode' => PeoplePickerModeEnum::Sponsor)); ?>",
         minLength: 3,
+        search: function( event, ui ) {
+          // Add spinner
+          $(this).closest('.co-loading-mini-input-container').find(".co-loading-mini").show();
+        },
+        response: function( event, ui ) {
+          // Remove spinner
+          $(this).closest('.co-loading-mini-input-container').find(".co-loading-mini").hide();
+        },
+        focus: function (event, ui) {
+          event.preventDefault();
+          $("#sponsors").val(ui.item.label + " (" + ui.item.value + ")");
+        },
         select: function(event, ui) {
-          $("#sponsors").val(ui.item.label);
+          $("#sponsors").val(ui.item.label + " (" + ui.item.value + ")");
           $("#sponsor_co_person_id").val(ui.item.value);
           return false;
         }
@@ -135,9 +151,21 @@
       // Unlike sponsor, manager is always active
       $("#managers").autocomplete({
         source: "<?php print $this->Html->url(array('controller' => 'co_people', 'action' => 'find', 'co' => $cur_co['Co']['id'], 'mode' => PeoplePickerModeEnum::Manager)); ?>",
+        focus: function (event, ui) {
+          event.preventDefault();
+          $("#managers").val(ui.item.label + " (" + ui.item.value + ")");
+        },
+        search: function( event, ui ) {
+          // Add spinner
+          $(this).closest('.co-loading-mini-input-container').find(".co-loading-mini").show();
+        },
+        response: function( event, ui ) {
+          // Remove spinner
+          $(this).closest('.co-loading-mini-input-container').find(".co-loading-mini").hide();
+        },
         minLength: 3,
         select: function(event, ui) {
-          $("#managers").val(ui.item.label);
+          $("#managers").val(ui.item.label + " (" + ui.item.value + ")");
           $("#manager_co_person_id").val(ui.item.value);
           return false;
         }
@@ -183,9 +211,9 @@
 
         <li id="fields-role" class="fieldGroup">
 
-          <a href="#tabs-role" class="fieldGroupName">
-            <em class="material-icons">indeterminate_check_box</em>
-            <?php print _txt('fd.attrs.copr'); ?>
+          <a href="#tabs-role" class="fieldGroupName" title="<?php print _txt('op.collapse') ?>" aria-expanded="true" aria-controls="<?php print $this->action; ?>_co_person_role">
+            <em class="material-icons" aria-hidden="true">expand_less</em>
+            <h2><?php print _txt('fd.attrs.copr'); ?></h2>
           </a>
 
           <ul id="<?php print $this->action; ?>_co_person_role" class="fields form-list">
@@ -473,21 +501,27 @@
                       if ($inlineEditableFields['sponsor-val']['set']) {
                         $iefClasses .= " hidden";
                       }
-
-                      print '<div class="' . $iefClasses . '">
-                               <div class="ui-widget">                      
-                                 <input id="sponsors" type="text" />'
-                                 . $this->Form->hidden('sponsor_co_person_id',
+                      ?>
+                      <div class="' . $iefClasses . '">
+                        <div class="ui-widget">
+                          <span class="co-loading-mini-input-container">
+                            <input id="sponsors"
+                                   placeholder="<?php print _txt("op.people.picker.placeholder"); ?>"
+                                   type="text" />
+                            <span class="co-loading-mini"><span></span><span></span><span></span></span>
+                          </span>
+                          <?php print $this->Form->hidden('sponsor_co_person_id',
                                  array(
                                    'id'      => 'sponsor_co_person_id',
                                    'default' => (!empty($co_person_roles[0]['CoPersonRole']['sponsor_co_person_id'])) ? $co_person_roles[0]['CoPersonRole']['sponsor_co_person_id'] : null
-                                 ))
-                            . '</div>
-                               <div class="field-desc">
-                                 <span class="ui-icon ui-icon-info co-info"></span>
-                                 <em>' . _txt('fd.sponsor.desc') . '</em>
-                               </div>';
-                      print '</div>';
+                                 )); ?>
+                        </div>
+                          <div class="field-desc">
+                            <span class="ui-icon ui-icon-info co-info"></span>
+                             <em><?php print _txt('fd.sponsor.desc'); ?></em>
+                          </div>
+                        </div>
+                      <?php
                       // We need to unlock the field for autocomplete manipulation
                       $this->Form->unlockField('CoPersonRole.sponsor_co_person_id');
                     }
@@ -551,21 +585,27 @@
                     if ($inlineEditableFields['manager-val']['set']) {
                       $iefClasses .= " hidden";
                     }
-
-                    print '<div class="' . $iefClasses . '">
-                             <div class="ui-widget">                      
-                               <input id="managers" type="text" />'
-                               . $this->Form->hidden('manager_co_person_id',
-                               array(
-                                 'id'      => 'manager_co_person_id',
-                                 'default' => (!empty($co_person_roles[0]['CoPersonRole']['manager_co_person_id'])) ? $co_person_roles[0]['CoPersonRole']['manager_co_person_id'] : null
-                               ))
-                          . '</div>
-                             <div class="field-desc">
-                               <span class="ui-icon ui-icon-info co-info"></span>
-                               <em>' . _txt('fd.manager.desc') . '</em>
-                             </div>';
-                    print '</div>';
+                    ?>
+                    <div class="' . $iefClasses . '">
+                      <div class="ui-widget">
+                        <span class="co-loading-mini-input-container">
+                          <input id="managers"
+                                 placeholder="<?php print _txt("op.people.picker.placeholder"); ?>"
+                                 type="text" />
+                          <span class="co-loading-mini"><span></span><span></span><span></span></span>
+                        </span>
+                        <?php print $this->Form->hidden('manager_co_person_id',
+                          array(
+                            'id'      => 'manager_co_person_id',
+                            'default' => (!empty($co_person_roles[0]['CoPersonRole']['manager_co_person_id'])) ? $co_person_roles[0]['CoPersonRole']['manager_co_person_id'] : null
+                          )); ?>
+                    </div>
+                      <div class="field-desc">
+                        <span class="ui-icon ui-icon-info co-info"></span>
+                        <em><?php print _txt('fd.manager.desc'); ?></em>
+                      </div>
+                    </div>
+                    <?php
                     // We need to unlock the field for autocomplete manipulation
                     $this->Form->unlockField('CoPersonRole.manager_co_person_id');
                   }
@@ -669,7 +709,7 @@
                     <?php
                       if($c['CoExtendedAttribute']['type'] == 'TIMESTAMP') {
                         print ($e && !$es ? $this->Form->text($cl.'.'.$attr, array('class' => 'datepicker'))
-                          : (($co_person_roles[0][$cl][$attr] > 0) ? strftime("%F", strtotime($co_person_roles[0][$cl][$attr])) : ""));
+                          : (($co_person_roles[0][$cl][$attr] > 0) ? date("Y-m-d", strtotime($co_person_roles[0][$cl][$attr])) : ""));
                       } else {
                         print ($e && !$es ? $this->Form->input($cl.'.'.$attr,
                           isset($co_person_roles[0][$cl][$attr]) ? array('default' => $co_person_roles[0][$cl][$attr]) : array())

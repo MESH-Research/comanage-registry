@@ -35,7 +35,7 @@
 
   // Add dashboard navigation if we have more than one dashboard
   if(!empty($vv_available_dashboards) && count($vv_available_dashboards) > 1) {
-    print '<nav id="dashboard-tabs" class="cm-subnav-tabs">';
+    print '<nav id="dashboard-tabs" class="cm-subnav-tabs" aria-label="' . _txt('me.menu.dashboards') . '">';
     print '<ul class="nav nav-tabs">';
     foreach($vv_available_dashboards as $dashboardId => $dashboardName) {
       print '<li class="nav-item">';
@@ -82,9 +82,41 @@
 
 <div class="table-container">
   <?php if(!empty($vv_dashboard)): ?>
+    <?php
+      // The Dashboard headers and footers can display user-generated HTML output AND CSS in a <style> tag. Use the html-sanitizer library.
+      if(!empty($vv_dashboard['CoDashboard']['header_text']) || !empty($vv_dashboard['CoDashboard']['footer_text'])) {
+        require(APP . '/Vendor/html-sanitizer-1.5/vendor/autoload.php');
+        
+        // We must build the Sanitizer to include our custom extension
+        $builder = new HtmlSanitizer\SanitizerBuilder();
+        $builder->registerExtension(new HtmlSanitizer\Extension\Basic\BasicExtension());
+        $builder->registerExtension(new HtmlSanitizer\Extension\Code\CodeExtension());
+        $builder->registerExtension(new HtmlSanitizer\Extension\Image\ImageExtension());
+        $builder->registerExtension(new HtmlSanitizer\Extension\Listing\ListExtension());
+        $builder->registerExtension(new HtmlSanitizer\Extension\Table\TableExtension());
+        $builder->registerExtension(new HtmlSanitizer\Extension\Details\DetailsExtension());
+        $builder->registerExtension(new HtmlSanitizer\Extension\Extra\ExtraExtension());
+        
+        // Our custom extension to allow <style> tags.
+        $builder->registerExtension(new HtmlSanitizer\Extension\Style\StyleExtension());
+  
+        $sanitizer = $builder->build([
+          'extensions' => ['basic', 'code', 'image', 'list', 'table', 'details', 'extra', 'style'],
+          'tags' => [
+            'div' => [
+              'allowed_attributes' => ['class'],
+            ],
+            'p' => [
+              'allowed_attributes' => ['class'],
+            ]
+          ],
+          'keepstyle' => true
+        ]);
+      }
+    ?>
     <?php if(!empty($vv_dashboard['CoDashboard']['header_text'])): ?>
       <div id="dashboard-header">
-        <?php print $vv_dashboard['CoDashboard']['header_text']; ?>
+        <?php print $sanitizer->sanitize($vv_dashboard['CoDashboard']['header_text']); ?>
       </div>
     <?php endif; ?>
     <?php if(!empty($vv_dashboard['CoDashboardWidget'])): ?>
@@ -95,13 +127,13 @@
               <?php print filter_var($w['description'], FILTER_SANITIZE_SPECIAL_CHARS); ?>
               <span id="widgetSpinner<?php print $w['id']; ?>" class="co-loading-mini"><span></span><span></span><span></span></span>
             </h2>
-            <?php if(!empty(trim($w['header']))): ?>
+            <?php if(isset($w['header']) && !empty(trim($w['header']))): ?>
               <div class="widget-header">
                 <?php print filter_var($w['header'], FILTER_SANITIZE_SPECIAL_CHARS); ?>
               </div>
             <?php endif; ?>
             <div id="widget<?php print $w['id']; ?>"></div>
-            <?php if(!empty(trim($w['footer']))): ?>
+            <?php if(isset($w['footer']) && !empty(trim($w['footer']))): ?>
               <div class="widget-footer">
                 <?php print filter_var($w['footer'], FILTER_SANITIZE_SPECIAL_CHARS); ?>
               </div>
@@ -114,7 +146,7 @@
     <?php endif; ?>
     <?php if(!empty($vv_dashboard['CoDashboard']['footer_text'])): ?>
       <div id="dashboard-footer">
-        <?php print $vv_dashboard['CoDashboard']['footer_text']; ?>
+        <?php print $sanitizer->sanitize($vv_dashboard['CoDashboard']['footer_text']); ?>
       </div>
     <?php endif; ?>
   <?php else: // $vv_dashboard ?>

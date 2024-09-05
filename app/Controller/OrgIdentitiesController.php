@@ -150,6 +150,12 @@ class OrgIdentitiesController extends StandardController {
           'label' => _txt('fd.title'),
           'type' => 'text',
         ),
+        'search.unattached' => array(         // 5th row, right column
+          'label' => _txt('fd.orgidentity.attached.no'),
+          'type' => 'checkbox',
+          'group' => _txt('fd.orgidentity'),
+          'column' => 1
+        ),
       );
     }
   }
@@ -838,6 +844,7 @@ class OrgIdentitiesController extends StandardController {
       $pagcond['joins'][$jcnt]['alias'] = 'Identifier';
       $pagcond['joins'][$jcnt]['type'] = 'INNER';
       $pagcond['joins'][$jcnt]['conditions'][0] = 'Identifier.org_identity_id=OrgIdentity.id';
+      $jcnt++;
     }
     
     // Filter by org identity source
@@ -845,6 +852,21 @@ class OrgIdentitiesController extends StandardController {
       // Cake will auto-join the table
       $pagcond['conditions']['OrgIdentitySourceRecord.org_identity_source_id'] = $this->request->params['named']['search.orgIdentitySource'];
     }
+
+    // Filter by openness
+    if(!empty($this->params['named']['search.unattached'])) {
+      $pagcond['joins'][$jcnt]['table'] = 'co_org_identity_links';
+      $pagcond['joins'][$jcnt]['alias'] = 'CoOrgIdentityLink';
+      $pagcond['joins'][$jcnt]['type'] = 'LEFT';
+      $pagcond['joins'][$jcnt]['conditions'][0] = 'CoOrgIdentityLink.org_identity_id=OrgIdentity.id';
+      $pagcond['conditions'][] = 'CoOrgIdentityLink.id IS NULL';
+      $jcnt++;
+    }
+
+    // We need to manually add this in for some reason. (It should have been
+    // added automatically by Cake based on the CoPerson Model definition of
+    // PrimaryName.)
+    $pagcond['conditions']['PrimaryName.primary_name'] = true;
     
     return $pagcond;
   }
