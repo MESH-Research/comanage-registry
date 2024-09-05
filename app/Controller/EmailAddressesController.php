@@ -164,13 +164,11 @@ class EmailAddressesController extends MVPAController {
         }
         break;
       case 'index':
-        if(!$this->request->is('restful')
-           || empty($this->request->query['copersonid'])) {
+         if(!$this->request->is('restful')) {
           break;
         }
-        if((int)$this->request->query['copersonid'] === $roles['copersonid']) {
-          $self = true;
-        }
+
+        $self = isset($this->request->query['copersonid']) && ((int)$this->request->query['copersonid'] === (int)$roles['copersonid']);
         break;
       }
     }
@@ -242,7 +240,6 @@ class EmailAddressesController extends MVPAController {
                   || $roles['coadmin']
                   || ($managed && $roles['couadmin'])
                   || $selfperms['view']);
-    
     $this->set('permissions', $p);
     return $p[$this->action];
   }
