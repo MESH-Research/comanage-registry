@@ -39,11 +39,14 @@ $formArgs =  array(
 );
 
 // If i have named parameters not related to search fields
-// get them and add them into the form
+// get them and add them into the form. But always skip "page":
+// a newly submitted search should always land on page one. 
 if(!empty($this->request->params['named'])) {
   $attributes = array_diff_key($this->request->params['named'], $vv_search_fields);
   foreach($attributes as $attr_name => $attr_value) {
-    $formArgs['url'][$attr_name] = $attr_value;
+    if($attr_name !== 'page') {
+      $formArgs['url'][$attr_name] = $attr_value;
+    }
   }
 }
 
@@ -57,19 +60,20 @@ $hasActiveFilters = false;
 
 ?>
 
-<div id="<?php print $req . ucfirst($this->request->action); ?>Search" class="top-search">
+<div id="<?php print $req . ucfirst($this->request->action); ?>Search" class="top-search" aria-label="<?php print _txt('me.menu.filters'); ?>">
   <?php
 
   // Action
   print $this->Form->hidden('RedirectAction.' . $this->request->action, array('default' => 'true')). PHP_EOL;
 
   // Named parameters
-  // Discard op.search named param
+  // Discard op.search named param and 'page'
   $search_params = array();
   if(isset($this->request->params['named'])) {
     foreach ($this->request->params['named'] as $param => $value) {
       if(strpos($param, 'search') === false
-         && $param !== "op") {
+         && $param !== "op"
+         && $param !== "page") {
         print $this->Form->hidden($this->request->action . '.named.' . $param, array('default' => filter_var($value, FILTER_SANITIZE_SPECIAL_CHARS))) . "\n";
       } else {
         $search_params[$param] = $value;
@@ -83,9 +87,9 @@ $hasActiveFilters = false;
   }
 
   ?>
-  <fieldset onclick="event.stopPropagation();">
+  <fieldset onclick="event.stopPropagation();" aria-label="<?php print _txt('me.menu.filters.form'); ?>">
     <legend id="top-search-toggle">
-      <em class="material-icons">search</em>
+      <em class="material-icons" aria-hidden="true">search</em>
       <?php print _txt('op.filter');?>
 
       <?php if(!empty($search_params)):?>
@@ -152,7 +156,9 @@ $hasActiveFilters = false;
           <?php endif; ?>
         </span>
       <?php endif; ?>
-      <button class="cm-toggle" aria-expanded="false" aria-controls="top-search-fields" type="button"><em class="material-icons drop-arrow">arrow_drop_down</em></button>
+      <button class="cm-toggle" aria-expanded="false" aria-controls="top-search-fields" type="button"  aria-label="<?php print _txt('me.menu.filters.open'); ?>">
+        <em class="material-icons drop-arrow" aria-hidden="true">arrow_drop_down</em>
+      </button>
     </legend>
 
     <div id="top-search-fields">

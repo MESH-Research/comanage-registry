@@ -63,13 +63,13 @@ if(!empty($vv_app_prefs['uiMainMenuSelectedParentId']) && $drawerState != 'half-
       // People Menu
       $currentMenu = 'peopleMenu';
       if(isset($permissions['menu']['cos']) && $permissions['menu']['cos']) {
-        print '<li id="peopleMenu" class="co-expandable-menu-item' . ($selectedMenu == $currentMenu ? " active" : "") . '">';
-        print '<a class="menuTop" title="' . _txt('me.people') . '" aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '" href="#">';
+        print '<li id="peopleMenu" class="co-expandable-menu-item' . ($selectedMenu == $currentMenu ? " active mm-active" : "") . '">';
+        print '<a class="menuTop" title="' . _txt('me.people') . '" aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '" aria-controls="peopleMenuList" href="#">';
         print '<em class="material-icons" aria-hidden="true">person</em>';
         print '<span class="menuTitle">' . _txt('me.people') . '</span>';
         print '<em class="material-icons arrow" aria-hidden="true">chevron_left</em>';
         print '</a>';
-        print '<ul aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '" class="collapse' . ($selectedMenu == $currentMenu ? " in" : "") . '">';
+        print '<ul id="peopleMenuList" class="main-menu-submenu' . ($selectedMenu == $currentMenu ? " mm-show" : "") . '">';
 
         if($permissions['menu']['mypopulation']) {
           print '<li>';
@@ -135,7 +135,7 @@ if(!empty($vv_app_prefs['uiMainMenuSelectedParentId']) && $drawerState != 'half-
             print "</li>";
           }
 
-          if(isset($permissions['menu']['petitions']) && $permissions['menu']['petitions']) {
+          if(isset($permissions['menu']['petitions']) && $permissions['menu']['petitions'] === true) {
             print '<li>';
             $args = array();
             $args['plugin'] = null;
@@ -149,6 +149,29 @@ if(!empty($vv_app_prefs['uiMainMenuSelectedParentId']) && $drawerState != 'half-
             print $this->Html->link(_txt('ct.co_petitions.pl'), $args, array('class' => 'spin'));
     
             print "</li>";
+          }
+
+          if(isset($permissions['menu']['petitions']) && is_array($permissions['menu']['petitions'])) {
+            foreach ($permissions['menu']['petitions'] as $eof_name => $allowed) {
+              if($allowed) {
+                print '<li>';
+                $args = array();
+                $args['plugin'] = null;
+                $args['controller'] = 'co_petitions';
+                $args['action'] = 'index';
+                $args['co'] = $menuCoId;
+                $args['sort'] = 'CoPetition.created';
+                $args['direction'] = 'desc';
+                $args['search.status'] = StatusEnum::PendingApproval;
+                $coef_id = array_search($eof_name, $vv_enrollment_flow_list);
+                $args['search.enrollmentFlow'] = $coef_id;
+
+                print $this->Html->link(_txt('ct.co_petitions.pl-a', array($eof_name)), $args, array('class' => 'spin'));
+
+                print "</li>";
+              }
+
+            }
           }
           
           if(isset($permissions['menu']['vettingrequests']) && $permissions['menu']['vettingrequests']) {
@@ -202,15 +225,15 @@ if(!empty($vv_app_prefs['uiMainMenuSelectedParentId']) && $drawerState != 'half-
       $currentMenu = 'groupMenu';
       if(isset($permissions['menu']['cogroups']) && $permissions['menu']['cogroups']) {
 
-        print '<li id="groupMenu" class="co-expandable-menu-item' . ($selectedMenu == $currentMenu ? " active" : "") . '">';
+        print '<li id="groupMenu" class="co-expandable-menu-item' . ($selectedMenu == $currentMenu ? " mm-active" : "") . '">';
 
-        print '<a class="menuTop" title="' . _txt('ct.co_groups.pl') . '" aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '" href="#">';
+        print '<a class="menuTop" title="' . _txt('ct.co_groups.pl') . '" aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '" aria-controls="groupMenuList" href="#">';
         print '<em class="material-icons" aria-hidden="true">group</em>';
         print '<span class="menuTitle">' . _txt('ct.co_groups.pl') . '</span>';
         print '<em class="material-icons arrow" aria-hidden="true">chevron_left</em>';
         print '</a>';
 
-        print '<ul aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '" class="collapse' . ($selectedMenu == $currentMenu ? " in" : "") . '">';
+        print '<ul id="groupMenuList" class="main-menu-submenu' . ($selectedMenu == $currentMenu ? " mm-show" : "") . '">';
 
         // Regular Groups (with default filtering)
         print '<li>';
@@ -221,6 +244,7 @@ if(!empty($vv_app_prefs['uiMainMenuSelectedParentId']) && $drawerState != 'half-
         $args['co'] = $menuCoId;
         $args['search.auto'] = 'f'; // filter out automatic groups by default
         $args['search.noadmin'] = '1'; // exclude administration groups by default
+        $args['search.noapprover'] = '1'; // exclude approvers groups by default
         print $this->Html->link(_txt('op.grm.regular'), $args, array('class' => 'spin'));
         print "</li>";
 
@@ -388,13 +412,13 @@ if(!empty($vv_app_prefs['uiMainMenuSelectedParentId']) && $drawerState != 'half-
         if(count(array_keys($services)) > 1) {
           // Multiple entries, so render a link to each COU.
           
-          print '<li id="serviceMenu">';
-          print '<a class="menuTop" title="' . _txt('ct.co_services.pl') . '" aria-expanded="false" href="#">';
+          print '<li id="serviceMenu" class="co-expandable-menu-item' . ($selectedMenu == $currentMenu ? " mm-active" : "") . '">';
+          print '<a class="menuTop" title="' . _txt('ct.co_services.pl') . '" aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '" aria-controls="servicesMenuList" href="#">';
           print '<em class="material-icons" aria-hidden="true">apps</em>';
           print '<span class="menuTitle">' . _txt('ct.co_services.pl') . '</span>';
           print '<em class="material-icons arrow" aria-hidden="true">chevron_left</em>';
           print '</a>';
-          print '<ul aria-expanded="false" class="collapse">';
+          print '<ul id="servicesMenuList" class="main-menu-submenu' . ($selectedMenu == $currentMenu ? " mm-show" : "") . '">';
           
           // COU IDs with a service portal visible to this user
           $couIds = array_keys($services);
@@ -531,13 +555,13 @@ if(!empty($vv_app_prefs['uiMainMenuSelectedParentId']) && $drawerState != 'half-
     // Platform Menu
     $currentMenu = "platformMenu";
     if(!empty($permissions['menu']['admin']) && $permissions['menu']['admin']) {
-      print '<li id="platformMenu" class="co-expandable-menu-item' . ($selectedMenu == $currentMenu ? " active" : "") . '">';
-      print '<a href="#" class="menuTop" title="' . _txt('me.platform') . '" aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '">';
+      print '<li id="platformMenu" class="co-expandable-menu-item' . ($selectedMenu == $currentMenu ? " mm-active" : "") . '">';
+      print '<a class="menuTop" title="' . _txt('me.platform') . '" aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '" aria-controls="platformMenuList" href="#">';
       print '<em class="material-icons" aria-hidden="true">build</em>';
       print '<span class="menuTitle">' . _txt('me.platform') . '</span>';
       print '<em class="material-icons arrow" aria-hidden="true">chevron_left</em>';
       print '</a>';
-      print '<ul aria-expanded="' . ($selectedMenu == $currentMenu ? "true" : "false") . '" class="collapse' . ($selectedMenu == $currentMenu ? " in" : "") . '">';
+      print '<ul id="platformMenuList" class="main-menu-submenu' . ($selectedMenu == $currentMenu ? " mm-show" : "") . '">';
       
       if($pool_org_identities) {
         print '<li>';

@@ -29,6 +29,7 @@
   header("Expires: Thursday, 10-Jan-69 00:00:00 GMT");
   header("Cache-Control: no-store, no-cache, max-age=0, must-revalidate");
   header("Pragma: no-cache");
+  header("Content-Security-Policy: frame-ancestors 'self'");
 
   // Add X-UA-Compatible header for IE
   if (isset($_SERVER['HTTP_USER_AGENT']) && (strpos($_SERVER['HTTP_USER_AGENT'], 'MSIE') !== false)) {
@@ -84,6 +85,7 @@
       print $this->Html->script('jquery/jquery-3.7.1.min.js') . "\n    ";
       print $this->Html->script('bootstrap/bootstrap-4.5.3-dist/js/bootstrap.bundle.min.js') . "\n    ";
       print $this->Html->script('jquery/jquery-ui-1.13.2.custom/jquery-ui.min.js') . "\n    ";
+      print $this->Html->script('autocomplete.comanage') . "\n    ";
       print $this->Html->script('vue/vue-3.2.31.global.prod.js') . "\n    ";
     ?>
 
@@ -169,7 +171,7 @@
             <?php print $this->element('links'); // XXX allow user to set this location (e.g. top or side) ?>
           </div>
         <?php endif; ?>
-        <nav id="user-menu">
+        <nav id="user-menu" aria-label="<?php print _txt('me.menu.user'); ?>">
           <?php print $this->element('menuUser'); ?>
         </nav>
       </div>
@@ -224,7 +226,7 @@
             }
           ?>
           <div id="navigation-drawer" class="<?php print $navigationDrawerClasses; ?>">
-            <nav id="navigation" aria-label="main menu">
+            <nav id="navigation" aria-label="<?php print _txt('me.menu.main'); ?>">
               <?php print $this->element('menuMain'); ?>
               <?php if(!empty($vv_NavLinks) || !empty($vv_CoNavLinks)): ?>
                 <div id="user-defined-links-left">
@@ -320,14 +322,10 @@
       print $this->Html->script('comanage.js') . "\n    ";
     ?>
 
-    <!-- Get timezone detection -->
-    <?php print $this->Html->script('jstimezonedetect/jstz.min.js'); ?>
     <script type="text/javascript">
-      // Determines the time zone of the browser client
-      var tz = jstz.determine();
       // This won't be available for the first delivered page, but after that the
       // server side should see it and process it
-      document.cookie = "cm_registry_tz_auto=" + tz.name() + "; path=/; SameSite=Strict";
+      document.cookie = "cm_registry_tz_auto=" + Intl.DateTimeFormat().resolvedOptions().timeZone + "; path=/; SameSite=Strict";
     </script>
 
 
@@ -354,7 +352,7 @@
 
       <!-- Dialog Form -->
       <div id="form-dialog" class="co-dialog">
-        <form method="post" action="" >
+        <form method="post" action="#" >
           <fieldset>
             <legend id="form-dialog-legend"><?php print _txt('js.input.provide');?></legend>
             <p>

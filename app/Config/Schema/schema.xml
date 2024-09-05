@@ -1397,6 +1397,9 @@
     <index name="identifiers_i10">
       <col>organization_id</col>
     </index>
+    <index name="identifiers_i11">
+      <col>co_group_id</col>
+    </index>
   </table>
 
   <table name="email_addresses">
@@ -2488,6 +2491,7 @@
     <field name="algorithm" type="C" size="2" />
     <field name="plugin" type="C" size="64" />
     <field name="format" type="C" size="256" />
+    <field name="minimum_length" type="I" />
     <field name="minimum" type="I" />
     <field name="maximum" type="I" />
     <field name="permitted" type="C" size="2" />

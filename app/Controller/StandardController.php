@@ -232,7 +232,8 @@ class StandardController extends AppController {
       $this->set('vv_servers', $this->Server->find('list', $args));
     }
 
-    if(!$this->request->is('restful')) {
+    if(!$this->request->is('restful')
+       && !$this->request->is('ajax')){
       // Include Search Block
       $this->set('vv_search_fields', $this->searchConfig($this->action));
       // Include alphabet Search bar
@@ -514,8 +515,13 @@ class StandardController extends AppController {
       
       $args['conditions'][$req.'.id'] = $id;
       $args['contain'] = $this->edit_contains;
-      
-      $curdata = $model->find('first', $args);
+
+      try {
+        // We need a try-catch here since Changelog can throw exceptions
+        $curdata = $model->find('first', $args);
+      } catch (Exception $e) {
+        $curdata = array();
+      }
     } else {
       // Old style
       
@@ -839,7 +845,7 @@ class StandardController extends AppController {
       if(!empty($this->request->query['search_identifier'])) {
         // XXX temporary implementation -- need more general approach (CO-1053)
         $args = array();
-        $args['conditions']['Identifier.identifier'] = $this->request->query['search_identifier'];
+        $args['conditions']['LOWER(Identifier.identifier) LIKE'] = '%' . strtolower($this->request->query['search_identifier']) . '%';
 
         $orgPooled = $this->CmpEnrollmentConfiguration->orgIdentitiesPooled();
         if(!empty($this->params['url']['coid']) && !$orgPooled) {
@@ -1432,15 +1438,19 @@ class StandardController extends AppController {
   function search() {
     // Construct the URL based on the action mode we're in (select, relink, index, link)
     $action = key($this->data['RedirectAction']);
-
+    
+    $url['controller'] = $this->request->params['controller'];
     $url['action'] = $action;
-    foreach($this->data[$action] as $key => $value) {
-      // pass parameters
-      if(is_int($key) && isset($value['pass'])) {
-        array_push($url, filter_var($value['pass'], FILTER_SANITIZE_SPECIAL_CHARS));
-      } else {
-        foreach ($value as $knamed => $vnamed) {
-          $url[$knamed] = filter_var($vnamed, FILTER_SANITIZE_SPECIAL_CHARS);
+    
+    if(isset($this->data[$action])) {
+      foreach($this->data[$action] as $key => $value) {
+        // pass parameters
+        if(is_int($key) && isset($value['pass'])) {
+          array_push($url, filter_var($value['pass'], FILTER_SANITIZE_SPECIAL_CHARS));
+        } else {
+          foreach($value as $knamed => $vnamed) {
+            $url[$knamed] = filter_var($vnamed, FILTER_SANITIZE_SPECIAL_CHARS);
+          }
         }
       }
     }
